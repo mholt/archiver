@@ -37,7 +37,7 @@ func Zip(zipPath string, filePaths []string) error {
 func zipFile(w *zip.Writer, source string) error {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
-		return fmt.Errorf("error stat'ing %s: %v", source, err)
+		return fmt.Errorf("%s: stat: %v", source, err)
 	}
 
 	var baseDir string
@@ -47,12 +47,12 @@ func zipFile(w *zip.Writer, source string) error {
 
 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("error walking to %s: %v", path, err)
+			return fmt.Errorf("walking to %s: %v", path, err)
 		}
 
 		header, err := zip.FileInfoHeader(info)
 		if err != nil {
-			return fmt.Errorf("error making header for %s: %v", path, err)
+			return fmt.Errorf("%s: getting header: %v", path, err)
 		}
 
 		if baseDir != "" {
@@ -67,7 +67,7 @@ func zipFile(w *zip.Writer, source string) error {
 
 		writer, err := w.CreateHeader(header)
 		if err != nil {
-			return fmt.Errorf("error making header for %s: %v", path, err)
+			return fmt.Errorf("%s: making header: %v", path, err)
 		}
 
 		if info.IsDir() {
@@ -76,13 +76,13 @@ func zipFile(w *zip.Writer, source string) error {
 
 		file, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf("error opening %s: %v", path, err)
+			return fmt.Errorf("%s: opening: %v", path, err)
 		}
 		defer file.Close()
 
 		_, err = io.Copy(writer, file)
 		if err != nil {
-			return fmt.Errorf("error copying contents of %s: %v", path, err)
+			return fmt.Errorf("%s: copying contents: %v", path, err)
 		}
 
 		return nil

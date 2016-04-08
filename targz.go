@@ -41,7 +41,7 @@ func TarGz(targzPath string, filePaths []string) error {
 func tarGzFile(tarWriter *tar.Writer, source string) error {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
-		return fmt.Errorf("error stat'ing %s: %v", source, err)
+		return fmt.Errorf("%s: stat: %v", source, err)
 	}
 
 	var baseDir string
@@ -56,7 +56,7 @@ func tarGzFile(tarWriter *tar.Writer, source string) error {
 
 		header, err := tar.FileInfoHeader(info, path)
 		if err != nil {
-			return fmt.Errorf("error making header for %s: %v", path, err)
+			return fmt.Errorf("%s: making header: %v", path, err)
 		}
 
 		if baseDir != "" {
@@ -69,7 +69,7 @@ func tarGzFile(tarWriter *tar.Writer, source string) error {
 
 		err = tarWriter.WriteHeader(header)
 		if err != nil {
-			return fmt.Errorf("error writing header for %s: %v", path, err)
+			return fmt.Errorf("%s: writing header: %v", path, err)
 		}
 
 		if info.IsDir() {
@@ -78,13 +78,13 @@ func tarGzFile(tarWriter *tar.Writer, source string) error {
 
 		file, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf("error opening %s: %v", path, err)
+			return fmt.Errorf("%s: open: %v", path, err)
 		}
 		defer file.Close()
 
 		_, err = io.Copy(tarWriter, file)
 		if err != nil {
-			return fmt.Errorf("error copying contents of %s: %v", path, err)
+			return fmt.Errorf("%s: copying contents: %v", path, err)
 		}
 
 		return nil
