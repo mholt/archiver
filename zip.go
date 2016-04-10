@@ -177,3 +177,11 @@ var CompressedFormats = map[string]struct{}{
 	".zip":  {},
 	".zipx": {},
 }
+
+type (
+	// CompressFunc is a function that makes an archive.
+	CompressFunc func(string, []string) error
+
+	// DecompressFunc is a function that extracts an archive.
+	DecompressFunc func(string, string) error
+)

@@ -12,7 +12,7 @@ func TestZipAndUnzip(t *testing.T) {
 	symmetricTest(t, ".zip", Zip, Unzip)
 }
 
-func symmetricTest(t *testing.T, ext string, cf compressFunc, dcf decompressFunc) {
+func symmetricTest(t *testing.T, ext string, cf CompressFunc, dcf DecompressFunc) {
 	tmp, err := ioutil.TempDir("", "archiver")
 	if err != nil {
 		t.Fatal(err)
@@ -87,8 +87,3 @@ func symmetricTest(t *testing.T, ext string, cf compressFunc, dcf decompressFunc
 		t.Fatalf("Expected %d resulting files, got %d", want, got)
 	}
 }
-
-type (
-	compressFunc   func(string, []string) error
-	decompressFunc func(string, string) error
-)
