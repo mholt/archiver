@@ -14,11 +14,8 @@ func main() {
 	}
 
 	cmd, filename := os.Args[1], os.Args[2]
-	if cmd != "make" && cmd != "open" {
-		fatal(usage)
-	}
-
 	lowerFilename := strings.ToLower(filename)
+
 	for _, ff := range fileFormats {
 		if !strings.HasSuffix(lowerFilename, ff.ext) {
 			continue
