@@ -1,9 +1,7 @@
-archiver
+archiver [![archiver GoDoc](https://img.shields.io/badge/reference-godoc-blue.svg?style=flat-square)](https://godoc.org/github.com/mholt/archiver)
 ========
 
-Package archiver makes it trivially easy to make .zip and .tar.gz files. Simply give the output filename and a list of files/folders you want included in the archive.
-
-The goal of this package is to make it as easy for Go programmers to make archives as it is for a computer user who just right-clicks and chooses something like "Compress".
+Package archiver makes it trivially easy to make and extract .zip and .tar.gz files. Simply give the input and output file(s).
 
 Files are put into the root of the archive; directories are recursively added.
 
@@ -29,15 +27,21 @@ Create a .tar.gz file:
 err := archiver.TarGz("output.tar.gz", []string{"file.txt",	"folder"})
 ```
 
+Extract a .zip file:
+
+```go
+err := archiver.Unzip("input.zip", "output_folder")
+```
+
+Extract a .tar.gz file:
+
+```go
+err := archiver.UntarGz("input.tar.gz", "output_folder")
+```
+
 
 ## FAQ
 
-#### Can it unzip and untar?
-
-No, because I haven't needed that yet. But if there's enough demand, we can add it. Pull requests welcome! **Remember: a pull request, with test, is best.**
-
-
 #### Can I list a file to go in a different folder in the archive?
 
-No, because I didn't need it to do that. Just structure your source files to mirror the structure in the archive, like you would normally do when you make an archive using your OS.
-
+No, because I don't need it to do that. Just structure your source files to mirror the structure in the archive, like you would normally do when you make an archive using your OS.

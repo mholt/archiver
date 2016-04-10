@@ -90,3 +90,46 @@ func tarGzFile(tarWriter *tar.Writer, source string) error {
 		return nil
 	})
 }
+
+// UntarGz untars source and decompresses the contents into destination.
+func UntarGz(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("%s: failed to open archive: %v", source, err)
+	}
+	defer f.Close()
+
+	gzf, err := gzip.NewReader(f)
+	if err != nil {
+		return fmt.Errorf("%s: create new gzip reader: %v", source, err)
+	}
+	defer gzf.Close()
+
+	tr := tar.NewReader(gzf)
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		if err := untarGzFile(tr, header, destination); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func untarGzFile(tr *tar.Reader, header *tar.Header, destination string) error {
+	switch header.Typeflag {
+	case tar.TypeDir:
+		return mkdir(filepath.Join(destination, header.Name))
+	case tar.TypeReg:
+		return writeNewFile(filepath.Join(destination, header.Name), tr)
+	default:
+		return fmt.Errorf("%s: unknown type flag: %c", header.Name, header.Typeflag)
+	}
+}

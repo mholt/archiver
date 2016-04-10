@@ -99,28 +99,81 @@ func zipFile(w *zip.Writer, source string) error {
 	})
 }
 
+// Unzip unzips the .zip file at source into destination.
+func Unzip(source, destination string) error {
+	r, err := zip.OpenReader(source)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	for _, zf := range r.File {
+		if err := unzipFile(zf, destination); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func unzipFile(zf *zip.File, destination string) error {
+	if strings.HasSuffix(zf.Name, "/") {
+		return mkdir(filepath.Join(destination, zf.Name))
+	}
+
+	rc, err := zf.Open()
+	if err != nil {
+		return fmt.Errorf("%s: open compressed file: %v", zf.Name, err)
+	}
+	defer rc.Close()
+
+	return writeNewFile(filepath.Join(destination, zf.Name), rc)
+}
+
+func writeNewFile(fpath string, in io.Reader) error {
+	out, err := os.Create(fpath)
+	if err != nil {
+		return fmt.Errorf("%s: creating new file: %v", fpath, err)
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return fmt.Errorf("%s: writing file: %v", fpath, err)
+	}
+	return nil
+}
+
+func mkdir(dirPath string) error {
+	err := os.Mkdir(dirPath, 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory: %v", dirPath, err)
+	}
+	return nil
+}
+
 // CompressedFormats is a set of lowercased file extensions
 // for file formats that are typically already compressed.
 // Compressing already-compressed files often results in
 // a larger file. This list is not an exhaustive.
 var CompressedFormats = map[string]struct{}{
-	".7z":   struct{}{},
-	".avi":  struct{}{},
-	".bz2":  struct{}{},
-	".gif":  struct{}{},
-	".gz":   struct{}{},
-	".jpeg": struct{}{},
-	".jpg":  struct{}{},
-	".lz":   struct{}{},
-	".lzma": struct{}{},
-	".mov":  struct{}{},
-	".mp3":  struct{}{},
-	".mp4":  struct{}{},
-	".mpeg": struct{}{},
-	".mpg":  struct{}{},
-	".png":  struct{}{},
-	".rar":  struct{}{},
-	".xz":   struct{}{},
-	".zip":  struct{}{},
-	".zipx": struct{}{},
+	".7z":   {},
+	".avi":  {},
+	".bz2":  {},
+	".gif":  {},
+	".gz":   {},
+	".jpeg": {},
+	".jpg":  {},
+	".lz":   {},
+	".lzma": {},
+	".mov":  {},
+	".mp3":  {},
+	".mp4":  {},
+	".mpeg": {},
+	".mpg":  {},
+	".png":  {},
+	".rar":  {},
+	".xz":   {},
+	".zip":  {},
+	".zipx": {},
 }
