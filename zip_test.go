@@ -1,75 +1,94 @@
 package archiver
 
 import (
-	"archive/zip"
 	"bytes"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
-func TestZip(t *testing.T) {
+func TestZipAndUnzip(t *testing.T) {
+	symmetricTest(t, ".zip", Zip, Unzip)
+}
+
+func symmetricTest(t *testing.T, ext string, cf compressFunc, dcf decompressFunc) {
 	tmp, err := ioutil.TempDir("", "archiver")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmp)
 
-	outfile := filepath.Join(tmp, "test.zip")
-	err = Zip(outfile, []string{
-		"testdata",
-	})
+	// Test creating archive
+	outfile := filepath.Join(tmp, "test"+ext)
+	err = cf(outfile, []string{"testdata"})
 	if err != nil {
-		t.Errorf("Didn't expect an error, but got: %v", err)
+		t.Fatalf("making archive: didn't expect an error, but got: %v", err)
 	}
 
-	var fileCount int
-	filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
-		fileCount++
+	var expectedFileCount int
+	filepath.Walk("testdata", func(fpath string, info os.FileInfo, err error) error {
+		expectedFileCount++
 		return nil
 	})
 
-	r, err := zip.OpenReader(outfile)
+	// Test extracting archive
+	dest := filepath.Join(tmp, "extraction_test")
+	os.Mkdir(dest, 0755)
+	err = dcf(outfile, dest)
 	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-
-	if got, want := len(r.File), fileCount; got != want {
-		t.Fatalf("Expected %d files, got %d", want, got)
+		t.Fatalf("extracting archive: didn't expect an error, but got: %v", err)
 	}
 
-	for _, zf := range r.File {
-		if strings.HasSuffix(zf.Name, "/") {
+	// If outputs equals inputs, we're good; traverse output files
+	// and compare file names, file contents, and file count.
+
+	var actualFileCount int
+	filepath.Walk(dest, func(fpath string, info os.FileInfo, err error) error {
+		if fpath == dest {
+			return nil
+		}
+		actualFileCount++
+
+		origPath, err := filepath.Rel(dest, fpath)
+		if err != nil {
+			t.Fatalf("%s: Error inducing original file path: %v", fpath, err)
+		}
+
+		if info.IsDir() {
 			// stat dir instead of read file
-			_, err := os.Stat(zf.Name)
+			_, err := os.Stat(origPath)
 			if err != nil {
-				t.Fatalf("%s: Couldn't stat directory: %v", zf.Name, err)
+				t.Fatalf("%s: Couldn't stat original directory (%s): %v",
+					fpath, origPath, err)
 			}
-			continue
+			return nil
 		}
 
-		expected, err := ioutil.ReadFile(zf.Name)
+		expected, err := ioutil.ReadFile(origPath)
 		if err != nil {
-			t.Fatalf("%s: Couldn't open from disk: %v", zf.Name, err)
+			t.Fatalf("%s: Couldn't open original file (%s) from disk: %v",
+				fpath, origPath, err)
 		}
 
-		rc, err := zf.Open()
+		actual, err := ioutil.ReadFile(fpath)
 		if err != nil {
-			t.Fatalf("%s: Couldn't open compressed file: %v", zf.Name, err)
+			t.Fatalf("%s: Couldn't open new file from disk: %v", fpath, err)
 		}
-		actual := new(bytes.Buffer)
-		_, err = io.Copy(actual, rc)
-		if err != nil {
-			t.Fatalf("%s: Couldn't read contents of compressed file: %v", zf.Name, err)
-		}
-		rc.Close()
 
-		if !bytes.Equal(expected, actual.Bytes()) {
-			t.Fatalf("%s: File contents differed between on disk and compressed", zf.Name)
+		if !bytes.Equal(expected, actual) {
+			t.Fatalf("%s: File contents differed between on disk and compressed", origPath)
 		}
+
+		return nil
+	})
+
+	if got, want := actualFileCount, expectedFileCount; got != want {
+		t.Fatalf("Expected %d resulting files, got %d", want, got)
 	}
 }
+
+type (
+	compressFunc   func(string, []string) error
+	decompressFunc func(string, string) error
+)
