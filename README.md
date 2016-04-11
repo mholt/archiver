@@ -13,7 +13,7 @@ go get github.com/mholt/archiver
 ```
 
 
-## Use
+## Library Use
 
 Create a .zip file:
 
@@ -21,16 +21,16 @@ Create a .zip file:
 err := archiver.Zip("output.zip", []string{"file.txt", "folder"})
 ```
 
-Create a .tar.gz file:
-
-```go
-err := archiver.TarGz("output.tar.gz", []string{"file.txt",	"folder"})
-```
-
 Extract a .zip file:
 
 ```go
 err := archiver.Unzip("input.zip", "output_folder")
+```
+
+Create a .tar.gz file:
+
+```go
+err := archiver.TarGz("output.tar.gz", []string{"file.txt",	"folder"})
 ```
 
 Extract a .tar.gz file:
@@ -40,8 +40,35 @@ err := archiver.UntarGz("input.tar.gz", "output_folder")
 ```
 
 
+## Command Use
+
+Make a new archive:
+
+```bash
+$ archiver make [archive name] [input files...]
+```
+
+(At least one input file is required.)
+
+To extract an archive:
+
+```bash
+$ archiver open [archive name] [destination]
+```
+
+(The destination path is optional; default is current directory.)
+
+The archive name must end with a supported file extension like .zip or .tar.gz&mdash;this is how it knows what kind of archive to make.
+
+
+
 ## FAQ
 
 #### Can I list a file to go in a different folder in the archive?
 
-No, because I don't need it to do that. Just structure your source files to mirror the structure in the archive, like you would normally do when you make an archive using your OS.
+No, because I didn't need it to do that. Just structure your source files to mirror the structure in the archive, like you would normally do when you make an archive using your OS.
+
+
+#### Can it add files to an existing archive?
+
+Nope. It just makes new archives or extracts existing ones.
