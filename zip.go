@@ -131,6 +131,11 @@ func unzipFile(zf *zip.File, destination string) error {
 }
 
 func writeNewFile(fpath string, in io.Reader) error {
+	err := os.MkdirAll(path.Dir(fpath), 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+	}
+
 	out, err := os.Create(fpath)
 	if err != nil {
 		return fmt.Errorf("%s: creating new file: %v", fpath, err)
