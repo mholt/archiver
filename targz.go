@@ -128,7 +128,9 @@ func untarGzFile(tr *tar.Reader, header *tar.Header, destination string) error {
 	case tar.TypeDir:
 		return mkdir(filepath.Join(destination, header.Name))
 	case tar.TypeReg:
-		return writeNewFile(filepath.Join(destination, header.Name), tr)
+		return writeNewFile(filepath.Join(destination, header.Name), tr, header.FileInfo().Mode())
+	case tar.TypeSymlink:
+		return writeNewSymbolicLink(filepath.Join(destination, header.Name), header.Linkname)
 	default:
 		return fmt.Errorf("%s: unknown type flag: %c", header.Name, header.Typeflag)
 	}
