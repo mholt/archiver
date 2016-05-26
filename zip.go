@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"runtime"
 )
 
 // Zip creates a .zip file in the location zipPath containing
@@ -146,7 +147,9 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 
 	err = out.Chmod(fm)
 	if err != nil {
-		return fmt.Errorf("%s: changing file mode: %v", fpath, err)
+		if runtime.GOOS != "windows" {
+			return fmt.Errorf("%s: changing file mode: %v", fpath, err)
+		}
 	}
 
 	_, err = io.Copy(out, in)
