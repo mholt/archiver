@@ -76,17 +76,18 @@ func tarGzFile(tarWriter *tar.Writer, source string) error {
 			return nil
 		}
 
-		file, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("%s: open: %v", path, err)
-		}
-		defer file.Close()
+		if header.Typeflag == tar.TypeReg {
+			file, err := os.Open(path)
+			if err != nil {
+				return fmt.Errorf("%s: open: %v", path, err)
+			}
+			defer file.Close()
 
-		_, err = io.Copy(tarWriter, file)
-		if err != nil {
-			return fmt.Errorf("%s: copying contents: %v", path, err)
+			_, err = io.Copy(tarWriter, file)
+			if err != nil {
+				return fmt.Errorf("%s: copying contents: %v", path, err)
+			}
 		}
-
 		return nil
 	})
 }

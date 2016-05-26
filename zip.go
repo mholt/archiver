@@ -84,15 +84,17 @@ func zipFile(w *zip.Writer, source string) error {
 			return nil
 		}
 
-		file, err := os.Open(fpath)
-		if err != nil {
-			return fmt.Errorf("%s: opening: %v", fpath, err)
-		}
-		defer file.Close()
+		if header.Mode().IsRegular() {
+			file, err := os.Open(fpath)
+			if err != nil {
+				return fmt.Errorf("%s: opening: %v", fpath, err)
+			}
+			defer file.Close()
 
-		_, err = io.Copy(writer, file)
-		if err != nil {
-			return fmt.Errorf("%s: copying contents: %v", fpath, err)
+			_, err = io.Copy(writer, file)
+			if err != nil {
+				return fmt.Errorf("%s: copying contents: %v", fpath, err)
+			}
 		}
 
 		return nil
