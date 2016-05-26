@@ -8,8 +8,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"runtime"
+	"strings"
 )
 
 // Zip creates a .zip file in the location zipPath containing
