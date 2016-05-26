@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -84,15 +85,17 @@ func zipFile(w *zip.Writer, source string) error {
 			return nil
 		}
 
-		file, err := os.Open(fpath)
-		if err != nil {
-			return fmt.Errorf("%s: opening: %v", fpath, err)
-		}
-		defer file.Close()
+		if header.Mode().IsRegular() {
+			file, err := os.Open(fpath)
+			if err != nil {
+				return fmt.Errorf("%s: opening: %v", fpath, err)
+			}
+			defer file.Close()
 
-		_, err = io.Copy(writer, file)
-		if err != nil {
-			return fmt.Errorf("%s: copying contents: %v", fpath, err)
+			_, err = io.Copy(writer, file)
+			if err != nil {
+				return fmt.Errorf("%s: copying contents: %v", fpath, err)
+			}
 		}
 
 		return nil
@@ -144,7 +147,9 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 
 	err = out.Chmod(fm)
 	if err != nil {
-		return fmt.Errorf("%s: changing file mode: %v", fpath, err)
+		if runtime.GOOS != "windows" {
+			return fmt.Errorf("%s: changing file mode: %v", fpath, err)
+		}
 	}
 
 	_, err = io.Copy(out, in)
