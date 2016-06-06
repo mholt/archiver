@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -84,15 +85,17 @@ func zipFile(w *zip.Writer, source string) error {
 			return nil
 		}
 
-		file, err := os.Open(fpath)
-		if err != nil {
-			return fmt.Errorf("%s: opening: %v", fpath, err)
-		}
-		defer file.Close()
+		if header.Mode().IsRegular() {
+			file, err := os.Open(fpath)
+			if err != nil {
+				return fmt.Errorf("%s: opening: %v", fpath, err)
+			}
+			defer file.Close()
 
-		_, err = io.Copy(writer, file)
-		if err != nil {
-			return fmt.Errorf("%s: copying contents: %v", fpath, err)
+			_, err = io.Copy(writer, file)
+			if err != nil {
+				return fmt.Errorf("%s: copying contents: %v", fpath, err)
+			}
 		}
 
 		return nil
@@ -127,10 +130,10 @@ func unzipFile(zf *zip.File, destination string) error {
 	}
 	defer rc.Close()
 
-	return writeNewFile(filepath.Join(destination, zf.Name), rc)
+	return writeNewFile(filepath.Join(destination, zf.Name), rc, zf.FileInfo().Mode())
 }
 
-func writeNewFile(fpath string, in io.Reader) error {
+func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 	err := os.MkdirAll(path.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -142,10 +145,29 @@ func writeNewFile(fpath string, in io.Reader) error {
 	}
 	defer out.Close()
 
+	err = out.Chmod(fm)
+	if err != nil && runtime.GOOS != "windows" {
+		return fmt.Errorf("%s: changing file mode: %v", fpath, err)
+	}
+
 	_, err = io.Copy(out, in)
 	if err != nil {
 		return fmt.Errorf("%s: writing file: %v", fpath, err)
 	}
+	return nil
+}
+
+func writeNewSymbolicLink(fpath string, target string) error {
+	err := os.MkdirAll(path.Dir(fpath), 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+	}
+
+	err = os.Symlink(target, fpath)
+	if err != nil {
+		return fmt.Errorf("%s: making symbolic link for: %v", fpath, err)
+	}
+
 	return nil
 }
 

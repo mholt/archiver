@@ -65,17 +65,29 @@ func symmetricTest(t *testing.T, ext string, cf CompressFunc, dcf DecompressFunc
 			return nil
 		}
 
+		expectedFileInfo, err := os.Stat(origPath)
+		if err != nil {
+			t.Fatalf("%s: Error obtaining original file info: %v", fpath, err)
+		}
 		expected, err := ioutil.ReadFile(origPath)
 		if err != nil {
 			t.Fatalf("%s: Couldn't open original file (%s) from disk: %v",
 				fpath, origPath, err)
 		}
 
+		actualFileInfo, err := os.Stat(fpath)
+		if err != nil {
+			t.Fatalf("%s: Error obtaining actual file info: %v", fpath, err)
+		}
 		actual, err := ioutil.ReadFile(fpath)
 		if err != nil {
 			t.Fatalf("%s: Couldn't open new file from disk: %v", fpath, err)
 		}
 
+		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
+			t.Fatalf("%s: File mode differed between on disk and compressed",
+				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
+		}
 		if !bytes.Equal(expected, actual) {
 			t.Fatalf("%s: File contents differed between on disk and compressed", origPath)
 		}
