@@ -146,10 +146,8 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 	defer out.Close()
 
 	err = out.Chmod(fm)
-	if err != nil {
-		if runtime.GOOS != "windows" {
-			return fmt.Errorf("%s: changing file mode: %v", fpath, err)
-		}
+	if err != nil && runtime.GOOS != "windows" {
+		return fmt.Errorf("%s: changing file mode: %v", fpath, err)
 	}
 
 	_, err = io.Copy(out, in)
