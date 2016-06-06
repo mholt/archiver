@@ -5,12 +5,39 @@ Package archiver makes it trivially easy to make and extract .zip and .tar.gz fi
 
 Files are put into the root of the archive; directories are recursively added.
 
+The `archiver` command runs the same cross-platform and has no external dependencies (not even libc); powered by the Go standard library. Enjoy.
+
 
 ## Install
 
 ```bash
 go get github.com/mholt/archiver
 ```
+
+Or download from the [releases](https://github.com/mholt/archiver/releases) page.
+
+
+## Command Use
+
+Make a new archive:
+
+```bash
+$ archiver make [archive name] [input files...]
+```
+
+(At least one input file is required.)
+
+To extract an archive:
+
+```bash
+$ archiver open [archive name] [destination]
+```
+
+(The destination path is optional; default is current directory.)
+
+The archive name must end with a supported file extension like .zip or .tar.gz&mdash;this is how it knows what kind of archive to make.
+
+
 
 
 ## Library Use
@@ -40,35 +67,14 @@ err := archiver.UntarGz("input.tar.gz", "output_folder")
 ```
 
 
-## Command Use
-
-Make a new archive:
-
-```bash
-$ archiver make [archive name] [input files...]
-```
-
-(At least one input file is required.)
-
-To extract an archive:
-
-```bash
-$ archiver open [archive name] [destination]
-```
-
-(The destination path is optional; default is current directory.)
-
-The archive name must end with a supported file extension like .zip or .tar.gz&mdash;this is how it knows what kind of archive to make.
-
-
 
 ## FAQ
 
 #### Can I list a file to go in a different folder in the archive?
 
-No, because I didn't need it to do that. Just structure your source files to mirror the structure in the archive, like you would normally do when you make an archive using your OS.
+No. Just structure your input files to mirror the structure you want in the archive, like you would normally do when you make an archive using your OS.
 
 
 #### Can it add files to an existing archive?
 
-Nope. It just makes new archives or extracts existing ones.
+Nope. It's a simple tool; it just makes new archives or extracts existing ones.

@@ -1,4 +1,5 @@
-// Package archiver makes it super easy to create .zip and .tar.gz archives.
+// Package archiver makes it super easy to create and open .zip and
+// .tar.gz files.
 package archiver
 
 import (
