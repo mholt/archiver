@@ -173,7 +173,7 @@ func writeNewSymbolicLink(fpath string, target string) error {
 }
 
 func mkdir(dirPath string) error {
-	err := os.Mkdir(dirPath, 0755)
+	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory: %v", dirPath, err)
 	}

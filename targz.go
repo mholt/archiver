@@ -28,17 +28,24 @@ func TarGz(targzPath string, filePaths []string) error {
 	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
 
+	return tarball(filePaths, tarWriter, targzPath)
+}
+
+// tarball writes all files listed in filePaths into tarWriter, which is
+// writing into a file located at dest.
+func tarball(filePaths []string, tarWriter *tar.Writer, dest string) error {
 	for _, fpath := range filePaths {
-		err := tarGzFile(tarWriter, fpath)
+		err := tarFile(tarWriter, fpath, dest)
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func tarGzFile(tarWriter *tar.Writer, source string) error {
+// tarFile writes the file at source into tarWriter. It does so
+// recursively for directories.
+func tarFile(tarWriter *tar.Writer, source, dest string) error {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		return fmt.Errorf("%s: stat: %v", source, err)
@@ -61,6 +68,11 @@ func tarGzFile(tarWriter *tar.Writer, source string) error {
 
 		if baseDir != "" {
 			header.Name = filepath.Join(baseDir, strings.TrimPrefix(path, source))
+		}
+
+		if header.Name == dest {
+			// our new tar file is inside the directory being archived; skip it
+			return nil
 		}
 
 		if info.IsDir() {
@@ -100,14 +112,17 @@ func UntarGz(source, destination string) error {
 	}
 	defer f.Close()
 
-	gzf, err := gzip.NewReader(f)
+	gzr, err := gzip.NewReader(f)
 	if err != nil {
 		return fmt.Errorf("%s: create new gzip reader: %v", source, err)
 	}
-	defer gzf.Close()
+	defer gzr.Close()
 
-	tr := tar.NewReader(gzf)
+	return untar(tar.NewReader(gzr), destination)
+}
 
+// untar un-tarballs the contents of tr into destination.
+func untar(tr *tar.Reader, destination string) error {
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -116,15 +131,15 @@ func UntarGz(source, destination string) error {
 			return err
 		}
 
-		if err := untarGzFile(tr, header, destination); err != nil {
+		if err := untarFile(tr, header, destination); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func untarGzFile(tr *tar.Reader, header *tar.Header, destination string) error {
+// untarFile untars a single file from tr with header header into destination.
+func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
 	switch header.Typeflag {
 	case tar.TypeDir:
 		return mkdir(filepath.Join(destination, header.Name))
