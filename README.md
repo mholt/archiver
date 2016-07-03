@@ -1,20 +1,26 @@
 archiver [![archiver GoDoc](https://img.shields.io/badge/reference-godoc-blue.svg?style=flat-square)](https://godoc.org/github.com/mholt/archiver) [![Linux Build Status](https://img.shields.io/travis/mholt/archiver.svg?style=flat-square&label=linux+build)](https://travis-ci.org/mholt/archiver) [![Windows Build Status](https://img.shields.io/appveyor/ci/mholt/archiver.svg?style=flat-square&label=windows+build)](https://ci.appveyor.com/project/mholt/archiver)
 ========
 
-Package archiver makes it trivially easy to make and extract .zip and .tar.gz files. Simply give the input and output file(s).
+Package archiver makes it trivially easy to make and extract common archive formats such as .zip, .tar.gz, and .tar.bz2. Simply name the input and output file(s).
 
 Files are put into the root of the archive; directories are recursively added.
 
-The `archiver` command runs the same cross-platform and has no external dependencies (not even libc); powered by the Go standard library. Enjoy.
+The `archiver` command runs the same cross-platform and has no external dependencies (not even libc); powered by the Go standard library and [dsnet/compress](https://github.com/dsnet/compress). Enjoy!
+
+Supported formats/extensions:
+
+- .zip
+- .tar.gz (.tgz)
+- .tar.bz2
 
 
 ## Install
 
 ```bash
-go get github.com/mholt/archiver
+go get github.com/mholt/cmd/archiver
 ```
 
-Or download from the [releases](https://github.com/mholt/archiver/releases) page.
+Or download binaries from the [releases](https://github.com/mholt/archiver/releases) page.
 
 
 ## Command Use
@@ -35,12 +41,14 @@ $ archiver open [archive name] [destination]
 
 (The destination path is optional; default is current directory.)
 
-The archive name must end with a supported file extension like .zip or .tar.gz&mdash;this is how it knows what kind of archive to make.
-
-
+The archive name must end with a supported file extension&mdash;this is how it knows what kind of archive to make. Run `archiver -h` for more help.
 
 
 ## Library Use
+
+```go
+import "github.com/mholt/archiver"
+```
 
 Create a .zip file:
 
@@ -54,27 +62,17 @@ Extract a .zip file:
 err := archiver.Unzip("input.zip", "output_folder")
 ```
 
-Create a .tar.gz file:
-
-```go
-err := archiver.TarGz("output.tar.gz", []string{"file.txt",	"folder"})
-```
-
-Extract a .tar.gz file:
-
-```go
-err := archiver.UntarGz("input.tar.gz", "output_folder")
-```
+Working with other file formats is exactly the same, but with [their own functions](https://godoc.org/github.com/mholt/archiver).
 
 
 
 ## FAQ
 
-#### Can I list a file to go in a different folder in the archive?
+#### Can I list a file in one folder to go into a different folder in the archive?
 
-No. Just structure your input files to mirror the structure you want in the archive, like you would normally do when you make an archive using your OS.
+No. This works just like your OS would make an archive in Finder or File Explorer: organize your input files to mirror the structure you want in the archive.
 
 
 #### Can it add files to an existing archive?
 
-Nope. It's a simple tool; it just makes new archives or extracts existing ones.
+Nope. This is a simple tool; it just makes new archives or extracts existing ones.

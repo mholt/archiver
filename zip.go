@@ -1,5 +1,5 @@
-// Package archiver makes it super easy to create and open .zip and
-// .tar.gz files.
+// Package archiver makes it super easy to create and open .zip,
+// .tar.gz, and .tar.bz2 files.
 package archiver
 
 import (
@@ -180,16 +180,19 @@ func mkdir(dirPath string) error {
 	return nil
 }
 
-// CompressedFormats is a set of lowercased file extensions
-// for file formats that are typically already compressed.
-// Compressing already-compressed files often results in
-// a larger file. This list is not an exhaustive.
+// CompressedFormats is a (non-exhaustive) set of lowercased
+// file extensions for formats that are typically already
+// compressed. Compressing already-compressed files often
+// results in a larger file, so when possible, we check this
+// set to avoid that.
 var CompressedFormats = map[string]struct{}{
 	".7z":   {},
 	".avi":  {},
 	".bz2":  {},
+	".cab":  {},
 	".gif":  {},
 	".gz":   {},
+	".jar":  {},
 	".jpeg": {},
 	".jpg":  {},
 	".lz":   {},
@@ -201,6 +204,7 @@ var CompressedFormats = map[string]struct{}{
 	".mpg":  {},
 	".png":  {},
 	".rar":  {},
+	".tgz":  {},
 	".xz":   {},
 	".zip":  {},
 	".zipx": {},
