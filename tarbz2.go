@@ -20,7 +20,10 @@ func TarBz2(tarbz2Path string, filePaths []string) error {
 	}
 	defer out.Close()
 
-	bz2Writer := bzip2.NewWriter(out)
+	bz2Writer, err := bzip2.NewWriter(out, nil)
+	if err != nil {
+		return fmt.Errorf("error compressing %s: %v", tarbz2Path, err)
+	}
 	defer bz2Writer.Close()
 
 	tarWriter := tar.NewWriter(bz2Writer)
@@ -37,7 +40,10 @@ func UntarBz2(source, destination string) error {
 	}
 	defer f.Close()
 
-	bz2r := bzip2.NewReader(f)
+	bz2r, err := bzip2.NewReader(f, nil)
+	if err != nil {
+		return fmt.Errorf("error decompressing %s: %v", source, err)
+	}
 	defer bz2r.Close()
 
 	return untar(tar.NewReader(bz2r), destination)
