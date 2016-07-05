@@ -72,6 +72,7 @@ const usage = `Usage: archiver {make|open} <archive file> [files...]
       .tar.gz
       .tgz
       .tar.bz2
+      .rar (open only)
 
   Existing files:
     When creating an archive file that already exists,
@@ -89,4 +90,5 @@ var fileFormats = []struct {
 	{ext: ".tar.gz", create: archiver.TarGz, extract: archiver.UntarGz},
 	{ext: ".tgz", create: archiver.TarGz, extract: archiver.UntarGz},
 	{ext: ".tar.bz2", create: archiver.TarBz2, extract: archiver.UntarBz2},
+	{ext: ".rar", create: archiver.Rar, extract: archiver.Unrar},
 }

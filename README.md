@@ -1,17 +1,19 @@
 archiver [![archiver GoDoc](https://img.shields.io/badge/reference-godoc-blue.svg?style=flat-square)](https://godoc.org/github.com/mholt/archiver) [![Linux Build Status](https://img.shields.io/travis/mholt/archiver.svg?style=flat-square&label=linux+build)](https://travis-ci.org/mholt/archiver) [![Windows Build Status](https://img.shields.io/appveyor/ci/mholt/archiver.svg?style=flat-square&label=windows+build)](https://ci.appveyor.com/project/mholt/archiver)
 ========
 
-Package archiver makes it trivially easy to make and extract common archive formats such as .zip, .tar.gz, and .tar.bz2. Simply name the input and output file(s).
+Package archiver makes it trivially easy to make and extract common archive formats such as .zip, and .tar.gz. Simply name the input and output file(s).
 
 Files are put into the root of the archive; directories are recursively added.
 
-The `archiver` command runs the same cross-platform and has no external dependencies (not even libc); powered by the Go standard library and [dsnet/compress](https://github.com/dsnet/compress). Enjoy!
+The `archiver` command runs the same cross-platform and has no external dependencies (not even libc); powered by the Go standard library, [dsnet/compress](https://github.com/dsnet/compress), and [nwaples/rardecode](https://github.com/nwaples/rardecode). Enjoy!
 
 Supported formats/extensions:
 
 - .zip
-- .tar.gz (.tgz)
+- .tar.gz
+- .tgz
 - .tar.bz2
+- .rar (open)
 
 
 ## Install
@@ -70,7 +72,7 @@ Working with other file formats is exactly the same, but with [their own functio
 
 #### Can I list a file in one folder to go into a different folder in the archive?
 
-No. This works just like your OS would make an archive in Finder or File Explorer: organize your input files to mirror the structure you want in the archive.
+No. This works just like your OS would make an archive in the file explorer: organize your input files to mirror the structure you want in the archive.
 
 
 #### Can it add files to an existing archive?
