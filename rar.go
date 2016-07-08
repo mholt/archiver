@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/nwaples/rardecode"
 )
@@ -36,6 +37,23 @@ func Unrar(source, destination string) error {
 			break
 		} else if err != nil {
 			return err
+		}
+		
+		pathComponents := strings.Split(header.Name, "/")
+
+		for pi, path := range pathComponents {
+			// the last component of the path will be the file
+			// so ignore it, since we only want to create folders
+			if pi == len(pathComponents)-1 {
+				continue
+			}
+
+			// check to see if the path exists already
+			if stat, err := os.Stat(destination + path); err != nil || !stat.IsDir() {
+				// make the directory
+				mkdir(destination + path)
+				continue
+			}
 		}
 
 		if header.IsDir {
