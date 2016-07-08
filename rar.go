@@ -10,8 +10,6 @@ import (
 	"github.com/nwaples/rardecode"
 )
 
-var checkedForSubfolders map[string]bool = make(map[string]bool)
-
 // Rar makes a .rar archive, but this is not implemented because
 // RAR is a proprietary format. It is here only for symmetry with
 // the other archive formats in this package.
@@ -33,6 +31,9 @@ func Unrar(source, destination string) error {
 		return fmt.Errorf("%s: failed to create reader: %v", source, err)
 	}
 
+	// we should only parse for subfolders once per unrar request
+	subfoldersCreated := false
+
 	for {
 		header, err := rr.Next()
 		if err == io.EOF {
@@ -42,7 +43,10 @@ func Unrar(source, destination string) error {
 		}
 
 		// make subfolders for this path
-		makeSubfolders(filepath.Dir(header.Name), destination)
+		if !subfoldersCreated {
+			makeSubfolders(filepath.Dir(header.Name), destination)
+			subfoldersCreated = true
+		}
 
 		if header.IsDir {
 			err = mkdir(filepath.Join(destination, header.Name))
@@ -64,12 +68,6 @@ func Unrar(source, destination string) error {
 // makeSubfolders will parse a path string for subfolders
 // and create them as needed.
 func makeSubfolders(path string, destination string) {
-
-	// return if we've already processed this path
-	if checkedForSubfolders[path] {
-		return
-	}
-
 	// parse path for subfolders
 	for _, subfolder := range strings.Split(path, "/") {
 		filepath.Dir(subfolder)
@@ -81,5 +79,4 @@ func makeSubfolders(path string, destination string) {
 			continue
 		}
 	}
-	checkedForSubfolders[path] = true
 }
