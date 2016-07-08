@@ -70,8 +70,6 @@ func Unrar(source, destination string) error {
 func makeSubfolders(path string, destination string) {
 	// parse path for subfolders
 	for _, subfolder := range strings.Split(path, "/") {
-		filepath.Dir(subfolder)
-
 		// check to see if the subfolder exists already
 		if stat, err := os.Stat(destination + subfolder); err != nil || !stat.IsDir() {
 			// make the directory
