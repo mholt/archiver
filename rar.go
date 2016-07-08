@@ -10,6 +10,8 @@ import (
 	"github.com/nwaples/rardecode"
 )
 
+var checkedForSubfolders map[string]bool = make(map[string]bool)
+
 // Rar makes a .rar archive, but this is not implemented because
 // RAR is a proprietary format. It is here only for symmetry with
 // the other archive formats in this package.
@@ -38,23 +40,9 @@ func Unrar(source, destination string) error {
 		} else if err != nil {
 			return err
 		}
-		
-		pathComponents := strings.Split(header.Name, "/")
 
-		for pi, path := range pathComponents {
-			// the last component of the path will be the file
-			// so ignore it, since we only want to create folders
-			if pi == len(pathComponents)-1 {
-				continue
-			}
-
-			// check to see if the path exists already
-			if stat, err := os.Stat(destination + path); err != nil || !stat.IsDir() {
-				// make the directory
-				mkdir(destination + path)
-				continue
-			}
-		}
+		// make subfolders for this path
+		makeSubfolders(filepath.Dir(header.Name), destination)
 
 		if header.IsDir {
 			err = mkdir(filepath.Join(destination, header.Name))
@@ -71,4 +59,27 @@ func Unrar(source, destination string) error {
 	}
 
 	return nil
+}
+
+// makeSubfolders will parse a path string for subfolders
+// and create them as needed.
+func makeSubfolders(path string, destination string) {
+
+	// return if we've already processed this path
+	if checkedForSubfolders[path] {
+		return
+	}
+
+	// parse path for subfolders
+	for _, subfolder := range strings.Split(path, "/") {
+		filepath.Dir(subfolder)
+
+		// check to see if the subfolder exists already
+		if stat, err := os.Stat(destination + subfolder); err != nil || !stat.IsDir() {
+			// make the directory
+			mkdir(destination + subfolder)
+			continue
+		}
+	}
+	checkedForSubfolders[path] = true
 }
