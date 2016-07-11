@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/nwaples/rardecode"
 )
@@ -31,21 +30,12 @@ func Unrar(source, destination string) error {
 		return fmt.Errorf("%s: failed to create reader: %v", source, err)
 	}
 
-	// we should only parse for subfolders once per unrar request
-	subfoldersCreated := false
-
 	for {
 		header, err := rr.Next()
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return err
-		}
-
-		// make subfolders for this path
-		if !subfoldersCreated {
-			makeSubfolders(filepath.Dir(header.Name), destination)
-			subfoldersCreated = true
 		}
 
 		if header.IsDir {
@@ -56,6 +46,11 @@ func Unrar(source, destination string) error {
 			continue
 		}
 
+		err = mkdir(filepath.Dir(filepath.Join(destination, header.Name)))
+		if err != nil {
+			return err
+		}
+
 		err = writeNewFile(filepath.Join(destination, header.Name), rr, header.Mode())
 		if err != nil {
 			return err
@@ -63,18 +58,4 @@ func Unrar(source, destination string) error {
 	}
 
 	return nil
-}
-
-// makeSubfolders will parse a path string for subfolders
-// and create them as needed.
-func makeSubfolders(path string, destination string) {
-	// parse path for subfolders
-	for _, subfolder := range strings.Split(path, "/") {
-		// check to see if the subfolder exists already
-		if stat, err := os.Stat(destination + subfolder); err != nil || !stat.IsDir() {
-			// make the directory
-			mkdir(destination + subfolder)
-			continue
-		}
-	}
 }
