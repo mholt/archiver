@@ -19,7 +19,7 @@ Supported formats/extensions:
 ## Install
 
 ```bash
-go get github.com/mholt/cmd/archiver
+go get github.com/mholt/archiver/cmd/archiver
 ```
 
 Or download binaries from the [releases](https://github.com/mholt/archiver/releases) page.

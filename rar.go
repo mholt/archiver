@@ -46,6 +46,8 @@ func Unrar(source, destination string) error {
 			continue
 		}
 
+		// if files come before their containing folders, then we must
+		// create their folders before writing the file
 		err = mkdir(filepath.Dir(filepath.Join(destination, header.Name)))
 		if err != nil {
 			return err
