@@ -46,6 +46,11 @@ func Unrar(source, destination string) error {
 			continue
 		}
 
+		err = mkdir(filepath.Dir(filepath.Join(destination, header.Name)))
+		if err != nil {
+			return err
+		}
+
 		err = writeNewFile(filepath.Join(destination, header.Name), rr, header.Mode())
 		if err != nil {
 			return err
