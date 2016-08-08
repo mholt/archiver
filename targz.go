@@ -95,8 +95,8 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 			}
 			defer file.Close()
 
-			_, err = io.Copy(tarWriter, file)
-			if err != nil {
+			_, err = io.CopyN(tarWriter, file, info.Size())
+			if err != nil && err != io.EOF {
 				return fmt.Errorf("%s: copying contents: %v", path, err)
 			}
 		}
