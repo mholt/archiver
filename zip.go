@@ -94,7 +94,7 @@ func zipFile(w *zip.Writer, source string) error {
 			defer file.Close()
 
             _, err = io.CopyN(writer, file, info.Size())
-			if err != nil {
+			if err != nil && err!= io.EOF{
 				return fmt.Errorf("%s: copying contents: %v", fpath, err)
 			}
 		}
