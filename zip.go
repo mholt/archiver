@@ -135,7 +135,7 @@ func unzipFile(zf *zip.File, destination string) error {
 }
 
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
-	err := os.MkdirAll(path.Dir(fpath), 0755)
+	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
 	}
@@ -159,7 +159,7 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 }
 
 func writeNewSymbolicLink(fpath string, target string) error {
-	err := os.MkdirAll(path.Dir(fpath), 0755)
+	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
 	}
