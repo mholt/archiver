@@ -62,7 +62,7 @@ func zipFile(w *zip.Writer, source string) error {
 		}
 
 		if baseDir != "" {
-			header.Name = filepath.Join(baseDir, strings.TrimPrefix(fpath, source))
+			header.Name = path.Join(baseDir, strings.TrimPrefix(fpath, source))
 		}
 
 		if info.IsDir() {
