@@ -10,6 +10,7 @@ The `archiver` command runs the same cross-platform and has no external dependen
 Supported formats/extensions:
 
 - .zip
+- .tar
 - .tar.gz
 - .tgz
 - .tar.bz2

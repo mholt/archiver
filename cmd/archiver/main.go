@@ -69,6 +69,7 @@ const usage = `Usage: archiver {make|open} <archive file> [files...]
     The format of the archive is determined by its
     file extension. Supported extensions:
       .zip
+      .tar
       .tar.gz
       .tgz
       .tar.bz2
@@ -83,10 +84,11 @@ const usage = `Usage: archiver {make|open} <archive file> [files...]
 
 var fileFormats = []struct {
 	ext     string
-	create  archiver.CompressFunc
-	extract archiver.DecompressFunc
+	create  archiver.MakeFunc
+	extract archiver.OpenFunc
 }{
 	{ext: ".zip", create: archiver.Zip, extract: archiver.Unzip},
+	{ext: ".tar", create: archiver.Tar, extract: archiver.Untar},
 	{ext: ".tar.gz", create: archiver.TarGz, extract: archiver.UntarGz},
 	{ext: ".tgz", create: archiver.TarGz, extract: archiver.UntarGz},
 	{ext: ".tar.bz2", create: archiver.TarBz2, extract: archiver.UntarBz2},

@@ -12,7 +12,10 @@ func TestZipAndUnzip(t *testing.T) {
 	symmetricTest(t, ".zip", Zip, Unzip)
 }
 
-func symmetricTest(t *testing.T, ext string, cf CompressFunc, dcf DecompressFunc) {
+// symmetricTest performs a symmetric test by using mf to make an archive
+// from the test corpus, then using of to open the archive and comparing
+// the contents to ensure they are equal.
+func symmetricTest(t *testing.T, ext string, mf MakeFunc, of OpenFunc) {
 	tmp, err := ioutil.TempDir("", "archiver")
 	if err != nil {
 		t.Fatal(err)
@@ -21,7 +24,7 @@ func symmetricTest(t *testing.T, ext string, cf CompressFunc, dcf DecompressFunc
 
 	// Test creating archive
 	outfile := filepath.Join(tmp, "test"+ext)
-	err = cf(outfile, []string{"testdata"})
+	err = mf(outfile, []string{"testdata"})
 	if err != nil {
 		t.Fatalf("making archive: didn't expect an error, but got: %v", err)
 	}
@@ -35,7 +38,7 @@ func symmetricTest(t *testing.T, ext string, cf CompressFunc, dcf DecompressFunc
 	// Test extracting archive
 	dest := filepath.Join(tmp, "extraction_test")
 	os.Mkdir(dest, 0755)
-	err = dcf(outfile, dest)
+	err = of(outfile, dest)
 	if err != nil {
 		t.Fatalf("extracting archive: didn't expect an error, but got: %v", err)
 	}

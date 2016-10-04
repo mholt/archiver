@@ -10,11 +10,27 @@ import (
 	"strings"
 )
 
-// TarGz creates a .tar.gz file at targzPath containing
-// the contents of files listed in filePaths. File paths
-// can be those of regular files or directories. Regular
+// Tar creates a .tar file at tarPath containing the
+// contents of files listed in filePaths. File paths can
+// be those of regular files or directories. Regular
 // files are stored at the 'root' of the archive, and
 // directories are recursively added.
+func Tar(tarPath string, filePaths []string) error {
+	out, err := os.Create(tarPath)
+	if err != nil {
+		return fmt.Errorf("error creating %s: %v", tarPath, err)
+	}
+	defer out.Close()
+
+	tarWriter := tar.NewWriter(out)
+	defer tarWriter.Close()
+
+	return tarball(filePaths, tarWriter, tarPath)
+}
+
+// TarGz creates a .tar.gz file at targzPath containing
+// the contents of files listed in filePaths. It works
+// the same way Tar does, but with gzip compression.
 func TarGz(targzPath string, filePaths []string) error {
 	out, err := os.Create(targzPath)
 	if err != nil {
@@ -102,6 +118,17 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 		}
 		return nil
 	})
+}
+
+// Untar untars source and puts the contents into destination.
+func Untar(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("%s: failed to open archive: %v", source, err)
+	}
+	defer f.Close()
+
+	return untar(tar.NewReader(f), destination)
 }
 
 // UntarGz untars source and decompresses the contents into destination.

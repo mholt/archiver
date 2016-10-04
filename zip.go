@@ -211,9 +211,9 @@ var CompressedFormats = map[string]struct{}{
 }
 
 type (
-	// CompressFunc is a function that makes an archive.
-	CompressFunc func(string, []string) error
+	// MakeFunc is a function that makes an archive.
+	MakeFunc func(string, []string) error
 
-	// DecompressFunc is a function that extracts an archive.
-	DecompressFunc func(string, string) error
+	// OpenFunc is a function that extracts an archive.
+	OpenFunc func(string, string) error
 )
