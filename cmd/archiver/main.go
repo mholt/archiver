@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/mholt/archiver"
 )
@@ -14,10 +13,9 @@ func main() {
 	}
 
 	cmd, filename := os.Args[1], os.Args[2]
-	lowerFilename := strings.ToLower(filename)
 
-	for _, ff := range fileFormats {
-		if !strings.HasSuffix(lowerFilename, ff.ext) {
+	for _, ff := range archiver.SupportedFormats {
+		if !ff.Match(filename) {
 			continue
 		}
 		var err error
@@ -26,7 +24,7 @@ func main() {
 			if len(os.Args) < 4 {
 				fatal(usage)
 			}
-			err = ff.create(filename, os.Args[3:])
+			err = ff.Make(filename, os.Args[3:])
 		case "open":
 			dest := ""
 			if len(os.Args) == 4 {
@@ -34,7 +32,7 @@ func main() {
 			} else if len(os.Args) > 4 {
 				fatal(usage)
 			}
-			err = ff.extract(filename, dest)
+			err = ff.Open(filename, dest)
 		default:
 			fatal(usage)
 		}
@@ -81,16 +79,3 @@ const usage = `Usage: archiver {make|open} <archive file> [files...]
     extracting files, archiver will NOT overwrite files
     that already exist in the destination path; this
     is treated as an error and extraction will abort.`
-
-var fileFormats = []struct {
-	ext     string
-	create  archiver.MakeFunc
-	extract archiver.OpenFunc
-}{
-	{ext: ".zip", create: archiver.Zip, extract: archiver.Unzip},
-	{ext: ".tar", create: archiver.Tar, extract: archiver.Untar},
-	{ext: ".tar.gz", create: archiver.TarGz, extract: archiver.UntarGz},
-	{ext: ".tgz", create: archiver.TarGz, extract: archiver.UntarGz},
-	{ext: ".tar.bz2", create: archiver.TarBz2, extract: archiver.UntarBz2},
-	{ext: ".rar", create: archiver.Rar, extract: archiver.Unrar},
-}

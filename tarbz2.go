@@ -4,16 +4,28 @@ import (
 	"archive/tar"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/dsnet/compress/bzip2"
 )
 
-// TarBz2 creates a .tar.bz2 file at tarbz2Path containing
+func init() {
+	RegisterFormat("TarBz2", tb{})
+}
+
+type tb struct{}
+
+func (tb) Match(filename string) bool {
+	// TODO: read file header to identify the format
+	return strings.HasSuffix(strings.ToLower(filename), ".tar.bz2")
+}
+
+// Make creates a .tar.bz2 file at tarbz2Path containing
 // the contents of files listed in filePaths. File paths
 // can be those of regular files or directories. Regular
 // files are stored at the 'root' of the archive, and
 // directories are recursively added.
-func TarBz2(tarbz2Path string, filePaths []string) error {
+func (tb) Make(tarbz2Path string, filePaths []string) error {
 	out, err := os.Create(tarbz2Path)
 	if err != nil {
 		return fmt.Errorf("error creating %s: %v", tarbz2Path, err)
@@ -32,8 +44,8 @@ func TarBz2(tarbz2Path string, filePaths []string) error {
 	return tarball(filePaths, tarWriter, tarbz2Path)
 }
 
-// UntarBz2 untars source and decompresses the contents into destination.
-func UntarBz2(source, destination string) error {
+// Open untars source and decompresses the contents into destination.
+func (tb) Open(source, destination string) error {
 	f, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("%s: failed to open archive: %v", source, err)

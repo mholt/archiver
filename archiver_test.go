@@ -8,14 +8,24 @@ import (
 	"testing"
 )
 
-func TestZipAndUnzip(t *testing.T) {
-	symmetricTest(t, ".zip", Zip, Unzip)
+func TestArchiver(t *testing.T) {
+	for name, ar := range SupportedFormats {
+		name, ar := name, ar
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// skip RAR for now
+			if _, ok := ar.(r); ok {
+				t.Skip("not supported")
+			}
+			symmetricTest(t, name, ar)
+		})
+	}
 }
 
 // symmetricTest performs a symmetric test by using mf to make an archive
 // from the test corpus, then using of to open the archive and comparing
 // the contents to ensure they are equal.
-func symmetricTest(t *testing.T, ext string, mf MakeFunc, of OpenFunc) {
+func symmetricTest(t *testing.T, name string, ar Archiver) {
 	tmp, err := ioutil.TempDir("", "archiver")
 	if err != nil {
 		t.Fatal(err)
@@ -23,8 +33,8 @@ func symmetricTest(t *testing.T, ext string, mf MakeFunc, of OpenFunc) {
 	defer os.RemoveAll(tmp)
 
 	// Test creating archive
-	outfile := filepath.Join(tmp, "test"+ext)
-	err = mf(outfile, []string{"testdata"})
+	outfile := filepath.Join(tmp, "test-"+name)
+	err = ar.Make(outfile, []string{"testdata"})
 	if err != nil {
 		t.Fatalf("making archive: didn't expect an error, but got: %v", err)
 	}
@@ -38,7 +48,7 @@ func symmetricTest(t *testing.T, ext string, mf MakeFunc, of OpenFunc) {
 	// Test extracting archive
 	dest := filepath.Join(tmp, "extraction_test")
 	os.Mkdir(dest, 0755)
-	err = of(outfile, dest)
+	err = ar.Open(outfile, dest)
 	if err != nil {
 		t.Fatalf("extracting archive: didn't expect an error, but got: %v", err)
 	}
@@ -100,5 +110,66 @@ func symmetricTest(t *testing.T, ext string, mf MakeFunc, of OpenFunc) {
 
 	if got, want := actualFileCount, expectedFileCount; got != want {
 		t.Fatalf("Expected %d resulting files, got %d", want, got)
+	}
+}
+
+func BenchmarkMake(b *testing.B) {
+	tmp, err := ioutil.TempDir("", "archiver")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(tmp)
+
+	for name, ar := range SupportedFormats {
+		name, ar := name, ar
+		b.Run(name, func(b *testing.B) {
+			// skip RAR for now
+			if _, ok := ar.(r); ok {
+				b.Skip("not supported")
+			}
+			outfile := filepath.Join(tmp, "benchMake-"+name)
+			for i := 0; i < b.N; i++ {
+				err = ar.Make(outfile, []string{"testdata"})
+				if err != nil {
+					b.Fatalf("making archive: didn't expect an error, but got: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkOpen(b *testing.B) {
+	tmp, err := ioutil.TempDir("", "archiver")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(tmp)
+
+	for name, ar := range SupportedFormats {
+		name, ar := name, ar
+		b.Run(name, func(b *testing.B) {
+			// skip RAR for now
+			if _, ok := ar.(r); ok {
+				b.Skip("not supported")
+			}
+			// prepare a archive
+			outfile := filepath.Join(tmp, "benchMake-"+name)
+			err = ar.Make(outfile, []string{"testdata"})
+			if err != nil {
+				b.Fatalf("open archive: didn't expect an error, but got: %v", err)
+			}
+			// prepare extraction destination
+			dest := filepath.Join(tmp, "extraction_test")
+			os.Mkdir(dest, 0755)
+
+			// let's go
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				err = ar.Open(outfile, dest)
+				if err != nil {
+					b.Fatalf("open archive: didn't expect an error, but got: %v", err)
+				}
+			}
+		})
 	}
 }
