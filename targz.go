@@ -8,8 +8,11 @@ import (
 	"strings"
 )
 
+// TarGz is for TarGz format
+var TarGz tarGzFormat
+
 func init() {
-	RegisterFormat("TarGz", tarGzFormat{})
+	RegisterFormat("TarGz", TarGz)
 }
 
 type tarGzFormat struct{}
