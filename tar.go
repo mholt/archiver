@@ -9,8 +9,11 @@ import (
 	"strings"
 )
 
+// Tar is for Tar format
+var Tar tarFormat
+
 func init() {
-	RegisterFormat("Tar", tarFormat{})
+	RegisterFormat("Tar", Tar)
 }
 
 type tarFormat struct{}

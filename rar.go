@@ -10,8 +10,11 @@ import (
 	"github.com/nwaples/rardecode"
 )
 
+// Rar is for RAR archive format
+var Rar rarFormat
+
 func init() {
-	RegisterFormat("Rar", rarFormat{})
+	RegisterFormat("Rar", Rar)
 }
 
 type rarFormat struct{}

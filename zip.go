@@ -12,8 +12,11 @@ import (
 	"strings"
 )
 
+// Zip is for Zip format
+var Zip zipFormat
+
 func init() {
-	RegisterFormat("Zip", zipFormat{})
+	RegisterFormat("Zip", Zip)
 }
 
 type zipFormat struct{}

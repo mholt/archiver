@@ -9,8 +9,11 @@ import (
 	"github.com/dsnet/compress/bzip2"
 )
 
+// TarBz2 is for TarBz2 format
+var TarBz2 tarBz2Format
+
 func init() {
-	RegisterFormat("TarBz2", tarBz2Format{})
+	RegisterFormat("TarBz2", TarBz2)
 }
 
 type tarBz2Format struct{}
