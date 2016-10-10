@@ -13,12 +13,12 @@ import (
 )
 
 func init() {
-	RegisterFormat("Zip", z{})
+	RegisterFormat("Zip", zipFormat{})
 }
 
-type z struct{}
+type zipFormat struct{}
 
-func (z) Match(filename string) bool {
+func (zipFormat) Match(filename string) bool {
 	// TODO: read file header to identify the format
 	return strings.HasSuffix(strings.ToLower(filename), ".zip")
 }
@@ -31,7 +31,7 @@ func (z) Match(filename string) bool {
 //
 // Files with an extension for formats that are already
 // compressed will be stored only, not compressed.
-func (z) Make(zipPath string, filePaths []string) error {
+func (zipFormat) Make(zipPath string, filePaths []string) error {
 	out, err := os.Create(zipPath)
 	if err != nil {
 		return fmt.Errorf("error creating %s: %v", zipPath, err)
@@ -114,7 +114,7 @@ func zipFile(w *zip.Writer, source string) error {
 }
 
 // Unzip unzips the .zip file at source into destination.
-func (z) Open(source, destination string) error {
+func (zipFormat) Open(source, destination string) error {
 	r, err := zip.OpenReader(source)
 	if err != nil {
 		return err

@@ -14,7 +14,7 @@ func TestArchiver(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			// skip RAR for now
-			if _, ok := ar.(r); ok {
+			if _, ok := ar.(rarFormat); ok {
 				t.Skip("not supported")
 			}
 			symmetricTest(t, name, ar)
@@ -22,8 +22,8 @@ func TestArchiver(t *testing.T) {
 	}
 }
 
-// symmetricTest performs a symmetric test by using mf to make an archive
-// from the test corpus, then using of to open the archive and comparing
+// symmetricTest performs a symmetric test by using ar.Make to make an archive
+// from the test corpus, then using ar.Open to open the archive and comparing
 // the contents to ensure they are equal.
 func symmetricTest(t *testing.T, name string, ar Archiver) {
 	tmp, err := ioutil.TempDir("", "archiver")
@@ -124,7 +124,7 @@ func BenchmarkMake(b *testing.B) {
 		name, ar := name, ar
 		b.Run(name, func(b *testing.B) {
 			// skip RAR for now
-			if _, ok := ar.(r); ok {
+			if _, ok := ar.(rarFormat); ok {
 				b.Skip("not supported")
 			}
 			outfile := filepath.Join(tmp, "benchMake-"+name)
@@ -149,7 +149,7 @@ func BenchmarkOpen(b *testing.B) {
 		name, ar := name, ar
 		b.Run(name, func(b *testing.B) {
 			// skip RAR for now
-			if _, ok := ar.(r); ok {
+			if _, ok := ar.(rarFormat); ok {
 				b.Skip("not supported")
 			}
 			// prepare a archive

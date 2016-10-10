@@ -11,12 +11,12 @@ import (
 )
 
 func init() {
-	RegisterFormat("Rar", r{})
+	RegisterFormat("Rar", rarFormat{})
 }
 
-type r struct{}
+type rarFormat struct{}
 
-func (r) Match(filename string) bool {
+func (rarFormat) Match(filename string) bool {
 	// TODO: read file header to identify the format
 	return strings.HasSuffix(strings.ToLower(filename), ".rar")
 }
@@ -24,13 +24,13 @@ func (r) Match(filename string) bool {
 // Make makes a .rar archive, but this is not implemented because
 // RAR is a proprietary format. It is here only for symmetry with
 // the other archive formats in this package.
-func (r) Make(rarPath string, filePaths []string) error {
+func (rarFormat) Make(rarPath string, filePaths []string) error {
 	return fmt.Errorf("make %s: RAR not implemented (proprietary format)", rarPath)
 }
 
 // Open extracts the RAR file at source and puts the contents
 // into destination.
-func (r) Open(source, destination string) error {
+func (rarFormat) Open(source, destination string) error {
 	f, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("%s: failed to open archive: %v", source, err)

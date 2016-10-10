@@ -10,12 +10,12 @@ import (
 )
 
 func init() {
-	RegisterFormat("TarBz2", tb{})
+	RegisterFormat("TarBz2", tarBz2Format{})
 }
 
-type tb struct{}
+type tarBz2Format struct{}
 
-func (tb) Match(filename string) bool {
+func (tarBz2Format) Match(filename string) bool {
 	// TODO: read file header to identify the format
 	return strings.HasSuffix(strings.ToLower(filename), ".tar.bz2")
 }
@@ -25,7 +25,7 @@ func (tb) Match(filename string) bool {
 // can be those of regular files or directories. Regular
 // files are stored at the 'root' of the archive, and
 // directories are recursively added.
-func (tb) Make(tarbz2Path string, filePaths []string) error {
+func (tarBz2Format) Make(tarbz2Path string, filePaths []string) error {
 	out, err := os.Create(tarbz2Path)
 	if err != nil {
 		return fmt.Errorf("error creating %s: %v", tarbz2Path, err)
@@ -45,7 +45,7 @@ func (tb) Make(tarbz2Path string, filePaths []string) error {
 }
 
 // Open untars source and decompresses the contents into destination.
-func (tb) Open(source, destination string) error {
+func (tarBz2Format) Open(source, destination string) error {
 	f, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("%s: failed to open archive: %v", source, err)

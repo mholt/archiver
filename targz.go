@@ -9,12 +9,12 @@ import (
 )
 
 func init() {
-	RegisterFormat("TarGz", tg{})
+	RegisterFormat("TarGz", tarGzFormat{})
 }
 
-type tg struct{}
+type tarGzFormat struct{}
 
-func (tg) Match(filename string) bool {
+func (tarGzFormat) Match(filename string) bool {
 	// TODO: read file header to identify the format
 	return strings.HasSuffix(strings.ToLower(filename), ".tar.gz") ||
 		strings.HasSuffix(strings.ToLower(filename), ".tgz")
@@ -23,7 +23,7 @@ func (tg) Match(filename string) bool {
 // Make creates a .tar.gz file at targzPath containing
 // the contents of files listed in filePaths. It works
 // the same way Tar does, but with gzip compression.
-func (tg) Make(targzPath string, filePaths []string) error {
+func (tarGzFormat) Make(targzPath string, filePaths []string) error {
 	out, err := os.Create(targzPath)
 	if err != nil {
 		return fmt.Errorf("error creating %s: %v", targzPath, err)
@@ -40,7 +40,7 @@ func (tg) Make(targzPath string, filePaths []string) error {
 }
 
 // Open untars source and decompresses the contents into destination.
-func (tg) Open(source, destination string) error {
+func (tarGzFormat) Open(source, destination string) error {
 	f, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("%s: failed to open archive: %v", source, err)

@@ -10,12 +10,12 @@ import (
 )
 
 func init() {
-	RegisterFormat("Tar", t{})
+	RegisterFormat("Tar", tarFormat{})
 }
 
-type t struct{}
+type tarFormat struct{}
 
-func (t) Match(filename string) bool {
+func (tarFormat) Match(filename string) bool {
 	// TODO: read file header to identify the format
 	return strings.HasSuffix(strings.ToLower(filename), ".tar")
 }
@@ -25,7 +25,7 @@ func (t) Match(filename string) bool {
 // be those of regular files or directories. Regular
 // files are stored at the 'root' of the archive, and
 // directories are recursively added.
-func (t) Make(tarPath string, filePaths []string) error {
+func (tarFormat) Make(tarPath string, filePaths []string) error {
 	out, err := os.Create(tarPath)
 	if err != nil {
 		return fmt.Errorf("error creating %s: %v", tarPath, err)
@@ -112,7 +112,7 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 }
 
 // Open untars source and puts the contents into destination.
-func (t) Open(source, destination string) error {
+func (tarFormat) Open(source, destination string) error {
 	f, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("%s: failed to open archive: %v", source, err)
