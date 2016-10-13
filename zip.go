@@ -116,7 +116,7 @@ func zipFile(w *zip.Writer, source string) error {
 	})
 }
 
-// Unzip unzips the .zip file at source into destination.
+// Open unzips the .zip file at source into destination.
 func (zipFormat) Open(source, destination string) error {
 	r, err := zip.OpenReader(source)
 	if err != nil {

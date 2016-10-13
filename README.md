@@ -56,16 +56,16 @@ import "github.com/mholt/archiver"
 Create a .zip file:
 
 ```go
-err := archiver.Zip("output.zip", []string{"file.txt", "folder"})
+err := archiver.Zip.Make("output.zip", []string{"file.txt", "folder"})
 ```
 
 Extract a .zip file:
 
 ```go
-err := archiver.Unzip("input.zip", "output_folder")
+err := archiver.Zip.Open("input.zip", "output_folder")
 ```
 
-Working with other file formats is exactly the same, but with [their own functions](https://godoc.org/github.com/mholt/archiver).
+Working with other file formats is exactly the same, but with [their own Archiver implementations](https://godoc.org/github.com/mholt/archiver#Archiver).
 
 
 
