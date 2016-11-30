@@ -71,6 +71,9 @@ const usage = `Usage: archiver {make|open} <archive file> [files...]
       .tar.gz
       .tgz
       .tar.bz2
+      .tbz2
+      .tar.xz
+      .txz
       .rar (open only)
 
   Existing files:

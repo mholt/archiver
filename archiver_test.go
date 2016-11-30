@@ -50,7 +50,7 @@ func symmetricTest(t *testing.T, name string, ar Archiver) {
 	os.Mkdir(dest, 0755)
 	err = ar.Open(outfile, dest)
 	if err != nil {
-		t.Fatalf("extracting archive: didn't expect an error, but got: %v", err)
+		t.Fatalf("extracting archive [%s -> %s]: didn't expect an error, but got: %v", outfile, dest, err)
 	}
 
 	// If outputs equals inputs, we're good; traverse output files

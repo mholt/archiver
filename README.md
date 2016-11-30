@@ -3,18 +3,18 @@ archiver [![archiver GoDoc](https://img.shields.io/badge/reference-godoc-blue.sv
 
 Package archiver makes it trivially easy to make and extract common archive formats such as .zip, and .tar.gz. Simply name the input and output file(s).
 
-Files are put into the root of the archive; directories are recursively added.
+Files are put into the root of the archive; directories are recursively added, preserving structure.
 
-The `archiver` command runs the same cross-platform and has no external dependencies (not even libc); powered by the Go standard library, [dsnet/compress](https://github.com/dsnet/compress), and [nwaples/rardecode](https://github.com/nwaples/rardecode). Enjoy!
+The `archiver` command runs the same cross-platform and has no external dependencies (not even libc); powered by the Go standard library, [dsnet/compress](https://github.com/dsnet/compress), [nwaples/rardecode](https://github.com/nwaples/rardecode), and [ulikunitz/xz](https://github.com/ulikunitz/xz). Enjoy!
 
 Supported formats/extensions:
 
 - .zip
 - .tar
-- .tar.gz
-- .tgz
-- .tar.bz2
-- .rar (open)
+- .tar.gz & .tgz
+- .tar.bz2 & .tbz2
+- .tar.xz & .txz
+- .rar (open only)
 
 
 ## Install

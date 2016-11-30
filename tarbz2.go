@@ -20,7 +20,8 @@ type tarBz2Format struct{}
 
 func (tarBz2Format) Match(filename string) bool {
 	// TODO: read file header to identify the format
-	return strings.HasSuffix(strings.ToLower(filename), ".tar.bz2")
+	return strings.HasSuffix(strings.ToLower(filename), ".tar.bz2") ||
+		strings.HasSuffix(strings.ToLower(filename), ".tbz2")
 }
 
 // Make creates a .tar.bz2 file at tarbz2Path containing
