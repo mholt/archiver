@@ -69,6 +69,20 @@ func writeNewSymbolicLink(fpath string, target string) error {
 	return nil
 }
 
+func writeNewHardLink(fpath string, target string) error {
+	err := os.MkdirAll(filepath.Dir(fpath), 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+	}
+
+	err = os.Link(target, fpath)
+	if err != nil {
+		return fmt.Errorf("%s: making hard link for: %v", fpath, err)
+	}
+
+	return nil
+}
+
 func mkdir(dirPath string) error {
 	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
