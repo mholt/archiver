@@ -151,6 +151,8 @@ func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
 		return writeNewFile(filepath.Join(destination, header.Name), tr, header.FileInfo().Mode())
 	case tar.TypeSymlink:
 		return writeNewSymbolicLink(filepath.Join(destination, header.Name), header.Linkname)
+	case tar.TypeLink:
+		return writeNewHardLink(filepath.Join(destination, header.Name), filepath.Join(destination, header.Linkname))
 	default:
 		return fmt.Errorf("%s: unknown type flag: %c", header.Name, header.Typeflag)
 	}
