@@ -19,9 +19,33 @@ func init() {
 type tarBz2Format struct{}
 
 func (tarBz2Format) Match(filename string) bool {
-	// TODO: read file header to identify the format
 	return strings.HasSuffix(strings.ToLower(filename), ".tar.bz2") ||
-		strings.HasSuffix(strings.ToLower(filename), ".tbz2")
+		strings.HasSuffix(strings.ToLower(filename), ".tbz2") ||
+		isTarBz2(filename)
+}
+
+// isTarBz2 checks the file has the bzip2 compressed Tar format header by
+// reading its beginning block.
+func isTarBz2(tarbz2Path string) bool {
+	f, err := os.Open(tarbz2Path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	bz2r, err := bzip2.NewReader(f, nil)
+	if err != nil {
+		return false
+	}
+	defer bz2r.Close()
+
+	buf := make([]byte, tarBlockSize)
+	n, err := bz2r.Read(buf)
+	if err != nil || n < tarBlockSize {
+		return false
+	}
+
+	return hasTarHeader(buf)
 }
 
 // Make creates a .tar.bz2 file at tarbz2Path containing
