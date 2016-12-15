@@ -20,9 +20,32 @@ type xzFormat struct{}
 
 // Match returns whether filename matches this format.
 func (xzFormat) Match(filename string) bool {
-	// TODO: read file header to identify the format
 	return strings.HasSuffix(strings.ToLower(filename), ".tar.xz") ||
-		strings.HasSuffix(strings.ToLower(filename), ".txz")
+		strings.HasSuffix(strings.ToLower(filename), ".txz") ||
+		isTarXz(filename)
+}
+
+// isTarXz checks the file has the xz compressed Tar format header by reading
+// its beginning block.
+func isTarXz(tarxzPath string) bool {
+	f, err := os.Open(tarxzPath)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	xzr, err := xz.NewReader(f)
+	if err != nil {
+		return false
+	}
+
+	buf := make([]byte, tarBlockSize)
+	n, err := xzr.Read(buf)
+	if err != nil || n < tarBlockSize {
+		return false
+	}
+
+	return hasTarHeader(buf)
 }
 
 // Make creates a .tar.xz file at xzPath containing
