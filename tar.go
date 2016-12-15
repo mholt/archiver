@@ -76,15 +76,8 @@ func hasTarHeader(buf []byte) bool {
 	if hdrSum != usum && int64(hdrSum) != sum {
 		return false // invalid checksum
 	}
-	// checksum OK
 
-	magic := buf[257:265]
-	if bytes.Equal(magic, []byte("ustar  \x00")) {
-		return true // GNU tar
-	} else if bytes.Equal(magic[:6], []byte("ustar\x00")) {
-		return true // POSIX tar
-	}
-	return true // Old style tar
+	return true
 }
 
 // Make creates a .tar file at tarPath containing the
