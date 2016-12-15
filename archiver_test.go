@@ -39,6 +39,10 @@ func symmetricTest(t *testing.T, name string, ar Archiver) {
 		t.Fatalf("making archive: didn't expect an error, but got: %v", err)
 	}
 
+	if !ar.Match(outfile) {
+		t.Fatalf("identifying format should be 'true', but got 'false'")
+	}
+
 	var expectedFileCount int
 	filepath.Walk("testdata", func(fpath string, info os.FileInfo, err error) error {
 		expectedFileCount++

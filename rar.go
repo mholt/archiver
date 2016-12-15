@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -20,8 +21,25 @@ func init() {
 type rarFormat struct{}
 
 func (rarFormat) Match(filename string) bool {
-	// TODO: read file header to identify the format
-	return strings.HasSuffix(strings.ToLower(filename), ".rar")
+	return strings.HasSuffix(strings.ToLower(filename), ".rar") || isRar(filename)
+}
+
+// isRar checks the file has the RAR 1.5 or 5.0 format signature by reading its
+// beginning bytes and matching it
+func isRar(rarPath string) bool {
+	f, err := os.Open(rarPath)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	buf := make([]byte, 8)
+	if n, err := f.Read(buf); err != nil || n < 8 {
+		return false
+	}
+
+	return bytes.Equal(buf[:7], []byte("Rar!\x1a\x07\x00")) || // ver 1.5
+		bytes.Equal(buf, []byte("Rar!\x1a\x07\x01\x00")) // ver 5.0
 }
 
 // Make makes a .rar archive, but this is not implemented because

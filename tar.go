@@ -2,10 +2,12 @@ package archiver
 
 import (
 	"archive/tar"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -19,8 +21,63 @@ func init() {
 type tarFormat struct{}
 
 func (tarFormat) Match(filename string) bool {
-	// TODO: read file header to identify the format
-	return strings.HasSuffix(strings.ToLower(filename), ".tar")
+	return strings.HasSuffix(strings.ToLower(filename), ".tar") || isTar(filename)
+}
+
+const tarBlockSize int = 512
+
+// isTar checks the file has the Tar format header by reading its beginning
+// block.
+func isTar(tarPath string) bool {
+	f, err := os.Open(tarPath)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	buf := make([]byte, tarBlockSize)
+	if _, err = io.ReadFull(f, buf); err != nil {
+		return false
+	}
+
+	return hasTarHeader(buf)
+
+}
+
+// hasTarHeader checks passed bytes has a valid tar header or not. buf must
+// contain at least 512 bytes and if not, it always returns false.
+func hasTarHeader(buf []byte) bool {
+	if len(buf) < tarBlockSize {
+		return false
+	}
+
+	b := buf[148:156]
+	b = bytes.Trim(b, " \x00") // clean up all spaces and null bytes
+	if len(b) == 0 {
+		return false // unknown format
+	}
+	hdrSum, err := strconv.ParseUint(string(b), 8, 64)
+	if err != nil {
+		return false
+	}
+
+	// According to the go official archive/tar, Sun tar uses signed byte
+	// values so this calcs both signed and unsigned
+	var usum uint64
+	var sum int64
+	for i, c := range buf {
+		if 148 <= i && i < 156 {
+			c = ' ' // checksum field itself is counted as branks
+		}
+		usum += uint64(uint8(c))
+		sum += int64(int8(c))
+	}
+
+	if hdrSum != usum && int64(hdrSum) != sum {
+		return false // invalid checksum
+	}
+
+	return true
 }
 
 // Make creates a .tar file at tarPath containing the

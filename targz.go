@@ -18,9 +18,33 @@ func init() {
 type tarGzFormat struct{}
 
 func (tarGzFormat) Match(filename string) bool {
-	// TODO: read file header to identify the format
 	return strings.HasSuffix(strings.ToLower(filename), ".tar.gz") ||
-		strings.HasSuffix(strings.ToLower(filename), ".tgz")
+		strings.HasSuffix(strings.ToLower(filename), ".tgz") ||
+		isTarGz(filename)
+}
+
+// isTarGz checks the file has the gzip compressed Tar format header by reading
+// its beginning block.
+func isTarGz(targzPath string) bool {
+	f, err := os.Open(targzPath)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	gzr, err := gzip.NewReader(f)
+	if err != nil {
+		return false
+	}
+	defer gzr.Close()
+
+	buf := make([]byte, tarBlockSize)
+	n, err := gzr.Read(buf)
+	if err != nil || n < tarBlockSize {
+		return false
+	}
+
+	return hasTarHeader(buf)
 }
 
 // Make creates a .tar.gz file at targzPath containing
