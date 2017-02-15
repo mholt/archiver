@@ -22,7 +22,7 @@ func (tarLz4Format) Match(filename string) bool {
 	return strings.HasSuffix(strings.ToLower(filename), ".tar.lz4") || strings.HasSuffix(strings.ToLower(filename), ".tlz4") || isTarLz4(filename)
 }
 
-// isTarLz4 checks the file has the bzip2 compressed Tar format header by
+// isTarLz4 checks the file has the lz4 compressed Tar format header by
 // reading its beginning block.
 func isTarLz4(tarlz4Path string) bool {
 	f, err := os.Open(tarlz4Path)
@@ -41,7 +41,7 @@ func isTarLz4(tarlz4Path string) bool {
 	return hasTarHeader(buf)
 }
 
-// Make creates a .tar.bz2 file at tarlz4Path containing
+// Make creates a .tar.lz4 file at tarlz4Path containing
 // the contents of files listed in filePaths. File paths
 // can be those of regular files or directories. Regular
 // files are stored at the 'root' of the archive, and
