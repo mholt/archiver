@@ -74,7 +74,7 @@ func symmetricTest(t *testing.T, name string, ar Archiver) {
 
 		if info.IsDir() {
 			// stat dir instead of read file
-			_, err := os.Stat(origPath)
+			_, err = os.Stat(origPath)
 			if err != nil {
 				t.Fatalf("%s: Couldn't stat original directory (%s): %v",
 					fpath, origPath, err)
