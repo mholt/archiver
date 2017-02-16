@@ -15,7 +15,6 @@ Supported formats/extensions:
 - .tar.bz2 & .tbz2
 - .tar.xz & .txz
 - .tar.lz4 & .tlz4
-- .tar.sz & .tsz
 - .rar (open only)
 
 
