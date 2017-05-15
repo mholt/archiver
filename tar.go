@@ -98,6 +98,12 @@ func (tarFormat) Make(tarPath string, filePaths []string) error {
 	return tarball(filePaths, tarWriter, tarPath)
 }
 
+func (tarFormat) MakeIntoWriter(out io.Writer, filePaths ...string) error {
+	tarWriter := tar.NewWriter(out)
+	defer tarWriter.Close()
+	return tarball(filePaths, tarWriter, "")
+}
+
 // tarball writes all files listed in filePaths into tarWriter, which is
 // writing into a file located at dest.
 func tarball(filePaths []string, tarWriter *tar.Writer, dest string) error {
@@ -180,6 +186,10 @@ func (tarFormat) Open(source, destination string) error {
 	defer f.Close()
 
 	return untar(tar.NewReader(f), destination)
+}
+
+func (tarFormat) OpenFromReader(in io.Reader, destination string) error {
+	return untar(tar.NewReader(in), destination)
 }
 
 // untar un-tarballs the contents of tr into destination.
