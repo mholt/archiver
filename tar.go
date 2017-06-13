@@ -41,7 +41,6 @@ func isTar(tarPath string) bool {
 	}
 
 	return hasTarHeader(buf)
-
 }
 
 // hasTarHeader checks passed bytes has a valid tar header or not. buf must
