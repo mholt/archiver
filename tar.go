@@ -145,6 +145,20 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 			header.Name += "/"
 		}
 
+		if !info.IsDir() {
+			fi, err := os.Lstat(path)
+			if err != nil {
+				return fmt.Errorf("%s: get lstat: %v", path, err)
+			}
+			if fi.Mode()&os.ModeSymlink != 0 {
+				link, err := os.Readlink(path)
+				if err != nil {
+					return fmt.Errorf("%s: read link: %v", path, err)
+				}
+				header.Linkname = link
+			}
+		}
+		
 		err = tarWriter.WriteHeader(header)
 		if err != nil {
 			return fmt.Errorf("%s: writing header: %v", path, err)
