@@ -145,6 +145,12 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 			header.Name += "/"
 		}
 
+		// special handling of symlinks
+		if header.Typeflag == tar.TypeSymlink {
+			linkDest, _ := os.Readlink(path)
+			header.Linkname = linkDest
+		}
+
 		err = tarWriter.WriteHeader(header)
 		if err != nil {
 			return fmt.Errorf("%s: writing header: %v", path, err)

@@ -17,6 +17,10 @@ func TestArchiver(t *testing.T) {
 			if _, ok := ar.(rarFormat); ok {
 				t.Skip("not supported")
 			}
+			// skip ZIP for now as well since it doesn't support symlinks
+			if _, ok := ar.(zipFormat); ok {
+				t.Skip("not supported")
+			}
 			symmetricTest(t, name, ar)
 		})
 	}
