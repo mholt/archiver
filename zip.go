@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,6 +44,26 @@ func isZip(zipPath string) bool {
 	return bytes.Equal(buf, []byte("PK\x03\x04"))
 }
 
+// Write outputs a .zip file to the given writer with
+// the contents of files listed in filePaths. File paths
+// can be those of regular files or directories. Regular
+// files are stored at the 'root' of the archive, and
+// directories are recursively added.
+//
+// Files with an extension for formats that are already
+// compressed will be stored only, not compressed.
+func (zipFormat) Write(output io.Writer, filePaths []string) error {
+	w := zip.NewWriter(output)
+	for _, fpath := range filePaths {
+		if err := zipFile(w, fpath); err != nil {
+			w.Close()
+			return err
+		}
+	}
+
+	return w.Close()
+}
+
 // Make creates a .zip file in the location zipPath containing
 // the contents of files listed in filePaths. File paths
 // can be those of regular files or directories. Regular
@@ -58,16 +79,7 @@ func (zipFormat) Make(zipPath string, filePaths []string) error {
 	}
 	defer out.Close()
 
-	w := zip.NewWriter(out)
-	for _, fpath := range filePaths {
-		err = zipFile(w, fpath)
-		if err != nil {
-			w.Close()
-			return err
-		}
-	}
-
-	return w.Close()
+	return Zip.Write(out, filePaths)
 }
 
 func zipFile(w *zip.Writer, source string) error {
@@ -137,6 +149,22 @@ func zipFile(w *zip.Writer, source string) error {
 	})
 }
 
+// Read unzips the .zip file read from the input Reader into destination.
+func (zipFormat) Read(input io.Reader, destination string) error {
+	buf, err := ioutil.ReadAll(input)
+	if err != nil {
+		return err
+	}
+
+	rdr := bytes.NewReader(buf)
+	r, err := zip.NewReader(rdr, rdr.Size())
+	if err != nil {
+		return err
+	}
+
+	return unzipAll(r, destination)
+}
+
 // Open unzips the .zip file at source into destination.
 func (zipFormat) Open(source, destination string) error {
 	r, err := zip.OpenReader(source)
@@ -145,6 +173,10 @@ func (zipFormat) Open(source, destination string) error {
 	}
 	defer r.Close()
 
+	return unzipAll(&r.Reader, destination)
+}
+
+func unzipAll(r *zip.Reader, destination string) error {
 	for _, zf := range r.File {
 		if err := unzipFile(zf, destination); err != nil {
 			return err

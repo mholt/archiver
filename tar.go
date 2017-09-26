@@ -79,6 +79,15 @@ func hasTarHeader(buf []byte) bool {
 	return true
 }
 
+// Write outputs a .tar file to a Writer containing the
+// contents of files listed in filePaths. File paths can
+// be those of regular files or directories. Regular
+// files are stored at the 'root' of the archive, and
+// directories are recursively added.
+func (tarFormat) Write(output io.Writer, filePaths []string) error {
+	return writeTar(filePaths, output, "")
+}
+
 // Make creates a .tar file at tarPath containing the
 // contents of files listed in filePaths. File paths can
 // be those of regular files or directories. Regular
@@ -91,10 +100,14 @@ func (tarFormat) Make(tarPath string, filePaths []string) error {
 	}
 	defer out.Close()
 
-	tarWriter := tar.NewWriter(out)
+	return writeTar(filePaths, out, tarPath)
+}
+
+func writeTar(filePaths []string, output io.Writer, dest string) error {
+	tarWriter := tar.NewWriter(output)
 	defer tarWriter.Close()
 
-	return tarball(filePaths, tarWriter, tarPath)
+	return tarball(filePaths, tarWriter, dest)
 }
 
 // tarball writes all files listed in filePaths into tarWriter, which is
@@ -170,6 +183,12 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 	})
 }
 
+// Read untars a .tar file read from a Reader and puts
+// the contents into destination.
+func (tarFormat) Read(input io.Reader, destination string) error {
+	return untar(tar.NewReader(input), destination)
+}
+
 // Open untars source and puts the contents into destination.
 func (tarFormat) Open(source, destination string) error {
 	f, err := os.Open(source)
@@ -178,7 +197,7 @@ func (tarFormat) Open(source, destination string) error {
 	}
 	defer f.Close()
 
-	return untar(tar.NewReader(f), destination)
+	return Tar.Read(f, destination)
 }
 
 // untar un-tarballs the contents of tr into destination.
