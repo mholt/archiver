@@ -31,6 +31,17 @@ func RegisterFormat(name string, format Archiver) {
 	SupportedFormats[name] = format
 }
 
+// MatchingFormat returns the first archive format that matches
+// the given file, or nil if there is no match
+func MatchingFormat(fpath string) Archiver {
+	for _, fmt := range SupportedFormats {
+		if fmt.Match(fpath) {
+			return fmt
+		}
+	}
+	return nil
+}
+
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
