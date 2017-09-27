@@ -1,0 +1,1 @@
+../proverbs/proverb1.txt
