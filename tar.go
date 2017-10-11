@@ -114,6 +114,15 @@ func writeTar(filePaths []string, output io.Writer, dest string) error {
 // writing into a file located at dest.
 func tarball(filePaths []string, tarWriter *tar.Writer, dest string) error {
 	for _, fpath := range filePaths {
+		// use abs path for all
+		if !filepath.IsAbs(fpath) {
+			var err error
+			fpath, err = filepath.Abs(fpath)
+			if err != nil {
+				return err
+			}
+		}
+		
 		err := tarFile(tarWriter, fpath, dest)
 		if err != nil {
 			return err
