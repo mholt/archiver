@@ -1,8 +1,8 @@
 package archiver
 
 import (
-	"archive/tar"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -48,6 +48,15 @@ func isTarBz2(tarbz2Path string) bool {
 	return hasTarHeader(buf)
 }
 
+// Write outputs a .tar.bz2 file to a Writer containing
+// the contents of files listed in filePaths. File paths
+// can be those of regular files or directories. Regular
+// files are stored at the 'root' of the archive, and
+// directories are recursively added.
+func (tarBz2Format) Write(output io.Writer, filePaths []string) error {
+	return writeTarBz2(filePaths, output, "")
+}
+
 // Make creates a .tar.bz2 file at tarbz2Path containing
 // the contents of files listed in filePaths. File paths
 // can be those of regular files or directories. Regular
@@ -60,16 +69,29 @@ func (tarBz2Format) Make(tarbz2Path string, filePaths []string) error {
 	}
 	defer out.Close()
 
-	bz2Writer, err := bzip2.NewWriter(out, nil)
+	return writeTarBz2(filePaths, out, tarbz2Path)
+}
+
+func writeTarBz2(filePaths []string, output io.Writer, dest string) error {
+	bz2w, err := bzip2.NewWriter(output, nil)
 	if err != nil {
-		return fmt.Errorf("error compressing %s: %v", tarbz2Path, err)
+		return fmt.Errorf("error compressing bzip2: %v", err)
 	}
-	defer bz2Writer.Close()
+	defer bz2w.Close()
 
-	tarWriter := tar.NewWriter(bz2Writer)
-	defer tarWriter.Close()
+	return writeTar(filePaths, bz2w, dest)
+}
 
-	return tarball(filePaths, tarWriter, tarbz2Path)
+// Read untars a .tar.bz2 file read from a Reader and decompresses
+// the contents into destination.
+func (tarBz2Format) Read(input io.Reader, destination string) error {
+	bz2r, err := bzip2.NewReader(input, nil)
+	if err != nil {
+		return fmt.Errorf("error decompressing bzip2: %v", err)
+	}
+	defer bz2r.Close()
+
+	return Tar.Read(bz2r, destination)
 }
 
 // Open untars source and decompresses the contents into destination.
@@ -80,11 +102,5 @@ func (tarBz2Format) Open(source, destination string) error {
 	}
 	defer f.Close()
 
-	bz2r, err := bzip2.NewReader(f, nil)
-	if err != nil {
-		return fmt.Errorf("error decompressing %s: %v", source, err)
-	}
-	defer bz2r.Close()
-
-	return untar(tar.NewReader(bz2r), destination)
+	return TarBz2.Read(f, destination)
 }

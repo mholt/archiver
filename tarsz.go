@@ -1,8 +1,8 @@
 package archiver
 
 import (
-	"archive/tar"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -41,6 +41,15 @@ func isTarSz(tarszPath string) bool {
 	return hasTarHeader(buf)
 }
 
+// Write outputs a .tar.sz file to a Writer containing
+// the contents of files listed in filePaths. File paths
+// can be those of regular files or directories. Regular
+// files are stored at the 'root' of the archive, and
+// directories are recursively added.
+func (tarSzFormat) Write(output io.Writer, filePaths []string) error {
+	return writeTarSz(filePaths, output, "")
+}
+
 // Make creates a .tar.sz file at tarszPath containing
 // the contents of files listed in filePaths. File paths
 // can be those of regular files or directories. Regular
@@ -53,13 +62,22 @@ func (tarSzFormat) Make(tarszPath string, filePaths []string) error {
 	}
 	defer out.Close()
 
-	szWriter := snappy.NewBufferedWriter(out)
-	defer szWriter.Close()
+	return writeTarSz(filePaths, out, tarszPath)
+}
 
-	tarWriter := tar.NewWriter(szWriter)
-	defer tarWriter.Close()
+func writeTarSz(filePaths []string, output io.Writer, dest string) error {
+	szw := snappy.NewBufferedWriter(output)
+	defer szw.Close()
 
-	return tarball(filePaths, tarWriter, tarszPath)
+	return writeTar(filePaths, szw, dest)
+}
+
+// Read untars a .tar.sz file read from a Reader and decompresses
+// the contents into destination.
+func (tarSzFormat) Read(input io.Reader, destination string) error {
+	szr := snappy.NewReader(input)
+
+	return Tar.Read(szr, destination)
 }
 
 // Open untars source and decompresses the contents into destination.
@@ -70,6 +88,5 @@ func (tarSzFormat) Open(source, destination string) error {
 	}
 	defer f.Close()
 
-	szr := snappy.NewReader(f)
-	return untar(tar.NewReader(szr), destination)
+	return TarSz.Read(f, destination)
 }
