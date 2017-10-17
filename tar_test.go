@@ -57,24 +57,6 @@ func TestTar(t *testing.T) {
 
 			// Check that what was extracted is what was compressed
 			symmetricTest(t, name, dest)
-
-			// os.RemoveAll("./result")
-			// os.Mkdir("./result", 0755)
-			// // defer os.Remove("./result")
-
-			// dst := "./result/test.tar"
-			// err = Tar.Make(dst, []string{".//testdata"})
-			// if err != nil {
-			// 	t.Fatal("make tar failed:", err.Error())
-			// }
-
-			// extraction := "./result/extraction"
-			// err = Tar.Open(dst, extraction)
-			// if err != nil {
-			// 	t.Fatal("extract tar failed:", err.Error())
-			// }
-
-			// symmetricTest(t, "Tar", extraction)
 		})
 	}
 }
