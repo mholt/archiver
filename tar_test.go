@@ -82,8 +82,6 @@ func TestTarWithDiffDest(t *testing.T) {
 	ar := Tar
 	for _, p := range testdataAllForm {
 		t.Run(fmt.Sprintf("path=%s", p), func(t *testing.T) {
-			t.Parallel()
-
 			tmp, err := ioutil.TempDir("", "archiver")
 			if err != nil {
 				t.Fatalf("[%s] %v", name, err)
