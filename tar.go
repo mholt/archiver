@@ -114,15 +114,6 @@ func writeTar(filePaths []string, output io.Writer, dest string) error {
 // writing into a file located at dest.
 func tarball(filePaths []string, tarWriter *tar.Writer, dest string) error {
 	for _, fpath := range filePaths {
-		// use abs path for all
-		if !filepath.IsAbs(fpath) {
-			var err error
-			fpath, err = filepath.Abs(fpath)
-			if err != nil {
-				return err
-			}
-		}
-		
 		err := tarFile(tarWriter, fpath, dest)
 		if err != nil {
 			return err
@@ -144,6 +135,8 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 		baseDir = filepath.Base(source)
 	}
 
+	// because the WakkFunc will pass the standard path under the source, so let us standard the source too.
+	source = filepath.Clean(source)
 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("error walking to %s: %v", path, err)
