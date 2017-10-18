@@ -112,8 +112,8 @@ func TestTarWithDiffDest(t *testing.T) {
 	}
 }
 
-// symmetricTest compares the contents of a destination directory to the contents
-// of the test corpus and tests that they are equal.
+// testSame compares the contents of a destination directory to the contents
+// of the test corpus and tests that they are equal. the ignore param was a file to be ignore compare.
 func testSame(t *testing.T, name, dest, ignore string) {
 	absForTestdata, err := filepath.Abs("testdata")
 	if err != nil {
