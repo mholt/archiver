@@ -9,8 +9,8 @@ import (
 	"runtime"
 )
 
-// Archiver represent a archive format
-type Archiver interface {
+// PreservableArchiver represent a archive format
+type PreservableArchiver interface {
 	// Match checks supported files
 	Match(filename string) bool
 	// Make makes an archive file on disk.
@@ -25,6 +25,20 @@ type Archiver interface {
 	OpenPreserve(source, destination string) error
 	// Read reads an archive from a Reader while preserving uid/gid.
 	ReadPreserve(input io.Reader, destination string) error
+}
+
+// Archiver represent a archive format
+type Archiver interface {
+	// Match checks supported files
+	Match(filename string) bool
+	// Make makes an archive file on disk.
+	Make(destination string, sources []string) error
+	// Open extracts an archive file on disk.
+	Open(source, destination string) error
+	// Write writes an archive to a Writer.
+	Write(output io.Writer, sources []string) error
+	// Read reads an archive from a Reader.
+	Read(input io.Reader, destination string) error
 }
 
 // SupportedFormats contains all supported archive formats
