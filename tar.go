@@ -7,9 +7,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
-	"runtime"
 	"syscall"
 )
 
@@ -223,7 +223,7 @@ func (tarFormat) open(source, destination string, preserveIds bool) error {
 func untar(tr *tar.Reader, destination string, preserveIds bool) error {
 	// Windows does not support preservation of UID/GID
 	if runtime.GOOS == "windows" {
-		preserveIds = false;
+		preserveIds = false
 	}
 
 	for {
@@ -243,7 +243,7 @@ func untar(tr *tar.Reader, destination string, preserveIds bool) error {
 
 // untarFile untars a single file from tr with header header into destination.
 func untarFile(tr *tar.Reader, header *tar.Header, destination string, preserveIds bool) error {
-	var err error;
+	var err error
 	switch header.Typeflag {
 	case tar.TypeDir:
 		err = mkdir(filepath.Join(destination, header.Name))
