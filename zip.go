@@ -231,13 +231,3 @@ var compressedFormats = map[string]struct{}{
 	".zip":  {},
 	".zipx": {},
 }
-
-// Returns an error, as zip does not support uid/gid preservation
-func (zipFormat) OpenPreserve(source, destination string) error {
-	return fmt.Errorf("%s: zip does not suppor uid/gid preservation", source)
-}
-
-// Returns an error, as zip does not support uid/gid preservation
-func (zipFormat) ReadPreserve(input io.Reader, destination string) error {
-	return fmt.Errorf("%v: zip does not suppor uid/gid preservation", input)
-}
