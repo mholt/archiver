@@ -7,9 +7,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
-	"runtime"
 	"syscall"
 )
 
@@ -223,7 +223,7 @@ func (tarFormat) open(source, destination string, preserveIds bool) error {
 func untar(tr *tar.Reader, destination string, preserveIds bool) error {
 	// Windows does not support preservation of UID/GID
 	if runtime.GOOS == "windows" {
-		preserveIds = false;
+		preserveIds = false
 	}
 
 	for {
