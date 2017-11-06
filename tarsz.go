@@ -90,3 +90,23 @@ func (tarSzFormat) Open(source, destination string) error {
 
 	return TarSz.Read(f, destination)
 }
+
+// Read untars a .tar.sz file read from a Reader and decompresses
+// the contents into destination while preserving uid/gid.
+func (tarSzFormat) ReadPreserve(input io.Reader, destination string) error {
+	szr := snappy.NewReader(input)
+
+	return Tar.ReadPreserve(szr, destination)
+}
+
+// Open untars source and decompresses the contents into destination
+// while preserving uid/gid.
+func (tarSzFormat) OpenPreserve(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("%s: failed to open archive: %v", source, err)
+	}
+	defer f.Close()
+
+	return TarSz.ReadPreserve(f, destination)
+}

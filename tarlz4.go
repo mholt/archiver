@@ -90,3 +90,23 @@ func (tarLz4Format) Open(source, destination string) error {
 
 	return TarLz4.Read(f, destination)
 }
+
+// Read untars a .tar.xz file read from a Reader and decompresses
+// the contents into destination while preserving uid/gid.
+func (tarLz4Format) ReadPreserve(input io.Reader, destination string) error {
+	lz4r := lz4.NewReader(input)
+
+	return Tar.Read(lz4r, destination)
+}
+
+// Open untars source and decompresses the contents into destination
+// while preserving uid/gid.
+func (tarLz4Format) OpenPreserve(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("%s: failed to open archive: %v", source, err)
+	}
+	defer f.Close()
+
+	return TarLz4.Read(f, destination)
+}

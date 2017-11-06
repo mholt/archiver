@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"runtime"
+	"syscall"
 )
 
 // Tar is for Tar format
@@ -186,22 +188,44 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 // Read untars a .tar file read from a Reader and puts
 // the contents into destination.
 func (tarFormat) Read(input io.Reader, destination string) error {
-	return untar(tar.NewReader(input), destination)
+	return untar(tar.NewReader(input), destination, false)
+}
+
+// Read untars a .tar file read from a Reader and puts
+// the contents into destination while preserving uid/gid.
+func (tarFormat) ReadPreserve(input io.Reader, destination string) error {
+	return untar(tar.NewReader(input), destination, true)
+}
+
+// Open untars source and puts the contents into destination
+// while preserving uid/gid.
+func (tarFormat) OpenPreserve(source, destination string) error {
+	return Tar.open(source, destination, true)
 }
 
 // Open untars source and puts the contents into destination.
 func (tarFormat) Open(source, destination string) error {
+	return Tar.open(source, destination, false)
+}
+
+// Private function used by Open and OpenPreserve
+func (tarFormat) open(source, destination string, preserveIds bool) error {
 	f, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("%s: failed to open archive: %v", source, err)
 	}
 	defer f.Close()
 
-	return Tar.Read(f, destination)
+	return untar(tar.NewReader(f), destination, preserveIds)
 }
 
 // untar un-tarballs the contents of tr into destination.
-func untar(tr *tar.Reader, destination string) error {
+func untar(tr *tar.Reader, destination string, preserveIds bool) error {
+	// Windows does not support preservation of UID/GID
+	if runtime.GOOS == "windows" {
+		preserveIds = false;
+	}
+
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -210,7 +234,7 @@ func untar(tr *tar.Reader, destination string) error {
 			return err
 		}
 
-		if err := untarFile(tr, header, destination); err != nil {
+		if err := untarFile(tr, header, destination, preserveIds); err != nil {
 			return err
 		}
 	}
@@ -218,17 +242,35 @@ func untar(tr *tar.Reader, destination string) error {
 }
 
 // untarFile untars a single file from tr with header header into destination.
-func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
+func untarFile(tr *tar.Reader, header *tar.Header, destination string, preserveIds bool) error {
+	var err error;
 	switch header.Typeflag {
 	case tar.TypeDir:
-		return mkdir(filepath.Join(destination, header.Name))
+		err = mkdir(filepath.Join(destination, header.Name))
+		break
 	case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
-		return writeNewFile(filepath.Join(destination, header.Name), tr, header.FileInfo().Mode())
+		err = writeNewFile(filepath.Join(destination, header.Name), tr, header.FileInfo().Mode())
+		break
 	case tar.TypeSymlink:
-		return writeNewSymbolicLink(filepath.Join(destination, header.Name), header.Linkname)
+		err = writeNewSymbolicLink(filepath.Join(destination, header.Name), header.Linkname)
+		break
 	case tar.TypeLink:
-		return writeNewHardLink(filepath.Join(destination, header.Name), filepath.Join(destination, header.Linkname))
+		err = writeNewHardLink(filepath.Join(destination, header.Name), filepath.Join(destination, header.Linkname))
+		break
 	default:
-		return fmt.Errorf("%s: unknown type flag: %c", header.Name, header.Typeflag)
+		err = fmt.Errorf("%s: unknown type flag: %c", header.Name, header.Typeflag)
+		break
 	}
+	if err != nil {
+		return err
+	}
+
+	if preserveIds && header.Name != "./" && header.Name != "." && runtime.GOOS != "windows" {
+		if err = os.Lchown(filepath.Join(destination, header.Name), header.Uid, header.Gid); err != nil {
+			return err
+		}
+		// If a special permission is set usage of the syscall is required.
+		return syscall.Chmod(filepath.Join(destination, header.Name), uint32(header.Mode))
+	}
+	return nil
 }

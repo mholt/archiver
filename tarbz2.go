@@ -104,3 +104,27 @@ func (tarBz2Format) Open(source, destination string) error {
 
 	return TarBz2.Read(f, destination)
 }
+
+// Read untars a .tar.bz2 file read from a Reader and decompresses
+// the contents into destination while preserving uid/gid.
+func (tarBz2Format) ReadPreserve(input io.Reader, destination string) error {
+	bz2r, err := bzip2.NewReader(input, nil)
+	if err != nil {
+		return fmt.Errorf("error decompressing bzip2: %v", err)
+	}
+	defer bz2r.Close()
+
+	return Tar.ReadPreserve(bz2r, destination)
+}
+
+// Open untars source and decompresses the contents into destination
+// while preserving uid/gid.
+func (tarBz2Format) OpenPreserve(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("%s: failed to open archive: %v", source, err)
+	}
+	defer f.Close()
+
+	return TarBz2.ReadPreserve(f, destination)
+}
