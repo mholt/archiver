@@ -22,6 +22,10 @@ type Archiver interface {
 	Write(output io.Writer, sources []string) error
 	// Read reads an archive from a Reader.
 	Read(input io.Reader, destination string) error
+	// Open extracts an archive file on disk while preserving uid/gid.
+	OpenPreserve(source, destination string) error
+	// Read reads an archive from a Reader while preserving uid/gid.
+	ReadPreserve(input io.Reader, destination string) error
 }
 
 // SupportedFormats contains all supported archive formats

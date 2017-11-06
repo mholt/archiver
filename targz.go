@@ -96,3 +96,27 @@ func (tarGzFormat) Open(source, destination string) error {
 
 	return TarGz.Read(f, destination)
 }
+
+// Read untars a .tar.gz file read from a Reader and decompresses
+// the contents into destination while preserving uid/gid.
+func (tarGzFormat) ReadPreserve(input io.Reader, destination string) error {
+	gzr, err := gzip.NewReader(input)
+	if err != nil {
+		return fmt.Errorf("error decompressing: %v", err)
+	}
+	defer gzr.Close()
+
+	return Tar.ReadPreserve(gzr, destination)
+}
+
+// Open untars source and decompresses the contents into destination
+// while preserving uid/gid.
+func (tarGzFormat) OpenPreserve(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("%s: failed to open archive: %v", source, err)
+	}
+	defer f.Close()
+
+	return TarGz.ReadPreserve(f, destination)
+}

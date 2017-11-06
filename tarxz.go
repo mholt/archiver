@@ -103,3 +103,26 @@ func (xzFormat) Open(source, destination string) error {
 
 	return TarXZ.Read(f, destination)
 }
+
+// Read untars a .tar.xz file read from a Reader and decompresses
+// the contents into destination while preserving uid/gid.
+func (xzFormat) ReadPreserve(input io.Reader, destination string) error {
+	xzr, err := xz.NewReader(input)
+	if err != nil {
+		return fmt.Errorf("error decompressing xz: %v", err)
+	}
+
+	return Tar.ReadPreserve(xzr, destination)
+}
+
+// Open untars source and decompresses the contents into destination
+// while preserving uid/gid.
+func (xzFormat) OpenPreserve(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("%s: failed to open archive: %v", source, err)
+	}
+	defer f.Close()
+
+	return TarXZ.ReadPreserve(f, destination)
+}
