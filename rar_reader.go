@@ -9,8 +9,6 @@ import (
 )
 var RarReader rarFormatReader
 
-type rarFormat struct{}
-
 type rarFormatEntry struct {
 	rarReader *rardecode.Reader
 	header    *rardecode.FileHeader
