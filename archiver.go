@@ -70,6 +70,40 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 	return nil
 }
 
+
+func writeNewFileFromEntry(destination string, entry Entry) error {
+	// if files come before their containing folders, then we must
+	// create their folders before writing the file
+	err := mkdir(filepath.Dir(filepath.Join(destination, entry.Name())))
+	if err != nil {
+		return err
+	}
+
+	fpath := filepath.Join(destination, entry.Name())
+
+	err = os.MkdirAll(filepath.Dir(fpath), 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+	}
+
+	out, err := os.Create(fpath)
+	if err != nil {
+		return fmt.Errorf("%s: creating new file: %v", fpath, err)
+	}
+	defer out.Close()
+
+	err = out.Chmod(entry.Mode())
+	if err != nil && runtime.GOOS != "windows" {
+		return fmt.Errorf("%s: changing file mode: %v", fpath, err)
+	}
+
+	err = entry.Write(out)
+	if err != nil {
+		return fmt.Errorf("%s: writing file: %v", fpath, err)
+	}
+	return nil
+}
+
 func writeNewSymbolicLink(fpath string, target string) error {
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
