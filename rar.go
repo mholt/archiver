@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/nwaples/rardecode"
 )
 
 // Rar is for RAR archive format
@@ -59,35 +57,31 @@ func (rarFormat) Make(rarPath string, filePaths []string) error {
 // Read extracts the RAR file read from input and puts the contents
 // into destination.
 func (rarFormat) Read(input io.Reader, destination string) error {
-	rr, err := rardecode.NewReader(input, "")
+	ar := RarReader
+	err := ar.Open(input)
+
 	if err != nil {
 		return fmt.Errorf("read: failed to create reader: %v", err)
 	}
 
+var entry Entry
+
 	for {
-		header, err := rr.Next()
-		if err == io.EOF {
+		entry, err = ar.ReadEntry()
+		if entry == NilEntry {
 			break
 		} else if err != nil {
 			return err
 		}
 
-		if header.IsDir {
-			err = mkdir(filepath.Join(destination, header.Name))
+		if entry.IsDirectory() {
+			err = mkdir(filepath.Join(destination, entry.Name()))
 			if err != nil {
 				return err
 			}
 			continue
 		}
-
-		// if files come before their containing folders, then we must
-		// create their folders before writing the file
-		err = mkdir(filepath.Dir(filepath.Join(destination, header.Name)))
-		if err != nil {
-			return err
-		}
-
-		err = writeNewFile(filepath.Join(destination, header.Name), rr, header.Mode())
+		err = writeNewFileFromEntry(destination, entry)
 		if err != nil {
 			return err
 		}

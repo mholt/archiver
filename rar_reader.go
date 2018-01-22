@@ -28,6 +28,13 @@ func (entry rarFormatEntry) IsDirectory() bool {
 	return false
 }
 
+func (entry rarFormatEntry) Mode() os.FileMode {
+	if entry.header != nil {
+		return entry.header.Mode()
+	}
+	return os.ModeAppend
+}
+
 func (entry *rarFormatEntry) Write(output io.Writer) error {
 	if entry.rarReader == nil {
 		return errors.New("no Reader")
