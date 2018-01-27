@@ -27,8 +27,8 @@ type Archiver interface {
 // SupportedFormats contains all supported archive formats
 var SupportedFormats = map[string]Archiver{}
 
-// WindowsReplacer replaces invalid characters in Windows filenames with underscore
-var WindowsReplacer = strings.NewReplacer(
+// windowsReplacer replaces invalid characters in Windows filenames with underscore
+var windowsReplacer = strings.NewReplacer(
 	"<", "_",
 	">", "_",
 	":", "_",
@@ -61,7 +61,7 @@ func MatchingFormat(fpath string) Archiver {
 
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 	if runtime.GOOS == "windows" {
-		fpath = WindowsReplacer.Replace(fpath)
+		fpath = windowsReplacer.Replace(fpath)
 	}
 
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -89,8 +89,8 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 
 func writeNewSymbolicLink(fpath string, target string) error {
 	if runtime.GOOS == "windows" {
-		fpath = WindowsReplacer.Replace(fpath)
-		target = WindowsReplacer.Replace(target)
+		fpath = windowsReplacer.Replace(fpath)
+		target = windowsReplacer.Replace(target)
 	}
 
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -108,8 +108,8 @@ func writeNewSymbolicLink(fpath string, target string) error {
 
 func writeNewHardLink(fpath string, target string) error {
 	if runtime.GOOS == "windows" {
-		fpath = WindowsReplacer.Replace(fpath)
-		target = WindowsReplacer.Replace(target)
+		fpath = windowsReplacer.Replace(fpath)
+		target = windowsReplacer.Replace(target)
 	}
 
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -127,7 +127,7 @@ func writeNewHardLink(fpath string, target string) error {
 
 func mkdir(dirPath string) error {
 	if runtime.GOOS == "windows" {
-		dirPath = WindowsReplacer.Replace(dirPath)
+		dirPath = windowsReplacer.Replace(dirPath)
 	}
 
 	err := os.MkdirAll(dirPath, 0755)
