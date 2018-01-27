@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // Archiver represent a archive format
@@ -25,6 +26,18 @@ type Archiver interface {
 
 // SupportedFormats contains all supported archive formats
 var SupportedFormats = map[string]Archiver{}
+
+// WindowsReplacer replaces invalid characters in Windows filenames with underscore
+var WindowsReplacer = strings.NewReplacer(
+	"<", "_",
+	">", "_",
+	":", "_",
+	"\"", "_",
+	"/", "_",
+	"?", "_",
+	"*", "_",
+	"|", "_",
+)
 
 // RegisterFormat adds a supported archive format
 func RegisterFormat(name string, format Archiver) {
@@ -47,6 +60,10 @@ func MatchingFormat(fpath string) Archiver {
 }
 
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
+	if runtime.GOOS == "windows" {
+		fpath = WindowsReplacer.Replace(fpath)
+	}
+
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -71,6 +88,11 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 }
 
 func writeNewSymbolicLink(fpath string, target string) error {
+	if runtime.GOOS == "windows" {
+		fpath = WindowsReplacer.Replace(fpath)
+		target = WindowsReplacer.Replace(target)
+	}
+
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -85,6 +107,11 @@ func writeNewSymbolicLink(fpath string, target string) error {
 }
 
 func writeNewHardLink(fpath string, target string) error {
+	if runtime.GOOS == "windows" {
+		fpath = WindowsReplacer.Replace(fpath)
+		target = WindowsReplacer.Replace(target)
+	}
+
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -99,6 +126,10 @@ func writeNewHardLink(fpath string, target string) error {
 }
 
 func mkdir(dirPath string) error {
+	if runtime.GOOS == "windows" {
+		dirPath = WindowsReplacer.Replace(dirPath)
+	}
+
 	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory: %v", dirPath, err)
