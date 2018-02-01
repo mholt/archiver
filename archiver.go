@@ -5,8 +5,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -39,6 +41,9 @@ var windowsReplacer = strings.NewReplacer(
 	"|", "_",
 )
 
+// replacedDirs tracks the replaced directory name for any given directory
+var replacedDirs = make(map[string]string)
+
 // RegisterFormat adds a supported archive format
 func RegisterFormat(name string, format Archiver) {
 	if _, ok := SupportedFormats[name]; ok {
@@ -59,9 +64,60 @@ func MatchingFormat(fpath string) Archiver {
 	return nil
 }
 
+// replaceInvalidChars corrects invalid file and directory characters,
+// and in the case of collision with an existing file or directory,
+// adds an incrementing integer to the end
+func replaceInvalidChars(name string, dir bool, rtype *strings.Replacer) string {
+	rawName := name
+	name = rtype.Replace(name)
+
+	if rawName != name {
+		// if a file belongs in a directory whose name was already replaced due
+		// to invalid characters, replace the raw directory name with the
+		// previously assigned replacement name
+		if !dir {
+			newDir, ok := replacedDirs[filepath.Dir(rawName)]
+
+			if ok {
+				name = path.Join(newDir, filepath.Base(name))
+			}
+		}
+
+		// if the proposed replacement name doesn't yet exist, it is good to go
+		if _, err := os.Stat(name); os.IsNotExist(err) {
+			if dir {
+				replacedDirs[rawName] = name
+			}
+
+			return name
+		}
+
+		// otherwise, loop until a unique sequence is found
+		seq := 0
+
+		for {
+			seq++
+
+			nameSeq := name + "-" + strconv.Itoa(seq)
+
+			if _, err := os.Stat(nameSeq); err == nil {
+				continue
+			}
+
+			if dir {
+				replacedDirs[rawName] = nameSeq
+			}
+
+			return nameSeq
+		}
+	}
+
+	return name
+}
+
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 	if runtime.GOOS == "windows" {
-		fpath = windowsReplacer.Replace(fpath)
+		fpath = replaceInvalidChars(fpath, false, windowsReplacer)
 	}
 
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -89,8 +145,8 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 
 func writeNewSymbolicLink(fpath string, target string) error {
 	if runtime.GOOS == "windows" {
-		fpath = windowsReplacer.Replace(fpath)
-		target = windowsReplacer.Replace(target)
+		fpath = replaceInvalidChars(fpath, false, windowsReplacer)
+		target = replaceInvalidChars(target, false, windowsReplacer)
 	}
 
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -108,8 +164,8 @@ func writeNewSymbolicLink(fpath string, target string) error {
 
 func writeNewHardLink(fpath string, target string) error {
 	if runtime.GOOS == "windows" {
-		fpath = windowsReplacer.Replace(fpath)
-		target = windowsReplacer.Replace(target)
+		fpath = replaceInvalidChars(fpath, false, windowsReplacer)
+		target = replaceInvalidChars(target, false, windowsReplacer)
 	}
 
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -127,7 +183,7 @@ func writeNewHardLink(fpath string, target string) error {
 
 func mkdir(dirPath string) error {
 	if runtime.GOOS == "windows" {
-		dirPath = windowsReplacer.Replace(dirPath)
+		dirPath = replaceInvalidChars(dirPath, true, windowsReplacer)
 	}
 
 	err := os.MkdirAll(dirPath, 0755)
