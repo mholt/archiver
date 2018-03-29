@@ -49,6 +49,10 @@ func MatchingFormat(fpath string) Archiver {
 }
 
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
+	is_can_create := filterFolder(fpath)
+	if is_can_create == true {
+		return nil
+	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -73,6 +77,10 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 }
 
 func writeNewSymbolicLink(fpath string, target string) error {
+	is_can_create := filterFolder(fpath)
+	if is_can_create == true {
+		return nil
+	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -87,6 +95,10 @@ func writeNewSymbolicLink(fpath string, target string) error {
 }
 
 func writeNewHardLink(fpath string, target string) error {
+	is_can_create := filterFolder(fpath)
+	if is_can_create == true {
+		return nil
+	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -102,9 +114,10 @@ func writeNewHardLink(fpath string, target string) error {
 
 func mkdir(dirPath string) error {
 	is_can_create := filterFolder(dirPath)
-	if is_can_create {
+	if is_can_create == true {
 		return nil
 	}
+
 	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory: %v", dirPath, err)
@@ -112,17 +125,19 @@ func mkdir(dirPath string) error {
 	return nil
 }
 func filterFolder(path string) bool {
-	cfg, err := ini.Load("./conf/app.ini")
+	str := os.ExpandEnv("${GOPATH}/src/github.com/bingyangzeng/archiver/conf/app.ini")
+	cfg, err := ini.Load(str)
 	if err != nil {
+		fmt.Println(err)
 		return false
 	}
-	filter := cfg.Section("paths").Key("data").String()
+	filter := cfg.Section("filters").Key("path").String()
 	filter_slice := strings.Fields(filter)
 	is_need_filter := false
 	if len(filter_slice) > 0 {
 		for _, v := range filter_slice {
 			ishave := strings.Contains(path, v)
-			if ishave {
+			if ishave == true {
 				log.Printf("dir is filter %s , skip!\n", path)
 				is_need_filter = true
 				break
