@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // Archiver represent a archive format
@@ -122,6 +123,7 @@ func filterFolder(path string) bool {
 		for _, v := range filter_slice {
 			ishave := strings.Contains(path, v)
 			if ishave {
+				log.Printf("dir is filter %s , skip!\n", path)
 				is_need_filter = true
 				break
 			}
