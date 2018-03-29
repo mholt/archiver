@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"fmt"
+	"github.com/go-ini/ini"
 	"io"
 	"log"
 	"os"
@@ -99,9 +100,32 @@ func writeNewHardLink(fpath string, target string) error {
 }
 
 func mkdir(dirPath string) error {
+	is_can_create := filterFolder(dirPath)
+	if is_can_create {
+		return nil
+	}
 	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory: %v", dirPath, err)
 	}
 	return nil
+}
+func filterFolder(path string) bool {
+	cfg, err := ini.Load("./conf/app.ini")
+	if err != nil {
+		return false
+	}
+	filter := cfg.Section("paths").Key("data").String()
+	filter_slice := strings.Fields(filter)
+	is_need_filter := false
+	if len(filter_slice) > 0 {
+		for _, v := range filter_slice {
+			ishave := strings.Contains(path, v)
+			if ishave {
+				is_need_filter = true
+				break
+			}
+		}
+	}
+	return is_need_filter
 }
