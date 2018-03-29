@@ -128,7 +128,9 @@ func filterFolder(path string) bool {
 	str := os.ExpandEnv("${GOPATH}/src/github.com/bingyangzeng/archiver/conf/app.ini")
 	cfg, err := ini.Load(str)
 	if err != nil {
-		fmt.Println(err)
+		cfg, err := ini.Load("./conf/app.ini")
+	}
+	if err != nil {
 		return false
 	}
 	filter := cfg.Section("filters").Key("path").String()
