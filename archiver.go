@@ -124,14 +124,27 @@ func mkdir(dirPath string) error {
 	}
 	return nil
 }
+func PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
 func filterFolder(path string) bool {
 	str := os.ExpandEnv("${GOPATH}/src/github.com/bingyangzeng/archiver/conf/app.ini")
-	cfg, err := ini.Load(str)
+	is_exists,err:= PathExists(str)
+	inipath := "./conf/app.ini"
+	if is_exists{
+		inipath = str 
+	}
+	cfg,err := ini.Load(inipath)
 	if err != nil {
-		cfg, err := ini.Load("./conf/app.ini")
-		if err != nil {
-			return false
-		}
+		fmt.Println(err)
+		return false
 	}
 	
 	filter := cfg.Section("filters").Key("path").String()
@@ -141,7 +154,7 @@ func filterFolder(path string) bool {
 		for _, v := range filter_slice {
 			ishave := strings.Contains(path, v)
 			if ishave == true {
-				log.Printf("dir is filter %s , skip!\n", path)
+				log.Printf("dir %s is filter %s , skip!\n",v, path)
 				is_need_filter = true
 				break
 			}
