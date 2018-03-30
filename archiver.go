@@ -49,8 +49,8 @@ func MatchingFormat(fpath string) Archiver {
 }
 
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
-	is_can_create := filterFolder(fpath)
-	if is_can_create == true {
+	isCanCreate := filterFolder(fpath)
+	if isCanCreate == true {
 		return nil
 	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -77,8 +77,8 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 }
 
 func writeNewSymbolicLink(fpath string, target string) error {
-	is_can_create := filterFolder(fpath)
-	if is_can_create == true {
+	isCanCreate := filterFolder(fpath)
+	if isCanCreate == true {
 		return nil
 	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -95,8 +95,8 @@ func writeNewSymbolicLink(fpath string, target string) error {
 }
 
 func writeNewHardLink(fpath string, target string) error {
-	is_can_create := filterFolder(fpath)
-	if is_can_create == true {
+	isCanCreate := filterFolder(fpath)
+	if isCanCreate == true {
 		return nil
 	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
@@ -113,8 +113,8 @@ func writeNewHardLink(fpath string, target string) error {
 }
 
 func mkdir(dirPath string) error {
-	is_can_create := filterFolder(dirPath)
-	if is_can_create == true {
+	isCanCreate := filterFolder(dirPath)
+	if isCanCreate == true {
 		return nil
 	}
 
@@ -124,7 +124,7 @@ func mkdir(dirPath string) error {
 	}
 	return nil
 }
-func PathExists(path string) (bool, error) {
+func pathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil
@@ -136,7 +136,7 @@ func PathExists(path string) (bool, error) {
 }
 func filterFolder(path string) bool {
 	str := os.ExpandEnv("${GOPATH}/src/github.com/bingyangzeng/archiver/conf/app.ini")
-	is_exists,err:= PathExists(str)
+	is_exists,err:= pathExists(str)
 	inipath := "./conf/app.ini"
 	if is_exists{
 		inipath = str 
@@ -148,17 +148,17 @@ func filterFolder(path string) bool {
 	}
 	
 	filter := cfg.Section("filters").Key("path").String()
-	filter_slice := strings.Fields(filter)
-	is_need_filter := false
-	if len(filter_slice) > 0 {
-		for _, v := range filter_slice {
+	filterSlice := strings.Fields(filter)
+	isNeedFilter := false
+	if len(filterSlice) > 0 {
+		for _, v := range filterSlice {
 			ishave := strings.Contains(path, v)
 			if ishave == true {
 				log.Printf("dir %s is filter %s , skip!\n",v, path)
-				is_need_filter = true
+				isNeedFilter = true
 				break
 			}
 		}
 	}
-	return is_need_filter
+	return isNeedFilter
 }
