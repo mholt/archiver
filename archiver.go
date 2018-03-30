@@ -136,9 +136,9 @@ func pathExists(path string) (bool, error) {
 }
 func filterFolder(path string) bool {
 	str := os.ExpandEnv("${GOPATH}/src/github.com/bingyangzeng/archiver/conf/app.ini")
-	is_exists,err:= pathExists(str)
+	isExists,err:= pathExists(str)
 	inipath := "./conf/app.ini"
-	if is_exists{
+	if isExists{
 		inipath = str 
 	}
 	cfg,err := ini.Load(inipath)
