@@ -129,10 +129,11 @@ func filterFolder(path string) bool {
 	cfg, err := ini.Load(str)
 	if err != nil {
 		cfg, err := ini.Load("./conf/app.ini")
+		if err != nil {
+			return false
+		}
 	}
-	if err != nil {
-		return false
-	}
+	
 	filter := cfg.Section("filters").Key("path").String()
 	filter_slice := strings.Fields(filter)
 	is_need_filter := false
