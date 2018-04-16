@@ -187,8 +187,15 @@ func unzipAll(r *zip.Reader, destination string) error {
 }
 
 func unzipFile(zf *zip.File, destination string) error {
+	// to avoid zip slip (writing outside of the destination), we resolve
+	// the target path, and make sure it's nested in the intended
+	// destination, or bail otherwise.
+	destpath := filepath.Join(destination, zf.Name)
+	if !strings.HasPrefix(destpath, destination) {
+		return fmt.Errorf("%s: illegal file path", zf.Name)
+	}
 	if strings.HasSuffix(zf.Name, "/") {
-		return mkdir(filepath.Join(destination, zf.Name))
+		return mkdir(destpath)
 	}
 
 	rc, err := zf.Open()
@@ -197,7 +204,7 @@ func unzipFile(zf *zip.File, destination string) error {
 	}
 	defer rc.Close()
 
-	return writeNewFile(filepath.Join(destination, zf.Name), rc, zf.FileInfo().Mode())
+	return writeNewFile(destpath, rc, zf.FileInfo().Mode())
 }
 
 // compressedFormats is a (non-exhaustive) set of lowercased

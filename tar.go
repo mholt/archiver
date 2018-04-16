@@ -219,15 +219,23 @@ func untar(tr *tar.Reader, destination string) error {
 
 // untarFile untars a single file from tr with header header into destination.
 func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
+	// to avoid zip slip (writing outside of the destination), we resolve
+	// the target path, and make sure it's nested in the intended
+	// destination, or bail otherwise.
+	destpath := filepath.Join(destination, header.Name)
+	if !strings.HasPrefix(destpath, destination) {
+		return fmt.Errorf("%s: illegal file path", header.Name)
+	}
+
 	switch header.Typeflag {
 	case tar.TypeDir:
-		return mkdir(filepath.Join(destination, header.Name))
+		return mkdir(destpath)
 	case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
-		return writeNewFile(filepath.Join(destination, header.Name), tr, header.FileInfo().Mode())
+		return writeNewFile(destpath, tr, header.FileInfo().Mode())
 	case tar.TypeSymlink:
-		return writeNewSymbolicLink(filepath.Join(destination, header.Name), header.Linkname)
+		return writeNewSymbolicLink(destpath, header.Linkname)
 	case tar.TypeLink:
-		return writeNewHardLink(filepath.Join(destination, header.Name), filepath.Join(destination, header.Linkname))
+		return writeNewHardLink(destpath, filepath.Join(destination, header.Linkname))
 	default:
 		return fmt.Errorf("%s: unknown type flag: %c", header.Name, header.Typeflag)
 	}

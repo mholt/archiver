@@ -27,7 +27,10 @@ func main() {
 		}
 		err = ff.Make(filename, os.Args[3:])
 	case "open":
-		dest := ""
+		dest, osErr := os.Getwd()
+		if osErr != nil {
+			fatal(err)
+		}
 		if len(os.Args) == 4 {
 			dest = os.Args[3]
 		} else if len(os.Args) > 4 {
