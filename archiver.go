@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // Archiver represent a archive format
@@ -102,6 +103,17 @@ func mkdir(dirPath string) error {
 	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory: %v", dirPath, err)
+	}
+	return nil
+}
+
+func sanitizeExtractPath(filePath string, destination string) error {
+	// to avoid zip slip (writing outside of the destination), we resolve
+	// the target path, and make sure it's nested in the intended
+	// destination, or bail otherwise.
+	destpath := filepath.Join(destination, filePath)
+	if !strings.HasPrefix(destpath, destination) {
+		return fmt.Errorf("%s: illegal file path", filePath)
 	}
 	return nil
 }

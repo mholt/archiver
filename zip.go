@@ -187,6 +187,11 @@ func unzipAll(r *zip.Reader, destination string) error {
 }
 
 func unzipFile(zf *zip.File, destination string) error {
+	err := sanitizeExtractPath(zf.Name, destination)
+	if err != nil {
+		return err
+	}
+
 	if strings.HasSuffix(zf.Name, "/") {
 		return mkdir(filepath.Join(destination, zf.Name))
 	}

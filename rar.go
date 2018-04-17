@@ -72,8 +72,15 @@ func (rarFormat) Read(input io.Reader, destination string) error {
 			return err
 		}
 
+		err = sanitizeExtractPath(header.Name, destination)
+		if err != nil {
+			return err
+		}
+
+		destpath := filepath.Join(destination, header.Name)
+
 		if header.IsDir {
-			err = mkdir(filepath.Join(destination, header.Name))
+			err = mkdir(destpath)
 			if err != nil {
 				return err
 			}
@@ -82,12 +89,12 @@ func (rarFormat) Read(input io.Reader, destination string) error {
 
 		// if files come before their containing folders, then we must
 		// create their folders before writing the file
-		err = mkdir(filepath.Dir(filepath.Join(destination, header.Name)))
+		err = mkdir(filepath.Dir(destpath))
 		if err != nil {
 			return err
 		}
 
-		err = writeNewFile(filepath.Join(destination, header.Name), rr, header.Mode())
+		err = writeNewFile(destpath, rr, header.Mode())
 		if err != nil {
 			return err
 		}
