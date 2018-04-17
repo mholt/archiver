@@ -21,7 +21,7 @@ func init() {
 type rarFormat struct{}
 
 func (rarFormat) Match(filename string) bool {
-	return strings.HasSuffix(strings.ToLower(filename), ".rar") || isRar(filename)
+	return strings.HasSuffix(strings.ToLower(filename), ".rar") || IsRar(filename)
 }
 
 // isRar checks the file has the RAR 1.5 or 5.0 format signature by reading its
