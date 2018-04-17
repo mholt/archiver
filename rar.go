@@ -72,13 +72,12 @@ func (rarFormat) Read(input io.Reader, destination string) error {
 			return err
 		}
 
-		// to avoid zip slip (writing outside of the destination), we
-		// resolve the target path, and make sure it's nested in
-		// the intended destination, or bail otherwise.
-		destpath := filepath.Join(destination, header.Name)
-		if !strings.HasPrefix(destpath, destination) {
-			return fmt.Errorf("%s: illegal file path", header.Name)
+		err = sanitizeExtractPath(header.Name, destination)
+		if err != nil {
+			return err
 		}
+
+		destpath := filepath.Join(destination, header.Name)
 
 		if header.IsDir {
 			err = mkdir(destpath)

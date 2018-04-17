@@ -219,13 +219,12 @@ func untar(tr *tar.Reader, destination string) error {
 
 // untarFile untars a single file from tr with header header into destination.
 func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
-	// to avoid zip slip (writing outside of the destination), we resolve
-	// the target path, and make sure it's nested in the intended
-	// destination, or bail otherwise.
-	destpath := filepath.Join(destination, header.Name)
-	if !strings.HasPrefix(destpath, destination) {
-		return fmt.Errorf("%s: illegal file path", header.Name)
+	err := sanitizeExtractPath(header.Name, destination)
+	if err != nil {
+		return err
 	}
+
+	destpath := filepath.Join(destination, header.Name)
 
 	switch header.Typeflag {
 	case tar.TypeDir:
