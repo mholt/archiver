@@ -2,11 +2,13 @@ package archiver
 
 import (
 	"fmt"
+	"github.com/go-ini/ini"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // Archiver represent a archive format
@@ -47,6 +49,10 @@ func MatchingFormat(fpath string) Archiver {
 }
 
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
+	isCanCreate := filterFolder(fpath)
+	if isCanCreate == true {
+		return nil
+	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -71,6 +77,10 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 }
 
 func writeNewSymbolicLink(fpath string, target string) error {
+	isCanCreate := filterFolder(fpath)
+	if isCanCreate == true {
+		return nil
+	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -85,6 +95,10 @@ func writeNewSymbolicLink(fpath string, target string) error {
 }
 
 func writeNewHardLink(fpath string, target string) error {
+	isCanCreate := filterFolder(fpath)
+	if isCanCreate == true {
+		return nil
+	}
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -99,9 +113,52 @@ func writeNewHardLink(fpath string, target string) error {
 }
 
 func mkdir(dirPath string) error {
+	isCanCreate := filterFolder(dirPath)
+	if isCanCreate == true {
+		return nil
+	}
+
 	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory: %v", dirPath, err)
 	}
 	return nil
+}
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+func filterFolder(path string) bool {
+	str := os.ExpandEnv("${GOPATH}/src/github.com/bingyangzeng/archiver/conf/app.ini")
+	isExists,_:= pathExists(str)
+	inipath := "./conf/app.ini"
+	if isExists{
+		inipath = str 
+	}
+	cfg,err := ini.Load(inipath)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	
+	filter := cfg.Section("filters").Key("path").String()
+	filterSlice := strings.Fields(filter)
+	isNeedFilter := false
+	if len(filterSlice) > 0 {
+		for _, v := range filterSlice {
+			ishave := strings.Contains(path, v)
+			if ishave == true {
+				log.Printf("dir %s is filter %s , skip!\n",v, path)
+				isNeedFilter = true
+				break
+			}
+		}
+	}
+	return isNeedFilter
 }
