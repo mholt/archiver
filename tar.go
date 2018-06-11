@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/cyphar/filepath-securejoin"
 )
 
 // Tar is for Tar format
@@ -224,7 +226,10 @@ func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
 		return err
 	}
 
-	destpath := filepath.Join(destination, header.Name)
+	destpath, err := securejoin.SecureJoin(destination, header.Name)
+	if err != nil {
+		return err
+	}
 
 	switch header.Typeflag {
 	case tar.TypeDir:
@@ -234,7 +239,12 @@ func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
 	case tar.TypeSymlink:
 		return writeNewSymbolicLink(destpath, header.Linkname)
 	case tar.TypeLink:
-		return writeNewHardLink(destpath, filepath.Join(destination, header.Linkname))
+		linkpath, err := securejoin.SecureJoin(destination, header.Linkname)
+		if err != nil {
+			return err
+		}
+		return writeNewHardLink(
+			destpath, linkpath)
 	default:
 		return fmt.Errorf("%s: unknown type flag: %c", header.Name, header.Typeflag)
 	}

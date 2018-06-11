@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cyphar/filepath-securejoin"
 	"github.com/nwaples/rardecode"
 )
 
@@ -77,8 +78,10 @@ func (rarFormat) Read(input io.Reader, destination string) error {
 			return err
 		}
 
-		destpath := filepath.Join(destination, header.Name)
-
+		destpath, err := securejoin.SecureJoin(destination, header.Name)
+		if err != nil {
+			return err
+		}
 		if header.IsDir {
 			err = mkdir(destpath)
 			if err != nil {
