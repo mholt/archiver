@@ -12,6 +12,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/cyphar/filepath-securejoin"
 )
 
 // Zip is for Zip format
@@ -192,8 +194,12 @@ func unzipFile(zf *zip.File, destination string) error {
 		return err
 	}
 
+	destpath, err := securejoin.SecureJoin(destination, zf.Name)
+	if err != nil {
+		return fmt.Errorf("%s: calculating file path: %v", zf.Name, err)
+	}
 	if strings.HasSuffix(zf.Name, "/") {
-		return mkdir(filepath.Join(destination, zf.Name))
+		return mkdir(destpath)
 	}
 
 	rc, err := zf.Open()
@@ -202,7 +208,7 @@ func unzipFile(zf *zip.File, destination string) error {
 	}
 	defer rc.Close()
 
-	return writeNewFile(filepath.Join(destination, zf.Name), rc, zf.FileInfo().Mode())
+	return writeNewFile(destpath, rc, zf.FileInfo().Mode())
 }
 
 // compressedFormats is a (non-exhaustive) set of lowercased
