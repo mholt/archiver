@@ -235,6 +235,9 @@ func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
 		return writeNewSymbolicLink(destpath, header.Linkname)
 	case tar.TypeLink:
 		return writeNewHardLink(destpath, filepath.Join(destination, header.Linkname))
+	case tar.TypeXGlobalHeader:
+		// ignore the pax global header from git generated tarballs
+		return nil
 	default:
 		return fmt.Errorf("%s: unknown type flag: %c", header.Name, header.Typeflag)
 	}
