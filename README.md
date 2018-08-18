@@ -81,3 +81,30 @@ No. This works just like your OS would make an archive in the file explorer: org
 #### Can it add files to an existing archive?
 
 Nope. This is a simple tool; it just makes new archives or extracts existing ones.
+
+
+## Project Values
+
+This project has a few principle-based goals that guide its development:
+
+- **Do one thing really well.** That is creating and opening archive files. It is not meant to be a replacement for specific archive format tools like tar, zip, etc. that have lots of features and customizability. (Some customizability is OK, but not to the extent that it becomes complicated or error-prone.)
+
+- **Have good tests.** Changes should be covered by tests.
+
+- **Limit dependencies.** Keep the package lightweight.
+
+- **Pure Go.** This means no cgo or other external/system dependencies. This package should be able to stand on its own and cross-compile easily to any platform.
+
+- **Idiomatic Go.** Keep interfaces small, variable names semantic, vet shows no errors, the linter is generally quiet, etc.
+
+- **Be elegant.** This package should be elegant to use and its code should be elegant when reading and testing. If it doesn't feel good, fix it up.
+
+- **Well-documented.** Use comments prudently; explain why non-obvious code is necessary (and use tests to enforce it). Keep the docs updated, and have examples where helpful.
+
+- **Keep it efficient.** This often means keep it simple. Fast code is valuable.
+
+- **Consensus.** Contributions should ideally be approved by multiple reviewers before being merged. Generally, avoid merging multi-chunk changes that do not go through at least one or two iterations/reviews. Except for trivial changes, PRs are seldom ready to merge right away.
+
+- **Have fun contributing.** Coding is awesome!
+
+We welcome contributions and appreciate your efforts! However, please open issues to discuss any changes before spending the time preparing a pull request. This will save time, reduce frustration, and help coordinate the work. Thank you!
