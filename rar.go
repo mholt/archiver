@@ -64,6 +64,22 @@ func (rarFormat) Read(input io.Reader, destination string) error {
 		return fmt.Errorf("read: failed to create reader: %v", err)
 	}
 
+	return extract(rr, destination)
+}
+
+// Open extracts the RAR file at source and puts the contents
+// into destination.
+func (rarFormat) Open(source, destination string) error {
+	rf, err := rardecode.OpenReader(source, "")
+	if err != nil {
+		return fmt.Errorf("%s: failed to open file: %v", source, err)
+	}
+	defer rf.Close()
+
+	return extract(&rf.Reader, destination)
+}
+
+func extract(rr *rardecode.Reader, destination string) error {
 	for {
 		header, err := rr.Next()
 		if err == io.EOF {
@@ -101,16 +117,4 @@ func (rarFormat) Read(input io.Reader, destination string) error {
 	}
 
 	return nil
-}
-
-// Open extracts the RAR file at source and puts the contents
-// into destination.
-func (rarFormat) Open(source, destination string) error {
-	rf, err := os.Open(source)
-	if err != nil {
-		return fmt.Errorf("%s: failed to open file: %v", source, err)
-	}
-	defer rf.Close()
-
-	return Rar.Read(rf, destination)
 }
