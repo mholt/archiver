@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // Tar is for Tar format
@@ -113,8 +115,25 @@ func writeTar(filePaths []string, output io.Writer, dest string) error {
 // tarball writes all files listed in filePaths into tarWriter, which is
 // writing into a file located at dest.
 func tarball(filePaths []string, tarWriter *tar.Writer, dest string) error {
+
+	// it is realy a good idea to make all the path be absolute path. because they will be compared with standard path later.
+	var err error
+	if !filepath.IsAbs(dest) {
+		dest, err = filepath.Abs(dest)
+		if err != nil {
+			return errors.Wrapf(err, "get absolute path failed")
+		}
+	}
+
 	for _, fpath := range filePaths {
-		err := tarFile(tarWriter, fpath, dest)
+		if !filepath.IsAbs(fpath) {
+			fpath, err = filepath.Abs(fpath)
+			if err != nil {
+				return errors.Wrapf(err, "get absolute path failed")
+			}
+		}
+
+		err = tarFile(tarWriter, fpath, dest)
 		if err != nil {
 			return err
 		}
@@ -149,7 +168,7 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 			header.Name = filepath.ToSlash(filepath.Join(baseDir, strings.TrimPrefix(path, source)))
 		}
 
-		if header.Name == dest {
+		if path == dest {
 			// our new tar file is inside the directory being archived; skip it
 			return nil
 		}
