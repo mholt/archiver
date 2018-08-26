@@ -89,6 +89,6 @@ const usage = `Usage: archiver {make|open} <archive file> [files...]
     archiver will overwrite the existing file. When
     extracting files, archiver will NOT overwrite files
     that already exist in the destination path; this
-	is treated as an error and extraction will abort.
+    is treated as an error and extraction will abort.
 
   Use "archiver -h" to display this help message`
