@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -135,18 +136,22 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 		baseDir = filepath.Base(source)
 	}
 
-	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(source, func(fpath string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("error walking to %s: %v", path, err)
+			return fmt.Errorf("error walking to %s: %v", fpath, err)
 		}
 
-		header, err := tar.FileInfoHeader(info, path)
+		header, err := tar.FileInfoHeader(info, fpath)
 		if err != nil {
-			return fmt.Errorf("%s: making header: %v", path, err)
+			return fmt.Errorf("%s: making header: %v", fpath, err)
 		}
 
 		if baseDir != "" {
-			header.Name = filepath.ToSlash(filepath.Join(baseDir, strings.TrimPrefix(path, source)))
+			name, err := filepath.Rel(source, fpath)
+			if err != nil {
+				return err
+			}
+			header.Name = path.Join(baseDir, filepath.ToSlash(name))
 		}
 
 		if header.Name == dest {
@@ -160,7 +165,7 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 
 		err = tarWriter.WriteHeader(header)
 		if err != nil {
-			return fmt.Errorf("%s: writing header: %v", path, err)
+			return fmt.Errorf("%s: writing header: %v", fpath, err)
 		}
 
 		if info.IsDir() {
@@ -168,15 +173,15 @@ func tarFile(tarWriter *tar.Writer, source, dest string) error {
 		}
 
 		if header.Typeflag == tar.TypeReg {
-			file, err := os.Open(path)
+			file, err := os.Open(fpath)
 			if err != nil {
-				return fmt.Errorf("%s: open: %v", path, err)
+				return fmt.Errorf("%s: open: %v", fpath, err)
 			}
 			defer file.Close()
 
 			_, err = io.CopyN(tarWriter, file, info.Size())
 			if err != nil && err != io.EOF {
-				return fmt.Errorf("%s: copying contents: %v", path, err)
+				return fmt.Errorf("%s: copying contents: %v", fpath, err)
 			}
 		}
 		return nil
