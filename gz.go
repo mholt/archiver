@@ -18,9 +18,27 @@ func init() {
 type gzFormat struct{}
 
 func (gzFormat) Match(filename string) bool {
-	return strings.HasSuffix(strings.ToLower(filename), ".gz") &&
+	return (strings.HasSuffix(strings.ToLower(filename), ".gz") &&
 		!strings.HasSuffix(strings.ToLower(filename), ".tar.gz") &&
-		!strings.HasSuffix(strings.ToLower(filename), ".tgz")
+		!strings.HasSuffix(strings.ToLower(filename), ".tgz")) ||
+		(!isTarGz(filename) &&
+			isGz(filename))
+}
+
+// isGz checks if the file is a valid gzip.
+func isGz(gzPath string) bool {
+	f, err := os.Open(gzPath)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	_, err = gzip.NewReader(f)
+	if err == gzip.ErrHeader {
+		return false
+	}
+
+	return true
 }
 
 // Write outputs to a Writer the gzip'd contents of the first file listed in

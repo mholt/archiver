@@ -19,9 +19,32 @@ func init() {
 type bzip2Format struct{}
 
 func (bzip2Format) Match(filename string) bool {
-	return strings.HasSuffix(strings.ToLower(filename), ".bz2") &&
+	return (strings.HasSuffix(strings.ToLower(filename), ".bz2") &&
 		!strings.HasSuffix(strings.ToLower(filename), ".tar.bz2") &&
-		!strings.HasSuffix(strings.ToLower(filename), ".tbz2")
+		!strings.HasSuffix(strings.ToLower(filename), ".tbz2")) ||
+		(!isTarBz2(filename) &&
+			isBz2(filename))
+}
+
+// isBz2 checks if the file is a valid bzip2.
+func isBz2(bzip2Path string) bool {
+	f, err := os.Open(bzip2Path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	bzip2r, err := bzip2.NewReader(f, nil)
+	if err != nil {
+		return false
+	}
+
+	buf := make([]byte, 16)
+	if _, err = io.ReadFull(bzip2r, buf); err != nil {
+		return false
+	}
+
+	return true
 }
 
 // Write outputs to a Writer the bzip2'd contents of the first file listed in
