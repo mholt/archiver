@@ -86,7 +86,7 @@ func testMakeOpen(t *testing.T, name string, ar Archiver) {
 
 // testMakeOpenWithDestinationEndingInSlash is similar to testMakeOpen except that
 // it tests the case where destination path has a terminating forward slash especially
-// on Windows os
+// on Windows os. 
 func testMakeOpenWithDestinationEndingInSlash(t *testing.T, name string, ar Archiver) {
 	tmp, err := ioutil.TempDir("", "archiver")
 	if err != nil {
