@@ -19,6 +19,7 @@ func TestArchiver(t *testing.T) {
 			}
 			testWriteRead(t, name, ar)
 			testMakeOpen(t, name, ar)
+			testMakeOpenWithDestinationEndingInSlash(t, name, ar)
 		})
 	}
 }
@@ -75,6 +76,39 @@ func testMakeOpen(t *testing.T, name string, ar Archiver) {
 	dest := filepath.Join(tmp, "extraction_test")
 	os.Mkdir(dest, 0755)
 	err = ar.Open(outfile, dest)
+	if err != nil {
+		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", name, outfile, dest, err)
+	}
+
+	// Check that what was extracted is what was compressed
+	symmetricTest(t, name, dest)
+}
+
+// testMakeOpenWithDestinationEndingInSlash is similar to testMakeOpen except that
+// it tests the case where destination path has a terminating forward slash especially
+// on Windows os.
+func testMakeOpenWithDestinationEndingInSlash(t *testing.T, name string, ar Archiver) {
+	tmp, err := ioutil.TempDir("", "archiver")
+	if err != nil {
+		t.Fatalf("[%s] %v", name, err)
+	}
+	defer os.RemoveAll(tmp)
+
+	// Test creating archive
+	outfile := filepath.Join(tmp, "test-"+name)
+	err = ar.Make(outfile, []string{"testdata"})
+	if err != nil {
+		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", name, err)
+	}
+
+	if !ar.Match(outfile) {
+		t.Fatalf("[%s] identifying format should be 'true', but got 'false'", name)
+	}
+
+	// Test extracting archive with destination that has a slash at the end
+	dest := filepath.Join(tmp, "extraction_test")
+	os.Mkdir(dest, 0755)
+	err = ar.Open(outfile, dest+"/")
 	if err != nil {
 		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", name, outfile, dest, err)
 	}
