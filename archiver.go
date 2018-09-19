@@ -112,7 +112,7 @@ func sanitizeExtractPath(filePath string, destination string) error {
 	// the target path, and make sure it's nested in the intended
 	// destination, or bail otherwise.
 	destpath := filepath.Join(destination, filePath)
-	if !strings.HasPrefix(destpath, destination) {
+	if !strings.HasPrefix(destpath, filepath.Clean(destination)) {
 		return fmt.Errorf("%s: illegal file path", filePath)
 	}
 	return nil
