@@ -219,7 +219,7 @@ func untar(tr *tar.Reader, destination string) error {
 
 // untarFile untars a single file from tr with header header into destination.
 func untarFile(tr *tar.Reader, header *tar.Header, destination string) error {
-	destpath, err := OnlineExtractPath(header.Name, destination)
+	destpath, err := DefaultExtractPathFunc(header.Name, destination)
 	if err != nil {
 		return err
 	}

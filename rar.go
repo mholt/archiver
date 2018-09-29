@@ -88,7 +88,7 @@ func extract(rr *rardecode.Reader, destination string) error {
 			return err
 		}
 
-		destpath, err := OnlineExtractPath(header.Name, destination)
+		destpath, err := DefaultExtractPathFunc(header.Name, destination)
 		if err != nil {
 			return err
 		}

@@ -187,13 +187,13 @@ func unzipAll(r *zip.Reader, destination string) error {
 }
 
 func unzipFile(zf *zip.File, destination string) error {
-	err := sanitizeExtractPath(zf.Name, destination)
+	destpath, err := DefaultExtractPathFunc(zf.Name, destination)
 	if err != nil {
 		return err
 	}
 
 	if strings.HasSuffix(zf.Name, "/") {
-		return mkdir(filepath.Join(destination, zf.Name))
+		return mkdir(destpath)
 	}
 
 	rc, err := zf.Open()
@@ -202,7 +202,7 @@ func unzipFile(zf *zip.File, destination string) error {
 	}
 	defer rc.Close()
 
-	return writeNewFile(filepath.Join(destination, zf.Name), rc, zf.FileInfo().Mode())
+	return writeNewFile(destpath, rc, zf.FileInfo().Mode())
 }
 
 // compressedFormats is a (non-exhaustive) set of lowercased
