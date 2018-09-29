@@ -88,12 +88,10 @@ func extract(rr *rardecode.Reader, destination string) error {
 			return err
 		}
 
-		err = sanitizeExtractPath(header.Name, destination)
+		destpath, err := OnlineExtractPath(header.Name, destination)
 		if err != nil {
 			return err
 		}
-
-		destpath := filepath.Join(destination, header.Name)
 
 		if header.IsDir {
 			err = mkdir(destpath)
