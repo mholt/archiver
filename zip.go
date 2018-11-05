@@ -115,12 +115,7 @@ func zipFile(w *zip.Writer, source string) error {
 			header.Name += "/"
 			header.Method = zip.Store
 		} else {
-			ext := strings.ToLower(path.Ext(header.Name))
-			if _, ok := compressedFormats[ext]; ok {
-				header.Method = zip.Store
-			} else {
-				header.Method = zip.Deflate
-			}
+			header.Method = zip.Deflate
 		}
 
 		writer, err := w.CreateHeader(header)
@@ -203,36 +198,4 @@ func unzipFile(zf *zip.File, destination string) error {
 	defer rc.Close()
 
 	return writeNewFile(filepath.Join(destination, zf.Name), rc, zf.FileInfo().Mode())
-}
-
-// compressedFormats is a (non-exhaustive) set of lowercased
-// file extensions for formats that are typically already
-// compressed. Compressing already-compressed files often
-// results in a larger file, so when possible, we check this
-// set to avoid that.
-var compressedFormats = map[string]struct{}{
-	".7z":   {},
-	".avi":  {},
-	".bz2":  {},
-	".cab":  {},
-	".gif":  {},
-	".gz":   {},
-	".jar":  {},
-	".jpeg": {},
-	".jpg":  {},
-	".lz":   {},
-	".lzma": {},
-	".mov":  {},
-	".mp3":  {},
-	".mp4":  {},
-	".mpeg": {},
-	".mpg":  {},
-	".png":  {},
-	".rar":  {},
-	".tbz2": {},
-	".tgz":  {},
-	".txz":  {},
-	".xz":   {},
-	".zip":  {},
-	".zipx": {},
 }
