@@ -510,6 +510,8 @@ func (t *Tar) Extract(source, target, destination string) error {
 	})
 }
 
+func (t *Tar) String() string { return "tar" }
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(Tar))

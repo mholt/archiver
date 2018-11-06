@@ -91,6 +91,8 @@ func (tgz *TarGz) wrapReader() {
 	}
 }
 
+func (tgz *TarGz) String() string { return "tar.gz" }
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(TarGz))

@@ -302,6 +302,8 @@ func (r *Rar) Extract(source, target, destination string) error {
 	})
 }
 
+func (r *Rar) String() string { return "rar" }
+
 type rarFileInfo struct {
 	fh *rardecode.FileHeader
 }

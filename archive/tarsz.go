@@ -82,6 +82,8 @@ func (tsz *TarSz) wrapReader() {
 	}
 }
 
+func (tsz *TarSz) String() string { return "tar.sz" }
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(TarSz))

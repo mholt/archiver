@@ -93,6 +93,8 @@ func (tbz2 *TarBz2) wrapReader() {
 	}
 }
 
+func (tbz2 *TarBz2) String() string { return "tar.bz2" }
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(TarBz2))

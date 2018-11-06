@@ -481,6 +481,8 @@ func (z *Zip) Extract(source, target, destination string) error {
 	})
 }
 
+func (z *Zip) String() string { return "zip" }
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(Zip))
@@ -508,7 +510,9 @@ var compressedFormats = map[string]struct{}{
 	".jpeg": {},
 	".jpg":  {},
 	".lz":   {},
+	".lz4":  {},
 	".lzma": {},
+	".m4v":  {},
 	".mov":  {},
 	".mp3":  {},
 	".mp4":  {},
@@ -517,8 +521,10 @@ var compressedFormats = map[string]struct{}{
 	".png":  {},
 	".pptx": {},
 	".rar":  {},
+	".sz":   {},
 	".tbz2": {},
 	".tgz":  {},
+	".tsz":  {},
 	".txz":  {},
 	".xlsx": {},
 	".xz":   {},
