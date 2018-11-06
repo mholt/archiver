@@ -51,11 +51,10 @@ type Tar struct {
 	cleanupWrapFn func()
 }
 
-// Archive creates a .tar file at destination containing
-// the files listed in sources. The destination must end
-// with ".tar". File paths can be those of regular files
-// or directories. Regular files are stored at the 'root'
-// of the archive, and directories are recursively added.
+// Archive creates a tarball file at destination containing
+// the files listed in sources. The destination must end with
+// ".tar". File paths can be those of regular files or
+// directories; directories will be recursively added.
 func (t *Tar) Archive(sources []string, destination string) error {
 	if t.writerWrapFn == nil && !strings.HasSuffix(destination, ".tar") {
 		return fmt.Errorf("output filename must have .tar extension")
@@ -358,8 +357,8 @@ func (t *Tar) Write(f File) error {
 	return nil
 }
 
-// Open opens t for reading an archive from in.
-// The size parameter is not needed.
+// Open opens t for reading an archive from
+// in. The size parameter is not used.
 func (t *Tar) Open(in io.Reader, size int64) error {
 	if t.tr != nil {
 		return fmt.Errorf("tar archive is already open for reading")

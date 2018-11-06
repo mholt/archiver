@@ -17,12 +17,11 @@ type TarGz struct {
 	CompressionLevel int
 }
 
-// Archive creates a gzip-compressed tar file at
-// destination containing the files listed in sources.
-// The destination must end with ".tar.gz" or ".tgz".
-// File paths can be those of regular files or
-// directories. Regular files are stored at the 'root'
-// of the archive, and directories are recursively added.
+// Archive creates a compressed tar file at destination
+// containing the files listed in sources. The destination
+// must end with ".tar.gz" or ".tgz". File paths can be
+// those of regular files or directories; directories will
+// be recursively added.
 func (tgz *TarGz) Archive(sources []string, destination string) error {
 	if !strings.HasSuffix(destination, ".tar.gz") &&
 		!strings.HasSuffix(destination, ".tgz") {
@@ -32,8 +31,8 @@ func (tgz *TarGz) Archive(sources []string, destination string) error {
 	return tgz.Tar.Archive(sources, destination)
 }
 
-// Unarchive unpacks the gzip-compressed tarball
-// at source to destination. Destination will be
+// Unarchive unpacks the compressed tarball at
+// source to destination. Destination will be
 // treated as a folder name.
 func (tgz *TarGz) Unarchive(source, destination string) error {
 	tgz.wrapReader()
@@ -46,15 +45,15 @@ func (tgz *TarGz) Walk(archive string, walkFn WalkFunc) error {
 	return tgz.Tar.Walk(archive, walkFn)
 }
 
-// Create opens tgz for writing a gzip-compressed
+// Create opens txz for writing a compressed
 // tar archive to out.
 func (tgz *TarGz) Create(out io.Writer) error {
 	tgz.wrapWriter()
 	return tgz.Create(out)
 }
 
-// Open opens t for reading an archive from in.
-// The size parameter is not needed.
+// Open opens t for reading a compressed archive from
+// in. The size parameter is not used.
 func (tgz *TarGz) Open(in io.Reader, size int64) error {
 	tgz.wrapReader()
 	return tgz.Tar.Open(in, size)
