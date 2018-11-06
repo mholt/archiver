@@ -11,9 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mholt/archiver/archiver"
 	"github.com/nwaples/rardecode"
-
-	"github.com/mholt/archiver/archive"
 )
 
 var (
@@ -56,34 +55,34 @@ func main() {
 	// run the desired command
 	switch subcommand {
 	case "archive":
-		a, ok := iface.(archive.Archiver)
+		a, ok := iface.(archiver.Archiver)
 		if !ok {
 			fatalf("the archive command does not support the %s format", iface)
 		}
 		err = a.Archive(flag.Args()[2:], flag.Arg(1))
 
 	case "unarchive":
-		a, ok := iface.(archive.Unarchiver)
+		a, ok := iface.(archiver.Unarchiver)
 		if !ok {
 			fatalf("the unarchive command does not support the %s format", iface)
 		}
 		err = a.Unarchive(flag.Arg(1), flag.Arg(2))
 
 	case "extract":
-		e, ok := iface.(archive.Extractor)
+		e, ok := iface.(archiver.Extractor)
 		if !ok {
 			fatalf("the extract command does not support the %s format", iface)
 		}
 		err = e.Extract(flag.Arg(1), flag.Arg(2), flag.Arg(3))
 
 	case "ls":
-		w, ok := iface.(archive.Walker)
+		w, ok := iface.(archiver.Walker)
 		if !ok {
 			fatalf("the ls command does not support the %s format", iface)
 		}
 
 		var count int
-		err = w.Walk(flag.Arg(1), func(f archive.File) error {
+		err = w.Walk(flag.Arg(1), func(f archiver.File) error {
 			count++
 			switch h := f.Header.(type) {
 			case *zip.FileHeader:
@@ -127,11 +126,11 @@ func main() {
 		fmt.Printf("total %d", count)
 
 	case "compress":
-		c, ok := iface.(archive.Compressor)
+		c, ok := iface.(archiver.Compressor)
 		if !ok {
 			fatalf("the compress command does not support the %s format", iface)
 		}
-		fc := archive.FileCompressor{Compressor: c}
+		fc := archiver.FileCompressor{Compressor: c}
 
 		in := flag.Arg(1)
 		out := flag.Arg(2)
@@ -148,11 +147,11 @@ func main() {
 		}
 
 	case "decompress":
-		c, ok := iface.(archive.Decompressor)
+		c, ok := iface.(archiver.Decompressor)
 		if !ok {
 			fatalf("the compress command does not support the %s format", iface)
 		}
-		fc := archive.FileCompressor{Decompressor: c}
+		fc := archiver.FileCompressor{Decompressor: c}
 
 		in := flag.Arg(1)
 		out := flag.Arg(2)
@@ -200,7 +199,7 @@ func getFormat(subcommand string) (interface{}, error) {
 
 	// configure an archiver
 	var iface interface{}
-	mytar := &archive.Tar{
+	mytar := &archiver.Tar{
 		OverwriteExisting:      overwriteExisting,
 		MkdirAll:               mkdirAll,
 		ImplicitTopLevelFolder: implicitTopLevelFolder,
@@ -209,7 +208,7 @@ func getFormat(subcommand string) (interface{}, error) {
 
 	switch ext {
 	case ".rar":
-		iface = &archive.Rar{
+		iface = &archiver.Rar{
 			OverwriteExisting:      overwriteExisting,
 			MkdirAll:               mkdirAll,
 			ImplicitTopLevelFolder: implicitTopLevelFolder,
@@ -223,14 +222,14 @@ func getFormat(subcommand string) (interface{}, error) {
 	case ".tbz2":
 		fallthrough
 	case ".tar.bz2":
-		iface = &archive.TarBz2{
+		iface = &archiver.TarBz2{
 			Tar: mytar,
 		}
 
 	case ".tgz":
 		fallthrough
 	case ".tar.gz":
-		iface = &archive.TarGz{
+		iface = &archiver.TarGz{
 			Tar:              mytar,
 			CompressionLevel: compressionLevel,
 		}
@@ -238,7 +237,7 @@ func getFormat(subcommand string) (interface{}, error) {
 	case ".tlz4":
 		fallthrough
 	case ".tar.lz4":
-		iface = &archive.TarLz4{
+		iface = &archiver.TarLz4{
 			Tar:              mytar,
 			CompressionLevel: compressionLevel,
 		}
@@ -246,19 +245,19 @@ func getFormat(subcommand string) (interface{}, error) {
 	case ".tsz":
 		fallthrough
 	case ".tar.sz":
-		iface = &archive.TarSz{
+		iface = &archiver.TarSz{
 			Tar: mytar,
 		}
 
 	case ".txz":
 		fallthrough
 	case ".tar.xz":
-		iface = &archive.TarXz{
+		iface = &archiver.TarXz{
 			Tar: mytar,
 		}
 
 	case ".zip":
-		iface = &archive.Zip{
+		iface = &archiver.Zip{
 			CompressionLevel:       compressionLevel,
 			OverwriteExisting:      overwriteExisting,
 			MkdirAll:               mkdirAll,
@@ -268,25 +267,25 @@ func getFormat(subcommand string) (interface{}, error) {
 		}
 
 	case ".gz":
-		iface = &archive.Gz{
+		iface = &archiver.Gz{
 			CompressionLevel: compressionLevel,
 		}
 
 	case ".bz2":
-		iface = &archive.Bz2{
+		iface = &archiver.Bz2{
 			CompressionLevel: compressionLevel,
 		}
 
 	case ".lz4":
-		iface = &archive.Lz4{
+		iface = &archiver.Lz4{
 			CompressionLevel: compressionLevel,
 		}
 
 	case ".sz":
-		iface = &archive.Snappy{}
+		iface = &archiver.Snappy{}
 
 	case ".xz":
-		iface = &archive.Xz{}
+		iface = &archiver.Xz{}
 
 	default:
 		archiveExt := filepath.Ext(archiveName)
