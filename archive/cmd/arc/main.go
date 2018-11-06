@@ -35,25 +35,164 @@ func init() {
 }
 
 func main() {
-	if len(os.Args) == 2 &&
+	if len(os.Args) >= 2 &&
 		(os.Args[1] == "-h" || os.Args[1] == "--help" || os.Args[1] == "help") {
-		buf := new(bytes.Buffer)
-		flag.CommandLine.SetOutput(buf)
-		buf.WriteString(usage)
-		flag.CommandLine.PrintDefaults()
-		fmt.Println(buf.String())
+		fmt.Println(usageString())
 		os.Exit(0)
 	}
 	if len(os.Args) < 3 {
-		fatal(usage)
+		fatal(usageString())
 	}
 	flag.Parse()
 
+	subcommand := flag.Arg(0)
+
+	// get the format we're working with
+	iface, err := getFormat(subcommand)
+	if err != nil {
+		fatal(err)
+	}
+
+	// run the desired command
+	switch subcommand {
+	case "archive":
+		a, ok := iface.(archive.Archiver)
+		if !ok {
+			fatalf("the archive command does not support the %s format", iface)
+		}
+		err = a.Archive(flag.Args()[2:], flag.Arg(1))
+
+	case "unarchive":
+		a, ok := iface.(archive.Unarchiver)
+		if !ok {
+			fatalf("the unarchive command does not support the %s format", iface)
+		}
+		err = a.Unarchive(flag.Arg(1), flag.Arg(2))
+
+	case "extract":
+		e, ok := iface.(archive.Extractor)
+		if !ok {
+			fatalf("the extract command does not support the %s format", iface)
+		}
+		err = e.Extract(flag.Arg(1), flag.Arg(2), flag.Arg(3))
+
+	case "ls":
+		w, ok := iface.(archive.Walker)
+		if !ok {
+			fatalf("the ls command does not support the %s format", iface)
+		}
+
+		var count int
+		err = w.Walk(flag.Arg(1), func(f archive.File) error {
+			count++
+			switch h := f.Header.(type) {
+			case *zip.FileHeader:
+				fmt.Printf("%s\t%d\t%d\t%s\t%s\n",
+					f.Mode(),
+					h.Method,
+					f.Size(),
+					f.ModTime(),
+					h.Name,
+				)
+			case *tar.Header:
+				fmt.Printf("%s\t%s\t%s\t%d\t%s\t%s\n",
+					f.Mode(),
+					h.Uname,
+					h.Gname,
+					f.Size(),
+					f.ModTime(),
+					h.Name,
+				)
+
+			case *rardecode.FileHeader:
+				fmt.Printf("%s\t%d\t%d\t%s\t%s\n",
+					f.Mode(),
+					int(h.HostOS),
+					f.Size(),
+					f.ModTime(),
+					h.Name,
+				)
+
+			default:
+				fmt.Printf("%s\t%d\t%s\t?/%s\n",
+					f.Mode(),
+					f.Size(),
+					f.ModTime(),
+					f.Name(), // we don't know full path from this
+				)
+			}
+			return nil
+		})
+
+		fmt.Printf("total %d", count)
+
+	case "compress":
+		c, ok := iface.(archive.Compressor)
+		if !ok {
+			fatalf("the compress command does not support the %s format", iface)
+		}
+		fc := archive.FileCompressor{Compressor: c}
+
+		in := flag.Arg(1)
+		out := flag.Arg(2)
+
+		var deleteWhenDone bool
+		if cs, ok := c.(fmt.Stringer); ok && out == cs.String() {
+			out = in + "." + out
+			deleteWhenDone = true
+		}
+
+		err = fc.CompressFile(in, out)
+		if err == nil && deleteWhenDone {
+			err = os.Remove(in)
+		}
+
+	case "decompress":
+		c, ok := iface.(archive.Decompressor)
+		if !ok {
+			fatalf("the compress command does not support the %s format", iface)
+		}
+		fc := archive.FileCompressor{Decompressor: c}
+
+		in := flag.Arg(1)
+		out := flag.Arg(2)
+
+		var deleteWhenDone bool
+		if cs, ok := c.(fmt.Stringer); ok && out == "" {
+			out = strings.TrimSuffix(in, "."+cs.String())
+			deleteWhenDone = true
+		}
+
+		err = fc.DecompressFile(in, out)
+		if err == nil && deleteWhenDone {
+			err = os.Remove(in)
+		}
+
+	default:
+		fatalf("unrecognized command: %s", flag.Arg(0))
+	}
+	if err != nil {
+		fatal(err)
+	}
+}
+
+func getFormat(subcommand string) (interface{}, error) {
+	formatPos := 1
+	if subcommand == "compress" {
+		formatPos = 2
+	}
+
 	// figure out which file format we're working with
 	var ext string
-	archiveName := flag.Arg(1)
+	archiveName := flag.Arg(formatPos)
 	for _, format := range supportedFormats {
-		if strings.HasSuffix(archiveName, format) {
+		// match by extension, or, in the case of 'compress',
+		// check the format without the leading dot; it allows
+		// a shortcut to specify a format while replacing
+		// the original file on disk
+		if strings.HasSuffix(archiveName, format) ||
+			(subcommand == "compress" &&
+				archiveName == strings.TrimPrefix(format, ".")) {
 			ext = format
 			break
 		}
@@ -67,6 +206,7 @@ func main() {
 		ImplicitTopLevelFolder: implicitTopLevelFolder,
 		ContinueOnError:        continueOnError,
 	}
+
 	switch ext {
 	case ".rar":
 		iface = &archive.Rar{
@@ -118,7 +258,7 @@ func main() {
 		}
 
 	case ".zip":
-		iface = archive.Zip{
+		iface = &archive.Zip{
 			CompressionLevel:       compressionLevel,
 			OverwriteExisting:      overwriteExisting,
 			MkdirAll:               mkdirAll,
@@ -127,95 +267,36 @@ func main() {
 			ContinueOnError:        continueOnError,
 		}
 
+	case ".gz":
+		iface = &archive.Gz{
+			CompressionLevel: compressionLevel,
+		}
+
+	case ".bz2":
+		iface = &archive.Bz2{
+			CompressionLevel: compressionLevel,
+		}
+
+	case ".lz4":
+		iface = &archive.Lz4{
+			CompressionLevel: compressionLevel,
+		}
+
+	case ".sz":
+		iface = &archive.Snappy{}
+
+	case ".xz":
+		iface = &archive.Xz{}
+
 	default:
 		archiveExt := filepath.Ext(archiveName)
 		if archiveExt == "" {
-			fatal("format missing (use file extension to specify archive/compression format)")
-		} else {
-			fatalf("unsupported format '%s'", archiveExt)
+			return nil, fmt.Errorf("format missing (use file extension to specify archive/compression format)")
 		}
+		return nil, fmt.Errorf("unsupported format '%s'", archiveExt)
 	}
 
-	var err error
-
-	switch flag.Arg(0) {
-	case "archive":
-		a, ok := iface.(archive.Archiver)
-		if !ok {
-			fatalf("the archive command does not support the %s format", iface)
-		}
-		err = a.Archive(flag.Args()[2:], flag.Arg(1))
-
-	case "unarchive":
-		a, ok := iface.(archive.Unarchiver)
-		if !ok {
-			fatalf("the unarchive command does not support the %s format", iface)
-		}
-		err = a.Unarchive(flag.Arg(1), flag.Arg(2))
-
-	case "extract":
-		e, ok := iface.(archive.Extractor)
-		if !ok {
-			fatalf("the unarchive command does not support the %s format", iface)
-		}
-		err = e.Extract(flag.Arg(1), flag.Arg(2), flag.Arg(3))
-
-	case "ls":
-		w, ok := iface.(archive.Walker)
-		if !ok {
-			fatalf("the unarchive command does not support the %s format", iface)
-		}
-
-		var count int
-		err = w.Walk(flag.Arg(1), func(f archive.File) error {
-			count++
-			switch h := f.Header.(type) {
-			case *zip.FileHeader:
-				fmt.Printf("%s\t%d\t%d\t%s\t%s\n",
-					f.Mode(),
-					h.Method,
-					f.Size(),
-					f.ModTime(),
-					h.Name,
-				)
-			case *tar.Header:
-				fmt.Printf("%s\t%s\t%s\t%d\t%s\t%s\n",
-					f.Mode(),
-					h.Uname,
-					h.Gname,
-					f.Size(),
-					f.ModTime(),
-					h.Name,
-				)
-
-			case *rardecode.FileHeader:
-				fmt.Printf("%s\t%d\t%d\t%s\t%s\n",
-					f.Mode(),
-					int(h.HostOS),
-					f.Size(),
-					f.ModTime(),
-					h.Name,
-				)
-
-			default:
-				fmt.Printf("%s\t%d\t%s\t?/%s\n",
-					f.Mode(),
-					f.Size(),
-					f.ModTime(),
-					f.Name(), // we don't know full path from this
-				)
-			}
-			return nil
-		})
-
-		fmt.Printf("total %d", count)
-
-	default:
-		fatalf("unrecognized command: %s", flag.Arg(0))
-	}
-	if err != nil {
-		fatal(err)
-	}
+	return iface, nil
 }
 
 func fatal(v ...interface{}) {
@@ -226,6 +307,14 @@ func fatal(v ...interface{}) {
 func fatalf(s string, v ...interface{}) {
 	fmt.Fprintf(os.Stderr, s+"\n", v...)
 	os.Exit(1)
+}
+
+func usageString() string {
+	buf := new(bytes.Buffer)
+	buf.WriteString(usage)
+	flag.CommandLine.SetOutput(buf)
+	flag.CommandLine.PrintDefaults()
+	return buf.String()
 }
 
 // supportedFormats is the list of recognized
@@ -241,7 +330,11 @@ var supportedFormats = []string{
 	".rar",
 	".tar",
 	".zip",
-	// TODO: add compression formats
+	".gz",
+	".bz2",
+	".lz4",
+	".sz",
+	".xz",
 }
 
 const usage = `Usage: arc {archive|unarchive|extract|ls|help} <archive file> [files...]
@@ -277,10 +370,26 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|help} <archive file> [fi
       .tar.sz
       .tsz
       .rar (open only)
+      .bz2
+      .gz
+      .lz4
+      .sz
+      .xz
+
+  (DE)COMPRESSING SINGLE FILES
+    Some formats are compression-only, and can be used
+    with the compress and decompress commands on a
+    single file; they do not bundle multiple files.
+
+    To replace a file when compressing, specify the
+    source file name for the first argument, and the
+    compression format (without leading dot) for the
+    second argument. To replace a file when decompressing,
+    specify only the source file and no destination.
 
   PASSWORD-PROTECTED RAR FILES
     Export the ARCHIVE_PASSWORD environment variable
-    to be able to open password-protected RAR archives.	
+    to be able to open password-protected rar archives.
 
   GLOBAL FLAG REFERENCE
     The following global flags may be used before the

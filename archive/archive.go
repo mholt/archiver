@@ -101,6 +101,18 @@ type WalkFunc func(f File) error
 // ErrStopWalk signals Walk to break without error.
 var ErrStopWalk = fmt.Errorf("walk stopped")
 
+// Compressor compresses to out what it reads from in.
+// It also ensures a compatible or matching file extension.
+type Compressor interface {
+	Compress(in io.Reader, out io.Writer) error
+	CheckExt(filename string) error
+}
+
+// Decompressor decompresses to out what it reads from in.
+type Decompressor interface {
+	Decompress(in io.Reader, out io.Writer) error
+}
+
 func fileExists(name string) bool {
 	_, err := os.Stat(name)
 	return !os.IsNotExist(err)
