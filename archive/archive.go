@@ -33,7 +33,7 @@ type Writer interface {
 // Reader can read discrete byte streams of files from
 // an input stream.
 type Reader interface {
-	Open(in io.ReaderAt, size int64) error
+	Open(in io.Reader, size int64) error
 	Read() (File, error)
 	Close() error
 }
@@ -74,6 +74,16 @@ func (fi FileInfo) Name() string {
 	}
 	return fi.FileInfo.Name()
 }
+
+// ReadFakeCloser is an io.Reader that has
+// a no-op close method to satisfy the
+// io.ReadCloser interface.
+type ReadFakeCloser struct {
+	io.Reader
+}
+
+// Close implements io.Closer.
+func (rfc ReadFakeCloser) Close() error { return nil }
 
 // Walker can walk an archive file and return information
 // about each item in the archive.
@@ -125,6 +135,34 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 	if err != nil {
 		return fmt.Errorf("%s: writing file: %v", fpath, err)
 	}
+	return nil
+}
+
+func writeNewSymbolicLink(fpath string, target string) error {
+	err := os.MkdirAll(filepath.Dir(fpath), 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+	}
+
+	err = os.Symlink(target, fpath)
+	if err != nil {
+		return fmt.Errorf("%s: making symbolic link for: %v", fpath, err)
+	}
+
+	return nil
+}
+
+func writeNewHardLink(fpath string, target string) error {
+	err := os.MkdirAll(filepath.Dir(fpath), 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+	}
+
+	err = os.Link(target, fpath)
+	if err != nil {
+		return fmt.Errorf("%s: making hard link for: %v", fpath, err)
+	}
+
 	return nil
 }
 

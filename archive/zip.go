@@ -313,13 +313,18 @@ func (z *Zip) Write(f File) error {
 }
 
 // Open opens z for reading an archive from in,
-// which is expected to have the given size.
-func (z *Zip) Open(in io.ReaderAt, size int64) error {
+// which is expected to have the given size and
+// which must be an io.ReaderAt.
+func (z *Zip) Open(in io.Reader, size int64) error {
+	inRdrAt, ok := in.(io.ReaderAt)
+	if !ok {
+		return fmt.Errorf("reader must be io.ReaderAt")
+	}
 	if z.zr != nil {
 		return fmt.Errorf("zip archive is already open for reading")
 	}
 	var err error
-	z.zr, err = zip.NewReader(in, size)
+	z.zr, err = zip.NewReader(inRdrAt, size)
 	if err != nil {
 		return fmt.Errorf("creating reader: %v", err)
 	}
