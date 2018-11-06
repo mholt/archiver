@@ -101,7 +101,7 @@ var (
 	_ = Extractor(new(TarGz))
 )
 
-// DefaultTarGz is a convenient TarGz archiver ready to use.
+// DefaultTarGz is a convenient archiver ready to use.
 var DefaultTarGz = &TarGz{
 	CompressionLevel: gzip.DefaultCompression,
 	Tar:              DefaultTar,

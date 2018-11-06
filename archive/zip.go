@@ -526,7 +526,7 @@ var compressedFormats = map[string]struct{}{
 	".zipx": {},
 }
 
-// DefaultZip is a convenient Zip archiver ready to use.
+// DefaultZip is a convenient archiver ready to use.
 var DefaultZip = &Zip{
 	CompressionLevel:     flate.DefaultCompression,
 	MkdirAll:             true,

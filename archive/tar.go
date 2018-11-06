@@ -520,7 +520,7 @@ var (
 	_ = Extractor(new(Tar))
 )
 
-// DefaultTar is a convenient Tar archiver ready to use.
+// DefaultTar is a convenient archiver ready to use.
 var DefaultTar = &Tar{
 	MkdirAll: true,
 }

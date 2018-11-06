@@ -97,7 +97,7 @@ var (
 	_ = Extractor(new(TarXz))
 )
 
-// DefaultTarXz is a convenient TarXz archiver ready to use.
+// DefaultTarXz is a convenient archiver ready to use.
 var DefaultTarXz = &TarXz{
 	Tar: DefaultTar,
 }
