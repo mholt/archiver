@@ -19,7 +19,7 @@ type TarBz2 struct {
 
 // Archive creates a compressed tar file at destination
 // containing the files listed in sources. The destination
-// must end with ".tar.gz" or ".tbz2". File paths can be
+// must end with ".tar.bz2" or ".tbz2". File paths can be
 // those of regular files or directories; directories will
 // be recursively added.
 func (tbz2 *TarBz2) Archive(sources []string, destination string) error {
