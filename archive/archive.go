@@ -201,5 +201,9 @@ func multipleTopLevels(paths []string) bool {
 
 func folderNameFromFileName(filename string) string {
 	base := filepath.Base(filename)
-	return strings.TrimSuffix(base, filepath.Ext(base))
+	firstDot := strings.Index(base, ".")
+	if firstDot > -1 {
+		return base[:firstDot]
+	}
+	return base
 }

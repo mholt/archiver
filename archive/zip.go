@@ -16,7 +16,7 @@ import (
 // See https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT.
 type Zip struct {
 	// The compression level to use, as described
-	// in the compress/flat package.
+	// in the compress/flate package.
 	CompressionLevel int
 
 	// Whether to overwrite existing files; if false,
@@ -70,6 +70,16 @@ func (z *Zip) Archive(sources []string, destination string) error {
 	}
 	if !z.OverwriteExisting && fileExists(destination) {
 		return fmt.Errorf("file already exists: %s", destination)
+	}
+
+	// make the folder to contain the resulting archive
+	// if it does not already exist
+	destDir := filepath.Dir(destination)
+	if z.MkdirAll && !fileExists(destDir) {
+		err := mkdir(destDir)
+		if err != nil {
+			return fmt.Errorf("making folder for destination: %v", err)
+		}
 	}
 
 	out, err := os.Create(destination)

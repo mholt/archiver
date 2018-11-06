@@ -45,6 +45,10 @@ type Tar struct {
 
 	tw *tar.Writer
 	tr *tar.Reader
+
+	readerWrapFn  func(io.Reader) (io.Reader, error)
+	writerWrapFn  func(io.Writer) (io.Writer, error)
+	cleanupWrapFn func()
 }
 
 // Archive creates a .tar file at destination containing
@@ -53,11 +57,21 @@ type Tar struct {
 // or directories. Regular files are stored at the 'root'
 // of the archive, and directories are recursively added.
 func (t *Tar) Archive(sources []string, destination string) error {
-	if !strings.HasSuffix(destination, ".tar") {
+	if t.writerWrapFn == nil && !strings.HasSuffix(destination, ".tar") {
 		return fmt.Errorf("output filename must have .tar extension")
 	}
 	if !t.OverwriteExisting && fileExists(destination) {
 		return fmt.Errorf("file already exists: %s", destination)
+	}
+
+	// make the folder to contain the resulting archive
+	// if it does not already exist
+	destDir := filepath.Dir(destination)
+	if t.MkdirAll && !fileExists(destDir) {
+		err := mkdir(destDir)
+		if err != nil {
+			return fmt.Errorf("making folder for destination: %v", err)
+		}
 	}
 
 	out, err := os.Create(destination)
@@ -148,7 +162,20 @@ func (t *Tar) addTopLevelFolder(sourceArchive, destination string) (string, erro
 	}
 	defer file.Close()
 
-	tr := tar.NewReader(file)
+	// if the reader is to be wrapped, ensure we do that now
+	// or we will not be able to read the archive successfully
+	reader := io.Reader(file)
+	if t.readerWrapFn != nil {
+		reader, err = t.readerWrapFn(reader)
+		if err != nil {
+			return "", fmt.Errorf("wrapping reader: %v", err)
+		}
+	}
+	if t.cleanupWrapFn != nil {
+		defer t.cleanupWrapFn()
+	}
+
+	tr := tar.NewReader(reader)
 
 	var files []string
 	for {
@@ -277,6 +304,17 @@ func (t *Tar) Create(out io.Writer) error {
 	if t.tw != nil {
 		return fmt.Errorf("tar archive is already created for writing")
 	}
+
+	// wrapping writers allows us to output
+	// compressed tarballs, for example
+	if t.writerWrapFn != nil {
+		var err error
+		out, err = t.writerWrapFn(out)
+		if err != nil {
+			return fmt.Errorf("wrapping writer: %v", err)
+		}
+	}
+
 	t.tw = tar.NewWriter(out)
 	return nil
 }
@@ -326,6 +364,14 @@ func (t *Tar) Open(in io.Reader, size int64) error {
 	if t.tr != nil {
 		return fmt.Errorf("tar archive is already open for reading")
 	}
+	// wrapping readers allows us to open compressed tarballs
+	if t.readerWrapFn != nil {
+		var err error
+		in, err = t.readerWrapFn(in)
+		if err != nil {
+			return fmt.Errorf("wrapping file reader: %v", err)
+		}
+	}
 	t.tr = tar.NewReader(in)
 	return nil
 }
@@ -355,6 +401,9 @@ func (t *Tar) Read() (File, error) {
 
 // Close closes the tar archive(s) opened by Create and Open.
 func (t *Tar) Close() error {
+	if t.cleanupWrapFn != nil {
+		t.cleanupWrapFn()
+	}
 	if t.tr != nil {
 		t.tr = nil
 	}
@@ -374,10 +423,14 @@ func (t *Tar) Walk(archive string, walkFn WalkFunc) error {
 	}
 	defer file.Close()
 
-	tr := tar.NewReader(file)
+	err = t.Open(file, 0)
+	if err != nil {
+		return fmt.Errorf("opening archive: %v", err)
+	}
+	defer t.Close()
 
 	for {
-		hdr, err := tr.Next()
+		f, err := t.Read()
 		if err == io.EOF {
 			break
 		}
@@ -388,20 +441,16 @@ func (t *Tar) Walk(archive string, walkFn WalkFunc) error {
 			}
 			return fmt.Errorf("opening next file: %v", err)
 		}
-		err = walkFn(File{
-			FileInfo:   hdr.FileInfo(),
-			Header:     hdr,
-			ReadCloser: ReadFakeCloser{tr},
-		})
+		err = walkFn(f)
 		if err != nil {
 			if err == ErrStopWalk {
 				break
 			}
 			if t.ContinueOnError {
-				log.Printf("[ERROR] Walking %s: %v", hdr.Name, err)
+				log.Printf("[ERROR] Walking %s: %v", f.Name(), err)
 				continue
 			}
-			return fmt.Errorf("walking %s: %v", hdr.Name, err)
+			return fmt.Errorf("walking %s: %v", f.Name(), err)
 		}
 	}
 
