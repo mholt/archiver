@@ -83,6 +83,8 @@ const usage = `Usage: archiver {make|open} <archive file> [files...]
       .tar.sz
       .tsz
       .rar (open only)
+	  .gz
+	  .bz2
 
   Existing files:
     When creating an archive file that already exists,
