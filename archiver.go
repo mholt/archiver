@@ -3,55 +3,138 @@ package archiver
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
-// Archiver represent a archive format
+// Archiver is a type that can create an archive file
+// from a list of source file names.
 type Archiver interface {
-	// Match checks supported files
-	Match(filename string) bool
-	// Make makes an archive file on disk.
-	Make(destination string, sources []string) error
-	// Open extracts an archive file on disk.
-	Open(source, destination string) error
-	// Write writes an archive to a Writer.
-	Write(output io.Writer, sources []string) error
-	// Read reads an archive from a Reader.
-	Read(input io.Reader, destination string) error
+	Archive(sources []string, destination string) error
 }
 
-// SupportedFormats contains all supported archive formats
-var SupportedFormats = map[string]Archiver{}
+// Unarchiver is a type that can extract archive files
+// into a folder.
+type Unarchiver interface {
+	Unarchive(source, destination string) error
+}
 
-// RegisterFormat adds a supported archive format
-func RegisterFormat(name string, format Archiver) {
-	if _, ok := SupportedFormats[name]; ok {
-		log.Printf("Format %s already exists, skip!\n", name)
-		return
+// Writer can write discrete byte streams of files to
+// an output stream.
+type Writer interface {
+	Create(out io.Writer) error
+	Write(f File) error
+	Close() error
+}
+
+// Reader can read discrete byte streams of files from
+// an input stream.
+type Reader interface {
+	Open(in io.Reader, size int64) error
+	Read() (File, error)
+	Close() error
+}
+
+// Extractor can extract a specific file from a source
+// archive to a specific destination folder on disk.
+type Extractor interface {
+	Extract(source, target, destination string) error
+}
+
+// File provides methods for accessing information about
+// or contents of a file within an archive.
+type File struct {
+	os.FileInfo
+
+	// The original header info; depends on
+	// type of archive -- could be nil, too.
+	Header interface{}
+
+	// Allow the file contents to be read (and closed)
+	io.ReadCloser
+}
+
+// FileInfo is an os.FileInfo but optionally with
+// a custom name, useful if dealing with files that
+// are not actual files on disk, or which have a
+// different name in an archive than on disk.
+type FileInfo struct {
+	os.FileInfo
+	CustomName string
+}
+
+// Name returns fi.CustomName if not empty;
+// otherwise it returns fi.FileInfo.Name().
+func (fi FileInfo) Name() string {
+	if fi.CustomName != "" {
+		return fi.CustomName
 	}
-	SupportedFormats[name] = format
+	return fi.FileInfo.Name()
 }
 
-// MatchingFormat returns the first archive format that matches
-// the given file, or nil if there is no match
-func MatchingFormat(fpath string) Archiver {
-	for _, fmt := range SupportedFormats {
-		if fmt.Match(fpath) {
-			return fmt
-		}
+// ReadFakeCloser is an io.Reader that has
+// a no-op close method to satisfy the
+// io.ReadCloser interface.
+type ReadFakeCloser struct {
+	io.Reader
+}
+
+// Close implements io.Closer.
+func (rfc ReadFakeCloser) Close() error { return nil }
+
+// Walker can walk an archive file and return information
+// about each item in the archive.
+type Walker interface {
+	Walk(archive string, walkFn WalkFunc) error
+}
+
+// WalkFunc is called at each item visited by Walk.
+// If an error is returned, the walk may continue
+// if the Walker is configured to continue on error.
+// The sole exception is the error value ErrStopWalk,
+// which stops the walk without an actual error.
+type WalkFunc func(f File) error
+
+// ErrStopWalk signals Walk to break without error.
+var ErrStopWalk = fmt.Errorf("walk stopped")
+
+// Compressor compresses to out what it reads from in.
+// It also ensures a compatible or matching file extension.
+type Compressor interface {
+	Compress(in io.Reader, out io.Writer) error
+	CheckExt(filename string) error
+}
+
+// Decompressor decompresses to out what it reads from in.
+type Decompressor interface {
+	Decompress(in io.Reader, out io.Writer) error
+}
+
+// Matcher is a type that can return whether the given
+// file appears to match the implementation's format.
+// Implementations should return the file's read position
+// to where it was when the method was called.
+type Matcher interface {
+	Match(*os.File) (bool, error)
+}
+
+func fileExists(name string) bool {
+	_, err := os.Stat(name)
+	return !os.IsNotExist(err)
+}
+
+func mkdir(dirPath string) error {
+	err := os.MkdirAll(dirPath, 0755)
+	if err != nil {
+		return fmt.Errorf("%s: making directory: %v", dirPath, err)
 	}
 	return nil
 }
 
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
-	if fileExists(fpath) {
-		return fmt.Errorf("%s: skipping because there exists a file with the same name", fpath)
-	}
-
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -103,31 +186,49 @@ func writeNewHardLink(fpath string, target string) error {
 	return nil
 }
 
-func mkdir(dirPath string) error {
-	err := os.MkdirAll(dirPath, 0755)
+// within returns true if sub is within or equal to parent.
+func within(parent, sub string) bool {
+	rel, err := filepath.Rel(parent, sub)
 	if err != nil {
-		return fmt.Errorf("%s: making directory: %v", dirPath, err)
+		return false
 	}
-	return nil
+	return !strings.Contains(rel, "..")
 }
 
-func sanitizeExtractPath(filePath string, destination string) error {
-	// to avoid zip slip (writing outside of the destination), we resolve
-	// the target path, and make sure it's nested in the intended
-	// destination, or bail otherwise.
-	destpath := filepath.Join(destination, filePath)
-	if !strings.HasPrefix(destpath, filepath.Clean(destination)) {
-		return fmt.Errorf("%s: illegal file path", filePath)
+// multipleTopLevels returns true if the paths do not
+// share a common top-level folder.
+func multipleTopLevels(paths []string) bool {
+	if len(paths) < 2 {
+		return false
 	}
-	return nil
+	var lastTop string
+	for _, p := range paths {
+		p = strings.TrimPrefix(strings.Replace(p, `\`, "/", -1), "/")
+		for {
+			next := path.Dir(p)
+			if next == "." {
+				break
+			}
+			p = next
+		}
+		if lastTop == "" {
+			lastTop = p
+		}
+		if p != lastTop {
+			return true
+		}
+	}
+	return false
 }
 
-// fileExists returns true only if we can successfuly get the file attributes or if the reason
-// for failure is the absence of the file.
-func fileExists(fpath string) bool {
-	_, err := os.Stat(fpath)
-	if err == nil {
-		return true
+// folderNameFromFileName returns a name for a folder
+// that is suitable based on the filename, which will
+// be stripped of its extensions.
+func folderNameFromFileName(filename string) string {
+	base := filepath.Base(filename)
+	firstDot := strings.Index(base, ".")
+	if firstDot > -1 {
+		return base[:firstDot]
 	}
-	return !os.IsNotExist(err)
+	return base
 }

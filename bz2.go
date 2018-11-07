@@ -3,120 +3,52 @@ package archiver
 import (
 	"fmt"
 	"io"
-	"os"
-	"strings"
+	"path/filepath"
 
 	"github.com/dsnet/compress/bzip2"
 )
 
-// Bzip2 is for Bzip2 format
-var Bzip2 bzip2Format
-
-func init() {
-	RegisterFormat("Bzip2", Bzip2)
+// Bz2 facilitates bzip2 compression.
+type Bz2 struct {
+	CompressionLevel int
 }
 
-type bzip2Format struct{}
-
-func (bzip2Format) Match(filename string) bool {
-	return (strings.HasSuffix(strings.ToLower(filename), ".bz2") &&
-		!strings.HasSuffix(strings.ToLower(filename), ".tar.bz2") &&
-		!strings.HasSuffix(strings.ToLower(filename), ".tbz2")) ||
-		(!isTarBz2(filename) &&
-			isBz2(filename))
+// Compress reads in, compresses it, and writes it to out.
+func (bz *Bz2) Compress(in io.Reader, out io.Writer) error {
+	w, err := bzip2.NewWriter(out, &bzip2.WriterConfig{
+		Level: bz.CompressionLevel,
+	})
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	_, err = io.Copy(w, in)
+	return err
 }
 
-// isBz2 checks if the file is a valid bzip2.
-func isBz2(bzip2Path string) bool {
-	f, err := os.Open(bzip2Path)
+// Decompress reads in, decompresses it, and writes it to out.
+func (bz *Bz2) Decompress(in io.Reader, out io.Writer) error {
+	r, err := bzip2.NewReader(in, nil)
 	if err != nil {
-		return false
+		return err
 	}
-	defer f.Close()
-
-	bzip2r, err := bzip2.NewReader(f, nil)
-	if err != nil {
-		return false
-	}
-
-	buf := make([]byte, 16)
-	if _, err = io.ReadFull(bzip2r, buf); err != nil {
-		return false
-	}
-
-	return true
+	defer r.Close()
+	_, err = io.Copy(out, r)
+	return err
 }
 
-// Write outputs to a Writer the bzip2'd contents of the first file listed in
-// filePaths.
-func (bzip2Format) Write(output io.Writer, filePaths []string) error {
-	return writeBzip2(filePaths, output, "")
-}
-
-// Make creates a file at bzip2Path containing the bzip2'd contents of the first file
-// listed in filePaths.
-func (bzip2Format) Make(bzip2Path string, filePaths []string) error {
-	out, err := os.Create(bzip2Path)
-	if err != nil {
-		return fmt.Errorf("error creating %s: %v", bzip2Path, err)
-	}
-	defer out.Close()
-
-	return writeBzip2(filePaths, out, bzip2Path)
-}
-
-func writeBzip2(filePaths []string, output io.Writer, dest string) error {
-	if len(filePaths) != 1 {
-		return fmt.Errorf("only one file supported for bzip2")
-	}
-	firstFile := filePaths[0]
-
-	fileInfo, err := os.Stat(firstFile)
-	if err != nil {
-		return fmt.Errorf("%s: stat: %v", firstFile, err)
-	}
-
-	if fileInfo.IsDir() {
-		return fmt.Errorf("%s is a directory", firstFile)
-	}
-
-	in, err := os.Open(firstFile)
-	if err != nil {
-		return fmt.Errorf("error reading %s: %v", firstFile, err)
-	}
-	defer in.Close()
-
-	bzip2w, err := bzip2.NewWriter(output, nil)
-	if err != nil {
-		return fmt.Errorf("error compressing bzip2: %v", err)
-	}
-	defer bzip2w.Close()
-
-	if _, err = io.Copy(bzip2w, in); err != nil {
-		return fmt.Errorf("error writing bzip2: %v", err)
+// CheckExt ensures the file extension matches the format.
+func (bz *Bz2) CheckExt(filename string) error {
+	if filepath.Ext(filename) != ".bz2" {
+		return fmt.Errorf("filename must have a .bz2 extension")
 	}
 	return nil
 }
 
-// Read a bzip2'd file from a Reader and decompresses the contents into
-// destination.
-func (bzip2Format) Read(input io.Reader, destination string) error {
-	bzip2r, err := bzip2.NewReader(input, nil)
-	if err != nil {
-		return fmt.Errorf("error decompressing: %v", err)
-	}
-	defer bzip2r.Close()
+func (bz *Bz2) String() string { return "bz2" }
 
-	return writeNewFile(destination, bzip2r, 0644)
-}
-
-// Open decompresses bzip2'd source into destination.
-func (bzip2Format) Open(source, destination string) error {
-	f, err := os.Open(source)
-	if err != nil {
-		return fmt.Errorf("%s: failed to open archive: %v", source, err)
-	}
-	defer f.Close()
-
-	return Bzip2.Read(f, destination)
-}
+// Compile-time checks to ensure type implements desired interfaces.
+var (
+	_ = Compressor(new(Bz2))
+	_ = Decompressor(new(Bz2))
+)

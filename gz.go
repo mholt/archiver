@@ -4,110 +4,48 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"os"
-	"strings"
+	"path/filepath"
 )
 
-// Gz is for Gz format
-var Gz gzFormat
-
-func init() {
-	RegisterFormat("Gz", Gz)
+// Gz facilitates gzip compression.
+type Gz struct {
+	CompressionLevel int
 }
 
-type gzFormat struct{}
-
-func (gzFormat) Match(filename string) bool {
-	return (strings.HasSuffix(strings.ToLower(filename), ".gz") &&
-		!strings.HasSuffix(strings.ToLower(filename), ".tar.gz") &&
-		!strings.HasSuffix(strings.ToLower(filename), ".tgz")) ||
-		(!isTarGz(filename) &&
-			isGz(filename))
-}
-
-// isGz checks if the file is a valid gzip.
-func isGz(gzPath string) bool {
-	f, err := os.Open(gzPath)
+// Compress reads in, compresses it, and writes it to out.
+func (gz *Gz) Compress(in io.Reader, out io.Writer) error {
+	w, err := gzip.NewWriterLevel(out, gz.CompressionLevel)
 	if err != nil {
-		return false
+		return err
 	}
-	defer f.Close()
-
-	_, err = gzip.NewReader(f)
-	if err == gzip.ErrHeader {
-		return false
-	}
-
-	return true
+	defer w.Close()
+	_, err = io.Copy(w, in)
+	return err
 }
 
-// Write outputs to a Writer the gzip'd contents of the first file listed in
-// filePaths.
-func (gzFormat) Write(output io.Writer, filePaths []string) error {
-	return writeGz(filePaths, output, "")
+// Decompress reads in, decompresses it, and writes it to out.
+func (gz *Gz) Decompress(in io.Reader, out io.Writer) error {
+	r, err := gzip.NewReader(in)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	_, err = io.Copy(out, r)
+	return err
 }
 
-// Make creates a file at gzPath containing the gzip'd contents of the first file
-// listed in filePaths.
-func (gzFormat) Make(gzPath string, filePaths []string) error {
-	out, err := os.Create(gzPath)
-	if err != nil {
-		return fmt.Errorf("error creating %s: %v", gzPath, err)
-	}
-	defer out.Close()
-
-	return writeGz(filePaths, out, gzPath)
-}
-
-func writeGz(filePaths []string, output io.Writer, dest string) error {
-	if len(filePaths) != 1 {
-		return fmt.Errorf("only one file supported for gz")
-	}
-	firstFile := filePaths[0]
-
-	fileInfo, err := os.Stat(firstFile)
-	if err != nil {
-		return fmt.Errorf("%s: stat: %v", firstFile, err)
-	}
-
-	if fileInfo.IsDir() {
-		return fmt.Errorf("%s is a directory", firstFile)
-	}
-
-	in, err := os.Open(firstFile)
-	if err != nil {
-		return fmt.Errorf("error reading %s: %v", firstFile, err)
-	}
-	defer in.Close()
-
-	gzw := gzip.NewWriter(output)
-	defer gzw.Close()
-
-	if _, err = io.Copy(gzw, in); err != nil {
-		return fmt.Errorf("error writing gz: %v", err)
+// CheckExt ensures the file extension matches the format.
+func (gz *Gz) CheckExt(filename string) error {
+	if filepath.Ext(filename) != ".gz" {
+		return fmt.Errorf("filename must have a .gz extension")
 	}
 	return nil
 }
 
-// Read a gzip'd file from a Reader and decompresses the contents into
-// destination.
-func (gzFormat) Read(input io.Reader, destination string) error {
-	gzr, err := gzip.NewReader(input)
-	if err != nil {
-		return fmt.Errorf("error decompressing: %v", err)
-	}
-	defer gzr.Close()
+func (gz *Gz) String() string { return "gz" }
 
-	return writeNewFile(destination, gzr, 0644)
-}
-
-// Open decompresses gzip'd source into destination.
-func (gzFormat) Open(source, destination string) error {
-	f, err := os.Open(source)
-	if err != nil {
-		return fmt.Errorf("%s: failed to open archive: %v", source, err)
-	}
-	defer f.Close()
-
-	return Gz.Read(f, destination)
-}
+// Compile-time checks to ensure type implements desired interfaces.
+var (
+	_ = Compressor(new(Gz))
+	_ = Decompressor(new(Gz))
+)

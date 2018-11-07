@@ -2,257 +2,213 @@ package archiver
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
-func TestArchiver(t *testing.T) {
-	for name, ar := range SupportedFormats {
-		name, ar := name, ar
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			// skip RAR for now
-			if _, ok := ar.(rarFormat); ok {
-				t.Skip("not supported")
-			}
-
-			_, gzOk := ar.(gzFormat)
-			_, bzip2Ok := ar.(bzip2Format)
-			if gzOk || bzip2Ok {
-				testSingleWriteRead(t, name, ar)
-				testSingleMakeOpen(t, name, ar)
-			} else {
-				testWriteRead(t, name, ar)
-				testMakeOpen(t, name, ar)
-				testMakeOpenWithDestinationEndingInSlash(t, name, ar)
-				testMakeOpenNotOverwriteAtDestination(t, name, ar)
-			}
-		})
-	}
-}
-
-// testSingleWriteRead performs a symmetric test by using ar.Write to generate
-// an archive from the test corpus, then using ar.Read to extract the archive
-// and comparing the contents to ensure they are equal.
-func testSingleWriteRead(t *testing.T, name string, ar Archiver) {
-	buf := new(bytes.Buffer)
-	tmp, err := ioutil.TempDir("", "archiver")
-	if err != nil {
-		t.Fatalf("[%s] %v", name, err)
-	}
-	defer os.RemoveAll(tmp)
-
-	origPath := "testdata/quote1.txt"
-	newPath := filepath.Join(tmp, "quote1.txt")
-
-	// Test creating archive
-	err = ar.Write(buf, []string{origPath})
-	if err != nil {
-		t.Fatalf("[%s] writing archive: didn't expect an error, but got: %v", name, err)
-	}
-
-	// Test extracting archive
-	err = ar.Read(buf, newPath)
-	if err != nil {
-		t.Fatalf("[%s] reading archive: didn't expect an error, but got: %v", name, err)
-	}
-
-	// Check that what was extracted is what was compressed
-	checkSameContent(t, name, origPath, newPath)
-}
-
-// testWriteRead performs a symmetric test by using ar.Write to generate an archive
-// from the test corpus, then using ar.Read to extract the archive and comparing
-// the contents to ensure they are equal.
-func testWriteRead(t *testing.T, name string, ar Archiver) {
-	buf := new(bytes.Buffer)
-	tmp, err := ioutil.TempDir("", "archiver")
-	if err != nil {
-		t.Fatalf("[%s] %v", name, err)
-	}
-	defer os.RemoveAll(tmp)
-
-	// Test creating archive
-	err = ar.Write(buf, []string{"testdata"})
-	if err != nil {
-		t.Fatalf("[%s] writing archive: didn't expect an error, but got: %v", name, err)
-	}
-
-	// Test extracting archive
-	err = ar.Read(buf, tmp)
-	if err != nil {
-		t.Fatalf("[%s] reading archive: didn't expect an error, but got: %v", name, err)
-	}
-
-	// Check that what was extracted is what was compressed
-	symmetricTest(t, name, tmp)
-}
-
-// testSingleMakeOpen performs a symmetric test by using ar.Make to make an archive
-// from the test corpus, then using ar.Open to open the archive and comparing
-// the contents to ensure they are equal.
-func testSingleMakeOpen(t *testing.T, name string, ar Archiver) {
-	tmp, err := ioutil.TempDir("", "archiver")
-	if err != nil {
-		t.Fatalf("[%s] %v", name, err)
-	}
-	defer os.RemoveAll(tmp)
-
-	origPath := "testdata/quote1.txt"
-	newPath := filepath.Join(tmp, "quote1.txt")
-
-	// Test creating archive
-	outfile := filepath.Join(tmp, "test-"+name)
-	err = ar.Make(outfile, []string{origPath})
-	if err != nil {
-		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", name, err)
-	}
-
-	if !ar.Match(outfile) {
-		t.Fatalf("[%s] identifying format should be 'true', but got 'false'", name)
-	}
-
-	// Test extracting archive
-	err = ar.Open(outfile, newPath)
-	if err != nil {
-		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", name, outfile, newPath, err)
-	}
-
-	// Check that what was extracted is what was compressed
-	checkSameContent(t, name, origPath, newPath)
-}
-
-// testMakeOpen performs a symmetric test by using ar.Make to make an archive
-// from the test corpus, then using ar.Open to open the archive and comparing
-// the contents to ensure they are equal.
-func testMakeOpen(t *testing.T, name string, ar Archiver) {
-	tmp, err := ioutil.TempDir("", "archiver")
-	if err != nil {
-		t.Fatalf("[%s] %v", name, err)
-	}
-	defer os.RemoveAll(tmp)
-
-	// Test creating archive
-	outfile := filepath.Join(tmp, "test-"+name)
-	err = ar.Make(outfile, []string{"testdata"})
-	if err != nil {
-		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", name, err)
-	}
-
-	if !ar.Match(outfile) {
-		t.Fatalf("[%s] identifying format should be 'true', but got 'false'", name)
-	}
-
-	// Test extracting archive
-	dest := filepath.Join(tmp, "extraction_test")
-	os.Mkdir(dest, 0755)
-	err = ar.Open(outfile, dest)
-	if err != nil {
-		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", name, outfile, dest, err)
-	}
-
-	// Check that what was extracted is what was compressed
-	symmetricTest(t, name, dest)
-}
-
-// testMakeOpenWithDestinationEndingInSlash is similar to testMakeOpen except that
-// it tests the case where destination path has a terminating forward slash especially
-// on Windows os.
-func testMakeOpenWithDestinationEndingInSlash(t *testing.T, name string, ar Archiver) {
-	tmp, err := ioutil.TempDir("", "archiver")
-	if err != nil {
-		t.Fatalf("[%s] %v", name, err)
-	}
-	defer os.RemoveAll(tmp)
-
-	// Test creating archive
-	outfile := filepath.Join(tmp, "test-"+name)
-	err = ar.Make(outfile, []string{"testdata"})
-	if err != nil {
-		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", name, err)
-	}
-
-	if !ar.Match(outfile) {
-		t.Fatalf("[%s] identifying format should be 'true', but got 'false'", name)
-	}
-
-	// Test extracting archive with destination that has a slash at the end
-	dest := filepath.Join(tmp, "extraction_test")
-	os.Mkdir(dest, 0755)
-	err = ar.Open(outfile, dest+"/")
-	if err != nil {
-		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", name, outfile, dest, err)
-	}
-
-	// Check that what was extracted is what was compressed
-	symmetricTest(t, name, dest)
-}
-
-// testMakeOpenNotOverwriteAtDestination performs a test to ensure we do not overwrite existing files
-// when extracting at a destination that has existing files named as those in the archive.
-func testMakeOpenNotOverwriteAtDestination(t *testing.T, name string, ar Archiver) {
-	tmp, err := ioutil.TempDir("", "archiver")
-	if err != nil {
-		t.Fatalf("[%s] %v", name, err)
-	}
-	defer os.RemoveAll(tmp)
-
-	mockOverWriteDirectory := filepath.Join(tmp, "testdatamock")
-	mockOverWriteFile := filepath.Join(tmp, "testdatamock", "shouldnotoverwrite.txt")
-
-	// Prepare a mock directory with files for testing
-	if err := os.Mkdir(mockOverWriteDirectory, 0774); err != nil {
-		t.Fatalf("[%s] preping mock directory: didn't expect an error, but got: %v", mockOverWriteDirectory, err)
-	}
-	if err := ioutil.WriteFile(filepath.Join(mockOverWriteDirectory, "fileatsourceonly.txt"), []byte("File-From-Source"), 0644); err != nil {
-		t.Fatalf("[%s] prep file in source: didn't expect an error, but got: %v", name, err)
-	}
-	defer os.RemoveAll(mockOverWriteDirectory)
-	if err := ioutil.WriteFile(mockOverWriteFile, []byte("File-From-Source"), 0644); err != nil {
-		t.Fatalf("[%s] prep file in source: didn't expect an error, but got: %v", name, err)
-	}
-
-	// Test creating archive
-	outfile := filepath.Join(tmp, "test-"+name)
-	err = ar.Make(outfile, []string{mockOverWriteDirectory})
-	if err != nil {
-		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", name, err)
-	}
-
-	if !ar.Match(outfile) {
-		t.Fatalf("[%s] identifying format should be 'true', but got 'false'", name)
-	}
-
-	// Introduce a change to the mock file, to track if it would be overwritten by unarchiving.
-	if err := ioutil.WriteFile(mockOverWriteFile, []byte("File-At-Destination"), 0644); err != nil {
-		t.Fatalf("[%s] change file in destination: didn't expect an error, but got: %v", name, err)
-	}
-
-	// Test extracting archive with destination same as original folder
-	dest := tmp
-	if err := ar.Open(outfile, dest); err != nil {
-		if !strings.Contains(err.Error(), "skipping because there exists a file with the same name") {
-			t.Fatalf("[%s] extracting archive [%s -> %s]: Unexpected error got: %v", name, outfile, dest, err)
+func TestWithin(t *testing.T) {
+	for i, tc := range []struct {
+		path1, path2 string
+		expect       bool
+	}{
+		{
+			path1:  "/foo",
+			path2:  "/foo/bar",
+			expect: true,
+		},
+		{
+			path1:  "/foo",
+			path2:  "/foobar/asdf",
+			expect: false,
+		},
+		{
+			path1:  "/foobar/",
+			path2:  "/foobar/asdf",
+			expect: true,
+		},
+		{
+			path1:  "/foobar/asdf",
+			path2:  "/foobar",
+			expect: false,
+		},
+		{
+			path1:  "/foobar/asdf",
+			path2:  "/foobar/",
+			expect: false,
+		},
+		{
+			path1:  "/",
+			path2:  "/asdf",
+			expect: true,
+		},
+		{
+			path1:  "/asdf",
+			path2:  "/asdf",
+			expect: true,
+		},
+		{
+			path1:  "/",
+			path2:  "/",
+			expect: true,
+		},
+		{
+			path1:  "/foo/bar/daa",
+			path2:  "/foo",
+			expect: false,
+		},
+		{
+			path1:  "/foo/",
+			path2:  "/foo/bar/daa",
+			expect: true,
+		},
+	} {
+		actual := within(tc.path1, tc.path2)
+		if actual != tc.expect {
+			t.Errorf("Test %d: [%s %s] Expected %t but got %t", i, tc.path1, tc.path2, tc.expect, actual)
 		}
 	}
+}
 
-	// Validate if the mock file was changed by the un-archiving process
-	content, err := ioutil.ReadFile(mockOverWriteFile)
-	if err != nil {
-		t.Fatalf("[%s] extracting archive [%s -> %s]: Unable to read file : %v", name, outfile, dest, err)
+func TestMultipleTopLevels(t *testing.T) {
+	for i, tc := range []struct {
+		set    []string
+		expect bool
+	}{
+		{
+			set:    []string{},
+			expect: false,
+		},
+		{
+			set:    []string{"/foo"},
+			expect: false,
+		},
+		{
+			set:    []string{"/foo", "/foo/bar"},
+			expect: false,
+		},
+		{
+			set:    []string{"/foo", "/bar"},
+			expect: true,
+		},
+		{
+			set:    []string{"/foo", "/foobar"},
+			expect: true,
+		},
+		{
+			set:    []string{"foo", "foo/bar"},
+			expect: false,
+		},
+		{
+			set:    []string{"foo", "/foo/bar"},
+			expect: false,
+		},
+		{
+			set:    []string{"../foo", "foo/bar"},
+			expect: true,
+		},
+		{
+			set:    []string{`C:\foo\bar`, `C:\foo\bar\zee`},
+			expect: false,
+		},
+		{
+			set:    []string{`C:\`, `C:\foo\bar`},
+			expect: false,
+		},
+		{
+			set:    []string{`D:\foo`, `E:\foo`},
+			expect: true,
+		},
+		{
+			set:    []string{`D:\foo`, `D:\foo\bar`, `C:\foo`},
+			expect: true,
+		},
+		{
+			set:    []string{"/foo", "/", "/bar"},
+			expect: true,
+		},
+	} {
+		actual := multipleTopLevels(tc.set)
+		if actual != tc.expect {
+			t.Errorf("Test %d: %v: Expected %t but got %t", i, tc.set, tc.expect, actual)
+		}
 	}
-	if string(content) != "File-At-Destination" {
-		t.Fatalf("[%s] extracting archive [%s -> %s]: Unexpected Overwrite of File at Destination %s, %s got %s", name, outfile, dest, mockOverWriteFile, "File-At-Destination", string(content))
+}
 
+func TestArchiveUnarchive(t *testing.T) {
+	for _, af := range archiveFormats {
+		au, ok := af.(archiverUnarchiver)
+		if !ok {
+			t.Errorf("%s (%T): not an Archiver and Unarchiver", af, af)
+			continue
+		}
+		testArchiveUnarchive(t, au)
+	}
+}
+
+func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
+	auStr := fmt.Sprintf("%s", au)
+
+	tmp, err := ioutil.TempDir("", "archiver_test")
+	if err != nil {
+		t.Fatalf("[%s] %v", auStr, err)
+	}
+	defer os.RemoveAll(tmp)
+
+	// Test creating archive
+	outfile := filepath.Join(tmp, "archiver_test."+auStr)
+	err = au.Archive([]string{"testdata"}, outfile)
+	if err != nil {
+		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", auStr, err)
+	}
+
+	// Test format matching (TODO: Make this its own test, out of band with the archive/unarchive tests)
+	//testMatching(t, au, outfile) // TODO: Disabled until we can finish implementing this for compressed tar formats
+
+	// Test extracting archive
+	dest := filepath.Join(tmp, "extraction_test_"+auStr)
+	os.Mkdir(dest, 0755)
+	err = au.Unarchive(outfile, dest)
+	if err != nil {
+		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", auStr, outfile, dest, err)
+	}
+
+	// Check that what was extracted is what was compressed
+	symmetricTest(t, auStr, dest)
+}
+
+// testMatching tests that au can match the format of archiveFile.
+func testMatching(t *testing.T, au archiverUnarchiver, archiveFile string) {
+	m, ok := au.(Matcher)
+	if !ok {
+		t.Logf("[NOTICE] %T (%s) is not a Matcher", au, au)
+		return
+	}
+
+	file, err := os.Open(archiveFile)
+	if err != nil {
+		t.Fatalf("[%s] opening file for matching: %v", au, err)
+	}
+	defer file.Close()
+
+	tmpBuf := make([]byte, 2048)
+	io.ReadFull(file, tmpBuf)
+
+	matched, err := m.Match(file)
+	if err != nil {
+		t.Fatalf("%s (%T): testing matching: got error, expected none: %v", m, m, err)
+	}
+	if !matched {
+		t.Fatalf("%s (%T): format should have matched, but didn't", m, m)
 	}
 }
 
 // symmetricTest compares the contents of a destination directory to the contents
 // of the test corpus and tests that they are equal.
-func symmetricTest(t *testing.T, name, dest string) {
+func symmetricTest(t *testing.T, formatName, dest string) {
 	var expectedFileCount int
 	filepath.Walk("testdata", func(fpath string, info os.FileInfo, err error) error {
 		expectedFileCount++
@@ -270,14 +226,14 @@ func symmetricTest(t *testing.T, name, dest string) {
 
 		origPath, err := filepath.Rel(dest, fpath)
 		if err != nil {
-			t.Fatalf("[%s] %s: Error inducing original file path: %v", name, fpath, err)
+			t.Fatalf("[%s] %s: Error inducing original file path: %v", formatName, fpath, err)
 		}
 
 		if info.IsDir() {
 			// stat dir instead of read file
 			_, err = os.Stat(origPath)
 			if err != nil {
-				t.Fatalf("[%s] %s: Couldn't stat original directory (%s): %v", name,
+				t.Fatalf("[%s] %s: Couldn't stat original directory (%s): %v", formatName,
 					fpath, origPath, err)
 			}
 			return nil
@@ -285,99 +241,50 @@ func symmetricTest(t *testing.T, name, dest string) {
 
 		expectedFileInfo, err := os.Stat(origPath)
 		if err != nil {
-			t.Fatalf("[%s] %s: Error obtaining original file info: %v", name, fpath, err)
+			t.Fatalf("[%s] %s: Error obtaining original file info: %v", formatName, fpath, err)
 		}
-		actualFileInfo, err := os.Stat(fpath)
+		expected, err := ioutil.ReadFile(origPath)
 		if err != nil {
-			t.Fatalf("[%s] %s: Error obtaining actual file info: %v", name, fpath, err)
-		}
-		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
-			t.Fatalf("[%s] %s: File mode differed between on disk and compressed", name,
-				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
+			t.Fatalf("[%s] %s: Couldn't open original file (%s) from disk: %v", formatName,
+				fpath, origPath, err)
 		}
 
-		checkSameContent(t, name, origPath, fpath)
+		actualFileInfo, err := os.Stat(fpath)
+		if err != nil {
+			t.Fatalf("[%s] %s: Error obtaining actual file info: %v", formatName, fpath, err)
+		}
+		actual, err := ioutil.ReadFile(fpath)
+		if err != nil {
+			t.Fatalf("[%s] %s: Couldn't open new file from disk: %v", formatName, fpath, err)
+		}
+
+		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
+			t.Fatalf("[%s] %s: File mode differed between on disk and compressed", formatName,
+				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
+		}
+		if !bytes.Equal(expected, actual) {
+			t.Fatalf("[%s] %s: File contents differed between on disk and compressed", formatName, origPath)
+		}
 
 		return nil
 	})
 
 	if got, want := actualFileCount, expectedFileCount; got != want {
-		t.Fatalf("[%s] Expected %d resulting files, got %d", name, want, got)
+		t.Fatalf("[%s] Expected %d resulting files, got %d", formatName, want, got)
 	}
 }
 
-func checkSameContent(t *testing.T, name, origPath, fpath string) {
-	expected, err := ioutil.ReadFile(origPath)
-	if err != nil {
-		t.Fatalf("[%s] %s: Couldn't open original file (%s) from disk: %v", name,
-			fpath, origPath, err)
-	}
-	actual, err := ioutil.ReadFile(fpath)
-	if err != nil {
-		t.Fatalf("[%s] %s: Couldn't open new file from disk: %v", name, fpath, err)
-	}
-	if !bytes.Equal(expected, actual) {
-		t.Fatalf("[%s] %s: File contents differed between on disk and compressed", name, origPath)
-	}
+var archiveFormats = []interface{}{
+	DefaultZip,
+	DefaultTar,
+	DefaultTarBz2,
+	DefaultTarGz,
+	DefaultTarLz4,
+	DefaultTarSz,
+	DefaultTarXz,
 }
 
-func BenchmarkMake(b *testing.B) {
-	tmp, err := ioutil.TempDir("", "archiver")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.RemoveAll(tmp)
-
-	for name, ar := range SupportedFormats {
-		name, ar := name, ar
-		b.Run(name, func(b *testing.B) {
-			// skip RAR for now
-			if _, ok := ar.(rarFormat); ok {
-				b.Skip("not supported")
-			}
-			outfile := filepath.Join(tmp, "benchMake-"+name)
-			for i := 0; i < b.N; i++ {
-				err = ar.Make(outfile, []string{"testdata"})
-				if err != nil {
-					b.Fatalf("making archive: didn't expect an error, but got: %v", err)
-				}
-			}
-		})
-	}
-}
-
-func BenchmarkOpen(b *testing.B) {
-	tmp, err := ioutil.TempDir("", "archiver")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.RemoveAll(tmp)
-
-	for name, ar := range SupportedFormats {
-		name, ar := name, ar
-		b.Run(name, func(b *testing.B) {
-			// skip RAR for now
-			if _, ok := ar.(rarFormat); ok {
-				b.Skip("not supported")
-			}
-			// prepare a archive
-			outfile := filepath.Join(tmp, "benchMake-"+name)
-			err = ar.Make(outfile, []string{"testdata"})
-			if err != nil {
-				b.Fatalf("open archive: didn't expect an error, but got: %v", err)
-			}
-			// prepare extraction destination
-			dest := filepath.Join(tmp, "extraction_test")
-			os.Mkdir(dest, 0755)
-
-			// let's go
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				err = ar.Open(outfile, dest)
-				if err != nil {
-					b.Fatalf("open archive: didn't expect an error, but got: %v", err)
-				}
-			}
-		})
-	}
+type archiverUnarchiver interface {
+	Archiver
+	Unarchiver
 }
