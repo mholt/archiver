@@ -9,6 +9,7 @@ environment:
 stack: go 1.11
 
 install:
+  - go get ./...
   - go get github.com/golang/lint/golint
   - go get github.com/gordonklaus/ineffassign
 
