@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -323,6 +324,28 @@ func (r *Rar) Extract(source, target, destination string) error {
 	})
 }
 
+// Match returns true if the format of file matches this
+// type's format. It should not affect reader position.
+func (*Rar) Match(file *os.File) (bool, error) {
+	currentPos, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return false, err
+	}
+	defer file.Seek(currentPos, io.SeekStart)
+
+	buf := make([]byte, 8)
+	if n, err := file.Read(buf); err != nil || n < 8 {
+		return false, nil
+	}
+	hasTarHeader := bytes.Equal(buf[:7], []byte("Rar!\x1a\x07\x00")) || // ver 1.5
+		bytes.Equal(buf, []byte("Rar!\x1a\x07\x01\x00")) // ver 5.0
+	return hasTarHeader, nil
+}
+
 func (r *Rar) String() string { return "rar" }
 
 type rarFileInfo struct {
@@ -342,6 +365,7 @@ var (
 	_ = Unarchiver(new(Rar))
 	_ = Walker(new(Rar))
 	_ = Extractor(new(Rar))
+	_ = Matcher(new(Rar))
 	_ = os.FileInfo(rarFileInfo{})
 )
 

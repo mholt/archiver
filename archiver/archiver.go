@@ -113,6 +113,14 @@ type Decompressor interface {
 	Decompress(in io.Reader, out io.Writer) error
 }
 
+// Matcher is a type that can return whether the given
+// file appears to match the implementation's format.
+// Implementations should return the file's read position
+// to where it was when the method was called.
+type Matcher interface {
+	Match(*os.File) (bool, error)
+}
+
 func fileExists(name string) bool {
 	_, err := os.Stat(name)
 	return !os.IsNotExist(err)

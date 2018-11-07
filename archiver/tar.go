@@ -2,12 +2,14 @@ package archiver
 
 import (
 	"archive/tar"
+	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -524,7 +526,65 @@ func (t *Tar) Extract(source, target, destination string) error {
 	})
 }
 
+// Match returns true if the format of file matches this
+// type's format. It should not affect reader position.
+func (*Tar) Match(file *os.File) (bool, error) {
+	currentPos, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return false, err
+	}
+	defer file.Seek(currentPos, io.SeekStart)
+
+	buf := make([]byte, tarBlockSize)
+	if _, err = io.ReadFull(file, buf); err != nil {
+		return false, nil
+	}
+	return hasTarHeader(buf), nil
+}
+
+// hasTarHeader checks passed bytes has a valid tar header or not. buf must
+// contain at least 512 bytes and if not, it always returns false.
+func hasTarHeader(buf []byte) bool {
+	if len(buf) < tarBlockSize {
+		return false
+	}
+
+	b := buf[148:156]
+	b = bytes.Trim(b, " \x00") // clean up all spaces and null bytes
+	if len(b) == 0 {
+		return false // unknown format
+	}
+	hdrSum, err := strconv.ParseUint(string(b), 8, 64)
+	if err != nil {
+		return false
+	}
+
+	// According to the go official archive/tar, Sun tar uses signed byte
+	// values so this calcs both signed and unsigned
+	var usum uint64
+	var sum int64
+	for i, c := range buf {
+		if 148 <= i && i < 156 {
+			c = ' ' // checksum field itself is counted as branks
+		}
+		usum += uint64(uint8(c))
+		sum += int64(int8(c))
+	}
+
+	if hdrSum != usum && int64(hdrSum) != sum {
+		return false // invalid checksum
+	}
+
+	return true
+}
+
 func (t *Tar) String() string { return "tar" }
+
+const tarBlockSize = 512
 
 // Compile-time checks to ensure type implements desired interfaces.
 var (
@@ -534,6 +594,7 @@ var (
 	_ = Unarchiver(new(Tar))
 	_ = Walker(new(Tar))
 	_ = Extractor(new(Tar))
+	_ = Matcher(new(Tar))
 )
 
 // DefaultTar is a convenient archiver ready to use.

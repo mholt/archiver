@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"archive/zip"
+	"bytes"
 	"compress/flate"
 	"fmt"
 	"io"
@@ -492,6 +493,26 @@ func (z *Zip) Extract(source, target, destination string) error {
 	})
 }
 
+// Match returns true if the format of file matches this
+// type's format. It should not affect reader position.
+func (*Zip) Match(file *os.File) (bool, error) {
+	currentPos, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return false, err
+	}
+	defer file.Seek(currentPos, io.SeekStart)
+
+	buf := make([]byte, 4)
+	if n, err := file.Read(buf); err != nil || n < 4 {
+		return false, nil
+	}
+	return bytes.Equal(buf, []byte("PK\x03\x04")), nil
+}
+
 func (z *Zip) String() string { return "zip" }
 
 // Compile-time checks to ensure type implements desired interfaces.
@@ -502,6 +523,7 @@ var (
 	_ = Unarchiver(new(Zip))
 	_ = Walker(new(Zip))
 	_ = Extractor(new(Zip))
+	_ = Matcher(new(Zip))
 )
 
 // compressedFormats is a (non-exhaustive) set of lowercased
