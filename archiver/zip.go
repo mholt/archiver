@@ -100,7 +100,7 @@ func (z *Zip) Archive(sources []string, destination string) error {
 	}
 
 	for _, source := range sources {
-		err := z.writeWalk(source, topLevelFolder)
+		err := z.writeWalk(source, topLevelFolder, destination)
 		if err != nil {
 			return fmt.Errorf("walking %s: %v", source, err)
 		}
@@ -193,7 +193,7 @@ func (z *Zip) extractFile(f File, to string) error {
 	return writeNewFile(to, f, f.Mode())
 }
 
-func (z *Zip) writeWalk(source, topLevelFolder string) error {
+func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 	sourceAbs, err := filepath.Abs(source)
 	if err != nil {
 		return fmt.Errorf("getting absolute path: %v", err)
@@ -201,6 +201,10 @@ func (z *Zip) writeWalk(source, topLevelFolder string) error {
 	sourceInfo, err := os.Stat(sourceAbs)
 	if err != nil {
 		return fmt.Errorf("%s: stat: %v", source, err)
+	}
+	destAbs, err := filepath.Abs(destination)
+	if err != nil {
+		return fmt.Errorf("%s: getting absolute path of destination %s: %v", source, destination, err)
 	}
 
 	var baseDir string
@@ -223,17 +227,24 @@ func (z *Zip) writeWalk(source, topLevelFolder string) error {
 			return handleErr(fmt.Errorf("traversing %s: %v", fpath, err))
 		}
 		if info == nil {
-			return handleErr(fmt.Errorf("no file info"))
+			return handleErr(fmt.Errorf("%s: no file info", fpath))
 		}
 
-		name := source
-		if source != fpath {
-			name, err = filepath.Rel(source, fpath)
-			if err != nil {
-				return handleErr(err)
-			}
+		// make sure we do not copy the output file into the output
+		// file; that results in an infinite loop and disk exhaustion!
+		fpathAbs, err := filepath.Abs(fpath)
+		if err != nil {
+			return handleErr(fmt.Errorf("%s: getting absolute path: %v", fpath, err))
+		}
+		if within(fpathAbs, destAbs) {
+			return nil
 		}
 
+		// build the name to be used within the archive
+		name, err := filepath.Rel(source, fpath)
+		if err != nil {
+			return handleErr(err)
+		}
 		nameInArchive := path.Join(baseDir, filepath.ToSlash(name))
 
 		file, err := os.Open(fpath)

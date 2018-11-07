@@ -336,7 +336,7 @@ var supportedFormats = []string{
 	".xz",
 }
 
-const usage = `Usage: arc {archive|unarchive|extract|ls|help} <archive file> [files...]
+const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help} [arguments...]
   archive
     Create a new archive file. List the files/folders
     to include in the archive; at least one required.
@@ -350,6 +350,10 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|help} <archive file> [fi
     archive is required), and third is destination.
   ls
     List the contents of the archive.
+  compress
+    Compresses a file, destination optional.
+  decompress
+    Decompresses a file, destination optional.
   help
     Display this help text. Also -h or --help.
 

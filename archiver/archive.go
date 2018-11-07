@@ -187,6 +187,8 @@ func within(parent, sub string) bool {
 	return !strings.Contains(rel, "..")
 }
 
+// multipleTopLevels returns true if the paths do not
+// share a common top-level folder.
 func multipleTopLevels(paths []string) bool {
 	if len(paths) < 2 {
 		return false
@@ -211,6 +213,9 @@ func multipleTopLevels(paths []string) bool {
 	return false
 }
 
+// folderNameFromFileName returns a name for a folder
+// that is suitable based on the filename, which will
+// be stripped of its extensions.
 func folderNameFromFileName(filename string) string {
 	base := filepath.Base(filename)
 	firstDot := strings.Index(base, ".")

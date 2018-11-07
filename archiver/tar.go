@@ -91,7 +91,7 @@ func (t *Tar) Archive(sources []string, destination string) error {
 	}
 
 	for _, source := range sources {
-		err := t.writeWalk(source, topLevelFolder)
+		err := t.writeWalk(source, topLevelFolder, destination)
 		if err != nil {
 			return fmt.Errorf("walking %s: %v", source, err)
 		}
@@ -234,7 +234,7 @@ func (t *Tar) untarFile(f File, to string) error {
 	}
 }
 
-func (t *Tar) writeWalk(source, topLevelFolder string) error {
+func (t *Tar) writeWalk(source, topLevelFolder, destination string) error {
 	sourceAbs, err := filepath.Abs(source)
 	if err != nil {
 		return fmt.Errorf("getting absolute path: %v", err)
@@ -242,6 +242,10 @@ func (t *Tar) writeWalk(source, topLevelFolder string) error {
 	sourceInfo, err := os.Stat(sourceAbs)
 	if err != nil {
 		return fmt.Errorf("%s: stat: %v", source, err)
+	}
+	destAbs, err := filepath.Abs(destination)
+	if err != nil {
+		return fmt.Errorf("%s: getting absolute path of destination %s: %v", source, destination, err)
 	}
 
 	var baseDir string
@@ -267,14 +271,20 @@ func (t *Tar) writeWalk(source, topLevelFolder string) error {
 			return handleErr(fmt.Errorf("no file info"))
 		}
 
-		name := source
-		if source != fpath {
-			name, err = filepath.Rel(source, fpath)
-			if err != nil {
-				return handleErr(err)
-			}
+		// make sure we do not copy our output file into itself
+		fpathAbs, err := filepath.Abs(fpath)
+		if err != nil {
+			return handleErr(fmt.Errorf("%s: getting absolute path: %v", fpath, err))
+		}
+		if within(fpathAbs, destAbs) {
+			return nil
 		}
 
+		// build the name to be used in the archive
+		name, err := filepath.Rel(source, fpath)
+		if err != nil {
+			return handleErr(err)
+		}
 		nameInArchive := path.Join(baseDir, filepath.ToSlash(name))
 
 		file, err := os.Open(fpath)
@@ -400,18 +410,22 @@ func (t *Tar) Read() (File, error) {
 
 // Close closes the tar archive(s) opened by Create and Open.
 func (t *Tar) Close() error {
-	if t.cleanupWrapFn != nil {
-		t.cleanupWrapFn()
-	}
+	var err error
 	if t.tr != nil {
 		t.tr = nil
 	}
 	if t.tw != nil {
 		tw := t.tw
 		t.tw = nil
-		return tw.Close()
+		err = tw.Close()
 	}
-	return nil
+	// make sure cleanup of "Reader/Writer wrapper"
+	// (say that ten times fast) happens AFTER the
+	// underlying stream is closed
+	if t.cleanupWrapFn != nil {
+		t.cleanupWrapFn()
+	}
+	return err
 }
 
 // Walk calls walkFn for each visited item in archive.
