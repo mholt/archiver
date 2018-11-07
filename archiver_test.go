@@ -17,11 +17,49 @@ func TestArchiver(t *testing.T) {
 			if _, ok := ar.(rarFormat); ok {
 				t.Skip("not supported")
 			}
-			testWriteRead(t, name, ar)
-			testMakeOpen(t, name, ar)
-			testMakeOpenWithDestinationEndingInSlash(t, name, ar)
+
+			_, gzOk := ar.(gzFormat)
+			_, bzip2Ok := ar.(bzip2Format)
+			if gzOk || bzip2Ok {
+				testSingleWriteRead(t, name, ar)
+				testSingleMakeOpen(t, name, ar)
+			} else {
+				testWriteRead(t, name, ar)
+				testMakeOpen(t, name, ar)
+				testMakeOpenWithDestinationEndingInSlash(t, name, ar)
+			}
 		})
 	}
+}
+
+// testSingleWriteRead performs a symmetric test by using ar.Write to generate
+// an archive from the test corpus, then using ar.Read to extract the archive
+// and comparing the contents to ensure they are equal.
+func testSingleWriteRead(t *testing.T, name string, ar Archiver) {
+	buf := new(bytes.Buffer)
+	tmp, err := ioutil.TempDir("", "archiver")
+	if err != nil {
+		t.Fatalf("[%s] %v", name, err)
+	}
+	defer os.RemoveAll(tmp)
+
+	origPath := "testdata/quote1.txt"
+	newPath := filepath.Join(tmp, "quote1.txt")
+
+	// Test creating archive
+	err = ar.Write(buf, []string{origPath})
+	if err != nil {
+		t.Fatalf("[%s] writing archive: didn't expect an error, but got: %v", name, err)
+	}
+
+	// Test extracting archive
+	err = ar.Read(buf, newPath)
+	if err != nil {
+		t.Fatalf("[%s] reading archive: didn't expect an error, but got: %v", name, err)
+	}
+
+	// Check that what was extracted is what was compressed
+	checkSameContent(t, name, origPath, newPath)
 }
 
 // testWriteRead performs a symmetric test by using ar.Write to generate an archive
@@ -49,6 +87,40 @@ func testWriteRead(t *testing.T, name string, ar Archiver) {
 
 	// Check that what was extracted is what was compressed
 	symmetricTest(t, name, tmp)
+}
+
+// testSingleMakeOpen performs a symmetric test by using ar.Make to make an archive
+// from the test corpus, then using ar.Open to open the archive and comparing
+// the contents to ensure they are equal.
+func testSingleMakeOpen(t *testing.T, name string, ar Archiver) {
+	tmp, err := ioutil.TempDir("", "archiver")
+	if err != nil {
+		t.Fatalf("[%s] %v", name, err)
+	}
+	defer os.RemoveAll(tmp)
+
+	origPath := "testdata/quote1.txt"
+	newPath := filepath.Join(tmp, "quote1.txt")
+
+	// Test creating archive
+	outfile := filepath.Join(tmp, "test-"+name)
+	err = ar.Make(outfile, []string{origPath})
+	if err != nil {
+		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", name, err)
+	}
+
+	if !ar.Match(outfile) {
+		t.Fatalf("[%s] identifying format should be 'true', but got 'false'", name)
+	}
+
+	// Test extracting archive
+	err = ar.Open(outfile, newPath)
+	if err != nil {
+		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", name, outfile, newPath, err)
+	}
+
+	// Check that what was extracted is what was compressed
+	checkSameContent(t, name, origPath, newPath)
 }
 
 // testMakeOpen performs a symmetric test by using ar.Make to make an archive
@@ -154,34 +226,37 @@ func symmetricTest(t *testing.T, name, dest string) {
 		if err != nil {
 			t.Fatalf("[%s] %s: Error obtaining original file info: %v", name, fpath, err)
 		}
-		expected, err := ioutil.ReadFile(origPath)
-		if err != nil {
-			t.Fatalf("[%s] %s: Couldn't open original file (%s) from disk: %v", name,
-				fpath, origPath, err)
-		}
-
 		actualFileInfo, err := os.Stat(fpath)
 		if err != nil {
 			t.Fatalf("[%s] %s: Error obtaining actual file info: %v", name, fpath, err)
 		}
-		actual, err := ioutil.ReadFile(fpath)
-		if err != nil {
-			t.Fatalf("[%s] %s: Couldn't open new file from disk: %v", name, fpath, err)
-		}
-
 		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
 			t.Fatalf("[%s] %s: File mode differed between on disk and compressed", name,
 				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
 		}
-		if !bytes.Equal(expected, actual) {
-			t.Fatalf("[%s] %s: File contents differed between on disk and compressed", name, origPath)
-		}
+
+		checkSameContent(t, name, origPath, fpath)
 
 		return nil
 	})
 
 	if got, want := actualFileCount, expectedFileCount; got != want {
 		t.Fatalf("[%s] Expected %d resulting files, got %d", name, want, got)
+	}
+}
+
+func checkSameContent(t *testing.T, name, origPath, fpath string) {
+	expected, err := ioutil.ReadFile(origPath)
+	if err != nil {
+		t.Fatalf("[%s] %s: Couldn't open original file (%s) from disk: %v", name,
+			fpath, origPath, err)
+	}
+	actual, err := ioutil.ReadFile(fpath)
+	if err != nil {
+		t.Fatalf("[%s] %s: Couldn't open new file from disk: %v", name, fpath, err)
+	}
+	if !bytes.Equal(expected, actual) {
+		t.Fatalf("[%s] %s: File contents differed between on disk and compressed", name, origPath)
 	}
 }
 
