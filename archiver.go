@@ -48,6 +48,10 @@ func MatchingFormat(fpath string) Archiver {
 }
 
 func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
+	if fileExists(fpath) {
+		return fmt.Errorf("%s: skipping because there exists a file with the same name", fpath)
+	}
+
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
@@ -116,4 +120,14 @@ func sanitizeExtractPath(filePath string, destination string) error {
 		return fmt.Errorf("%s: illegal file path", filePath)
 	}
 	return nil
+}
+
+// fileExists returns true only if we can successfuly get the file attributes or if the reason
+// for failure is the absence of the file.
+func fileExists(fpath string) bool {
+	_, err := os.Stat(fpath)
+	if err == nil {
+		return true
+	}
+	return !os.IsNotExist(err)
 }

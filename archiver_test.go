@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -27,6 +28,7 @@ func TestArchiver(t *testing.T) {
 				testWriteRead(t, name, ar)
 				testMakeOpen(t, name, ar)
 				testMakeOpenWithDestinationEndingInSlash(t, name, ar)
+				testMakeOpenNotOverwriteAtDestination(t, name, ar)
 			}
 		})
 	}
@@ -187,6 +189,65 @@ func testMakeOpenWithDestinationEndingInSlash(t *testing.T, name string, ar Arch
 
 	// Check that what was extracted is what was compressed
 	symmetricTest(t, name, dest)
+}
+
+// testMakeOpenNotOverwriteAtDestination performs a test to ensure we do not overwrite existing files
+// when extracting at a destination that has existing files named as those in the archive.
+func testMakeOpenNotOverwriteAtDestination(t *testing.T, name string, ar Archiver) {
+	tmp, err := ioutil.TempDir("", "archiver")
+	if err != nil {
+		t.Fatalf("[%s] %v", name, err)
+	}
+	defer os.RemoveAll(tmp)
+
+	mockOverWriteDirectory := filepath.Join(tmp, "testdatamock")
+	mockOverWriteFile := filepath.Join(tmp, "testdatamock", "shouldnotoverwrite.txt")
+
+	// Prepare a mock directory with files for testing
+	if err := os.Mkdir(mockOverWriteDirectory, 0774); err != nil {
+		t.Fatalf("[%s] preping mock directory: didn't expect an error, but got: %v", mockOverWriteDirectory, err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(mockOverWriteDirectory, "fileatsourceonly.txt"), []byte("File-From-Source"), 0644); err != nil {
+		t.Fatalf("[%s] prep file in source: didn't expect an error, but got: %v", name, err)
+	}
+	defer os.RemoveAll(mockOverWriteDirectory)
+	if err := ioutil.WriteFile(mockOverWriteFile, []byte("File-From-Source"), 0644); err != nil {
+		t.Fatalf("[%s] prep file in source: didn't expect an error, but got: %v", name, err)
+	}
+
+	// Test creating archive
+	outfile := filepath.Join(tmp, "test-"+name)
+	err = ar.Make(outfile, []string{mockOverWriteDirectory})
+	if err != nil {
+		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", name, err)
+	}
+
+	if !ar.Match(outfile) {
+		t.Fatalf("[%s] identifying format should be 'true', but got 'false'", name)
+	}
+
+	// Introduce a change to the mock file, to track if it would be overwritten by unarchiving.
+	if err := ioutil.WriteFile(mockOverWriteFile, []byte("File-At-Destination"), 0644); err != nil {
+		t.Fatalf("[%s] change file in destination: didn't expect an error, but got: %v", name, err)
+	}
+
+	// Test extracting archive with destination same as original folder
+	dest := tmp
+	if err := ar.Open(outfile, dest); err != nil {
+		if !strings.Contains(err.Error(), "skipping because there exists a file with the same name") {
+			t.Fatalf("[%s] extracting archive [%s -> %s]: Unexpected error got: %v", name, outfile, dest, err)
+		}
+	}
+
+	// Validate if the mock file was changed by the un-archiving process
+	content, err := ioutil.ReadFile(mockOverWriteFile)
+	if err != nil {
+		t.Fatalf("[%s] extracting archive [%s -> %s]: Unable to read file : %v", name, outfile, dest, err)
+	}
+	if string(content) != "File-At-Destination" {
+		t.Fatalf("[%s] extracting archive [%s -> %s]: Unexpected Overwrite of File at Destination %s, %s got %s", name, outfile, dest, mockOverWriteFile, "File-At-Destination", string(content))
+
+	}
 }
 
 // symmetricTest compares the contents of a destination directory to the contents
