@@ -46,11 +46,13 @@ type Rar struct {
 	// The password to open archives (optional).
 	Password string
 
-	rr *rardecode.Reader
+	rr *rardecode.Reader     // underlying stream reader
+	rc *rardecode.ReadCloser // supports multi-volume archives (files only)
 }
 
 // Unarchive unpacks the .rar file at source to destination.
-// Destination will be treated as a folder name.
+// Destination will be treated as a folder name. It supports
+// multi-volume archives.
 func (r *Rar) Unarchive(source, destination string) error {
 	if !fileExists(destination) && r.MkdirAll {
 		err := mkdir(destination)
@@ -70,13 +72,7 @@ func (r *Rar) Unarchive(source, destination string) error {
 		}
 	}
 
-	file, err := os.Open(source)
-	if err != nil {
-		return fmt.Errorf("opening source archive: %v", err)
-	}
-	defer file.Close()
-
-	err = r.Open(file, 0)
+	err := r.OpenFile(source)
 	if err != nil {
 		return fmt.Errorf("opening rar archive for reading: %v", err)
 	}
@@ -110,14 +106,14 @@ func (r *Rar) addTopLevelFolder(sourceArchive, destination string) (string, erro
 	}
 	defer file.Close()
 
-	rr, err := rardecode.NewReader(file, r.Password)
+	rc, err := rardecode.NewReader(file, r.Password)
 	if err != nil {
 		return "", fmt.Errorf("creating archive reader: %v", err)
 	}
 
 	var files []string
 	for {
-		hdr, err := rr.Next()
+		hdr, err := rc.Next()
 		if err == io.EOF {
 			break
 		}
@@ -167,6 +163,22 @@ func (r *Rar) unrarFile(f File, to string) error {
 	return writeNewFile(to, r.rr, hdr.Mode())
 }
 
+// OpenFile opens filename for reading. This method supports
+// multi-volume archives, whereas Open does not (but Open
+// supports any stream, not just files).
+func (r *Rar) OpenFile(filename string) error {
+	if r.rr != nil {
+		return fmt.Errorf("rar archive is already open for reading")
+	}
+	var err error
+	r.rc, err = rardecode.OpenReader(filename, r.Password)
+	if err != nil {
+		return err
+	}
+	r.rr = &r.rc.Reader
+	return nil
+}
+
 // Open opens t for reading an archive from
 // in. The size parameter is not used.
 func (r *Rar) Open(in io.Reader, size int64) error {
@@ -203,7 +215,16 @@ func (r *Rar) Read() (File, error) {
 
 // Close closes the rar archive(s) opened by Create and Open.
 func (r *Rar) Close() error {
-	return nil
+	var err error
+	if r.rc != nil {
+		rc := r.rc
+		r.rc = nil
+		err = rc.Close()
+	}
+	if r.rr != nil {
+		r.rr = nil
+	}
+	return err
 }
 
 // Walk calls walkFn for each visited item in archive.
