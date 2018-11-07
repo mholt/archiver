@@ -1,25 +1,24 @@
 version: "{build}"
 
-os: Windows Server 2012 R2
-
 clone_folder: c:\gopath\src\github.com\mholt\archiver
 
 environment:
   GOPATH: c:\gopath
   CGO_ENABLED: 0
 
+stack: go 1.11
+
 install:
-  - rmdir c:\go /s /q
-  - appveyor DownloadFile https://dl.google.com/go/go1.10.4.windows-amd64.zip
-  - 7z x go1.10.4.windows-amd64.zip -y -oC:\ > NUL
-  - go version
-  - go env
-  - go get -t ./...
+  - go get ./...
   - go get github.com/golang/lint/golint
   - go get github.com/gordonklaus/ineffassign
   - set PATH=%GOPATH%\bin;%PATH%
 
 build: off
+
+before_test:
+  - go version
+  - go env
 
 test_script:
   - go vet ./...
