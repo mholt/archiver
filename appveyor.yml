@@ -12,6 +12,7 @@ install:
   - go get ./...
   - go get github.com/golang/lint/golint
   - go get github.com/gordonklaus/ineffassign
+  - set PATH=%GOPATH%\bin;%PATH%
 
 build: off
 
