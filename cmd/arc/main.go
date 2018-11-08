@@ -85,7 +85,7 @@ func main() {
 		err = w.Walk(flag.Arg(1), func(f archiver.File) error {
 			count++
 			switch h := f.Header.(type) {
-			case *zip.FileHeader:
+			case zip.FileHeader:
 				fmt.Printf("%s\t%d\t%d\t%s\t%s\n",
 					f.Mode(),
 					h.Method,
