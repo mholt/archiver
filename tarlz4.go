@@ -52,7 +52,7 @@ func (tlz4 *TarLz4) Walk(archive string, walkFn WalkFunc) error {
 // tar archive to out.
 func (tlz4 *TarLz4) Create(out io.Writer) error {
 	tlz4.wrapWriter()
-	return tlz4.Create(out)
+	return tlz4.Tar.Create(out)
 }
 
 // Open opens t for reading a compressed archive from

@@ -49,7 +49,7 @@ func (tbz2 *TarBz2) Walk(archive string, walkFn WalkFunc) error {
 // tar archive to out.
 func (tbz2 *TarBz2) Create(out io.Writer) error {
 	tbz2.wrapWriter()
-	return tbz2.Create(out)
+	return tbz2.Tar.Create(out)
 }
 
 // Open opens t for reading a compressed archive from

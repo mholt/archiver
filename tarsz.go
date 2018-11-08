@@ -47,7 +47,7 @@ func (tsz *TarSz) Walk(archive string, walkFn WalkFunc) error {
 // tar archive to out.
 func (tsz *TarSz) Create(out io.Writer) error {
 	tsz.wrapWriter()
-	return tsz.Create(out)
+	return tsz.Tar.Create(out)
 }
 
 // Open opens t for reading a compressed archive from
