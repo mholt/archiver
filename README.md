@@ -52,7 +52,7 @@ Files are put into the root of the archive; directories are recursively added, p
 ## Install
 
 ```bash
-go get -u github.com/mholt/archiver/cmd/archiver
+go get -u github.com/mholt/archiver/cmd/arc
 ```
 
 Or download binaries from the [releases](https://github.com/mholt/archiver/releases) page.
