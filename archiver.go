@@ -232,3 +232,35 @@ func folderNameFromFileName(filename string) string {
 	}
 	return base
 }
+
+// makeBaseDir returns the base directory to use for storing files in an
+// archive. topLevelFolder should be the name of the top-level folder of
+// the archive (if there is one), and sourceInfo is the file info obtained
+// by calling os.Stat on the source file or directory to include in the
+// archive.
+func makeBaseDir(topLevelFolder string, sourceInfo os.FileInfo) string {
+	var baseDir string
+	if topLevelFolder != "" {
+		baseDir = topLevelFolder
+	}
+	if sourceInfo.IsDir() {
+		baseDir = path.Join(baseDir, sourceInfo.Name())
+	}
+	return baseDir
+}
+
+// makeNameInArchive returns the filename for the file given by fpath to be used within
+// the archive. sourceInfo is the info obtained by calling os.Stat on source, and baseDir
+// is the base directory obtained by calling makeBaseDir. fpath should be the unaltered
+// file path of the file given to a filepath.WalkFunc.
+func makeNameInArchive(sourceInfo os.FileInfo, source, baseDir, fpath string) (string, error) {
+	name := fpath
+	if sourceInfo.IsDir() {
+		var err error
+		name, err = filepath.Rel(source, fpath)
+		if err != nil {
+			return "", err
+		}
+	}
+	return path.Join(baseDir, filepath.ToSlash(name)), nil
+}

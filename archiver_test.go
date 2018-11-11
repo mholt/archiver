@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestWithin(t *testing.T) {
@@ -134,6 +135,94 @@ func TestMultipleTopLevels(t *testing.T) {
 		actual := multipleTopLevels(tc.set)
 		if actual != tc.expect {
 			t.Errorf("Test %d: %v: Expected %t but got %t", i, tc.set, tc.expect, actual)
+		}
+	}
+}
+
+func TestMakeBaseDir(t *testing.T) {
+	for i, tc := range []struct {
+		topLevelFolder string
+		sourceInfo     fakeFileInfo
+		expect         string
+	}{
+		{
+			topLevelFolder: "",
+			sourceInfo:     fakeFileInfo{isDir: false},
+			expect:         "",
+		},
+		{
+			topLevelFolder: "foo",
+			sourceInfo:     fakeFileInfo{isDir: false},
+			expect:         "foo",
+		},
+		{
+			topLevelFolder: "",
+			sourceInfo:     fakeFileInfo{isDir: true, name: "bar"},
+			expect:         "bar",
+		},
+		{
+			topLevelFolder: "foo",
+			sourceInfo:     fakeFileInfo{isDir: true, name: "bar"},
+			expect:         "foo/bar",
+		},
+	} {
+		actual := makeBaseDir(tc.topLevelFolder, tc.sourceInfo)
+		if actual != tc.expect {
+			t.Errorf("Test %d: Expected '%s' but got '%s'", i, tc.expect, actual)
+		}
+	}
+}
+
+func TestMakeNameInArchive(t *testing.T) {
+	for i, tc := range []struct {
+		sourceInfo fakeFileInfo
+		source     string
+		baseDir    string
+		fpath      string
+		expect     string
+	}{
+		{
+			sourceInfo: fakeFileInfo{isDir: false},
+			source:     "foo.txt",
+			baseDir:    "",
+			fpath:      "foo.txt",
+			expect:     "foo.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: false},
+			source:     "foo.txt",
+			baseDir:    "base",
+			fpath:      "foo.txt",
+			expect:     "base/foo.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: false},
+			source:     "foo/bar.txt",
+			baseDir:    "",
+			fpath:      "foo/bar.txt",
+			expect:     "foo/bar.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: false},
+			source:     "foo/bar.txt",
+			baseDir:    "base",
+			fpath:      "foo/bar.txt",
+			expect:     "base/foo/bar.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: true},
+			source:     "foo/bar",
+			baseDir:    "bar",
+			fpath:      "foo/bar",
+			expect:     "bar",
+		},
+	} {
+		actual, err := makeNameInArchive(tc.sourceInfo, tc.source, tc.baseDir, tc.fpath)
+		if err != nil {
+			t.Errorf("Test %d: Got error: %v", i, err)
+		}
+		if actual != tc.expect {
+			t.Errorf("Test %d: Expected '%s' but got '%s'", i, tc.expect, actual)
 		}
 	}
 }
@@ -288,3 +377,19 @@ type archiverUnarchiver interface {
 	Archiver
 	Unarchiver
 }
+
+type fakeFileInfo struct {
+	name    string
+	size    int64
+	mode    os.FileMode
+	modTime time.Time
+	isDir   bool
+	sys     interface{}
+}
+
+func (ffi fakeFileInfo) Name() string       { return ffi.name }
+func (ffi fakeFileInfo) Size() int64        { return ffi.size }
+func (ffi fakeFileInfo) Mode() os.FileMode  { return ffi.mode }
+func (ffi fakeFileInfo) ModTime() time.Time { return ffi.modTime }
+func (ffi fakeFileInfo) IsDir() bool        { return ffi.isDir }
+func (ffi fakeFileInfo) Sys() interface{}   { return ffi.sys }

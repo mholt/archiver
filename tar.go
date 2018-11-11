@@ -249,14 +249,7 @@ func (t *Tar) writeWalk(source, topLevelFolder, destination string) error {
 	if err != nil {
 		return fmt.Errorf("%s: getting absolute path of destination %s: %v", source, destination, err)
 	}
-
-	var baseDir string
-	if topLevelFolder != "" {
-		baseDir = topLevelFolder
-	}
-	if sourceInfo.IsDir() {
-		baseDir = path.Join(baseDir, sourceInfo.Name())
-	}
+	baseDir := makeBaseDir(topLevelFolder, sourceInfo)
 
 	return filepath.Walk(source, func(fpath string, info os.FileInfo, err error) error {
 		handleErr := func(err error) error {
@@ -282,12 +275,11 @@ func (t *Tar) writeWalk(source, topLevelFolder, destination string) error {
 			return nil
 		}
 
-		// build the name to be used in the archive
-		name, err := filepath.Rel(source, fpath)
+		// build the name to be used within the archive
+		nameInArchive, err := makeNameInArchive(sourceInfo, source, baseDir, fpath)
 		if err != nil {
 			return handleErr(err)
 		}
-		nameInArchive := path.Join(baseDir, filepath.ToSlash(name))
 
 		file, err := os.Open(fpath)
 		if err != nil {
@@ -344,7 +336,6 @@ func (t *Tar) Write(f File) error {
 	if f.ReadCloser == nil {
 		return fmt.Errorf("%s: no way to read file contents", f.Name())
 	}
-
 	hdr, err := tar.FileInfoHeader(f, f.Name())
 	if err != nil {
 		return fmt.Errorf("%s: making header: %v", f.Name(), err)
