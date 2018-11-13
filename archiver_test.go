@@ -139,46 +139,12 @@ func TestMultipleTopLevels(t *testing.T) {
 	}
 }
 
-func TestMakeBaseDir(t *testing.T) {
-	for i, tc := range []struct {
-		topLevelFolder string
-		sourceInfo     fakeFileInfo
-		expect         string
-	}{
-		{
-			topLevelFolder: "",
-			sourceInfo:     fakeFileInfo{isDir: false},
-			expect:         "",
-		},
-		{
-			topLevelFolder: "foo",
-			sourceInfo:     fakeFileInfo{isDir: false},
-			expect:         "foo",
-		},
-		{
-			topLevelFolder: "",
-			sourceInfo:     fakeFileInfo{isDir: true, name: "bar"},
-			expect:         "bar",
-		},
-		{
-			topLevelFolder: "foo",
-			sourceInfo:     fakeFileInfo{isDir: true, name: "bar"},
-			expect:         "foo/bar",
-		},
-	} {
-		actual := makeBaseDir(tc.topLevelFolder, tc.sourceInfo)
-		if actual != tc.expect {
-			t.Errorf("Test %d: Expected '%s' but got '%s'", i, tc.expect, actual)
-		}
-	}
-}
-
 func TestMakeNameInArchive(t *testing.T) {
 	for i, tc := range []struct {
 		sourceInfo fakeFileInfo
-		source     string
-		baseDir    string
-		fpath      string
+		source     string // a file path explicitly listed by the user to include in the archive
+		baseDir    string // the base or root directory or path within the archive which contains all other files
+		fpath      string // the file path being walked; if source is a directory, this will be a child path
 		expect     string
 	}{
 		{
@@ -200,21 +166,70 @@ func TestMakeNameInArchive(t *testing.T) {
 			source:     "foo/bar.txt",
 			baseDir:    "",
 			fpath:      "foo/bar.txt",
-			expect:     "foo/bar.txt",
+			expect:     "bar.txt",
 		},
 		{
 			sourceInfo: fakeFileInfo{isDir: false},
 			source:     "foo/bar.txt",
 			baseDir:    "base",
 			fpath:      "foo/bar.txt",
-			expect:     "base/foo/bar.txt",
+			expect:     "base/bar.txt",
 		},
 		{
 			sourceInfo: fakeFileInfo{isDir: true},
 			source:     "foo/bar",
-			baseDir:    "bar",
+			baseDir:    "base",
 			fpath:      "foo/bar",
-			expect:     "bar",
+			expect:     "base/bar",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: false},
+			source:     "/absolute/path.txt",
+			baseDir:    "",
+			fpath:      "/absolute/path.txt",
+			expect:     "path.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: false},
+			source:     "/absolute/sub/path.txt",
+			baseDir:    "",
+			fpath:      "/absolute/sub/path.txt",
+			expect:     "path.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: false},
+			source:     "/absolute/sub/path.txt",
+			baseDir:    "base",
+			fpath:      "/absolute/sub/path.txt",
+			expect:     "base/path.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: false},
+			source:     "sub/path.txt",
+			baseDir:    "base/subbase",
+			fpath:      "sub/path.txt",
+			expect:     "base/subbase/path.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: true},
+			source:     "sub/dir",
+			baseDir:    "base/subbase",
+			fpath:      "sub/dir/path.txt",
+			expect:     "base/subbase/dir/path.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: true},
+			source:     "sub/dir",
+			baseDir:    "base/subbase",
+			fpath:      "sub/dir/sub2/sub3/path.txt",
+			expect:     "base/subbase/dir/sub2/sub3/path.txt",
+		},
+		{
+			sourceInfo: fakeFileInfo{isDir: true},
+			source:     `/absolute/dir`,
+			baseDir:    "base",
+			fpath:      `/absolute/dir/sub1/sub2/file.txt`,
+			expect:     "base/dir/sub1/sub2/file.txt",
 		},
 	} {
 		actual, err := makeNameInArchive(tc.sourceInfo, tc.source, tc.baseDir, tc.fpath)

@@ -13,6 +13,11 @@ import (
 // Archiver is a type that can create an archive file
 // from a list of source file names.
 type Archiver interface {
+	// Archive adds all the files or folders in sources
+	// to an archive to be created at destination. Files
+	// are added to the root of the archive, and directories
+	// are walked and recursively added, preserving folder
+	// structure.
 	Archive(sources []string, destination string) error
 }
 
@@ -233,34 +238,22 @@ func folderNameFromFileName(filename string) string {
 	return base
 }
 
-// makeBaseDir returns the base directory to use for storing files in an
-// archive. topLevelFolder should be the name of the top-level folder of
-// the archive (if there is one), and sourceInfo is the file info obtained
-// by calling os.Stat on the source file or directory to include in the
-// archive.
-func makeBaseDir(topLevelFolder string, sourceInfo os.FileInfo) string {
-	var baseDir string
-	if topLevelFolder != "" {
-		baseDir = topLevelFolder
-	}
-	if sourceInfo.IsDir() {
-		baseDir = path.Join(baseDir, sourceInfo.Name())
-	}
-	return baseDir
-}
-
 // makeNameInArchive returns the filename for the file given by fpath to be used within
-// the archive. sourceInfo is the info obtained by calling os.Stat on source, and baseDir
-// is the base directory obtained by calling makeBaseDir. fpath should be the unaltered
-// file path of the file given to a filepath.WalkFunc.
+// the archive. sourceInfo is the FileInfo obtained by calling os.Stat on source, and baseDir
+// is an optional base directory that becomes the root of the archive. fpath should be the
+// unaltered file path of the file given to a filepath.WalkFunc.
 func makeNameInArchive(sourceInfo os.FileInfo, source, baseDir, fpath string) (string, error) {
-	name := fpath
+	name := filepath.Base(fpath) // start with the file or dir name
 	if sourceInfo.IsDir() {
-		var err error
-		name, err = filepath.Rel(source, fpath)
+		// preserve internal directory structure; that's the path components
+		// between the source directory's leaf and this file's leaf
+		dir, err := filepath.Rel(filepath.Dir(source), filepath.Dir(fpath))
 		if err != nil {
 			return "", err
 		}
+		// prepend the internal directory structure to the leaf name,
+		// and convert path separators to forward slashes as per spec
+		name = path.Join(filepath.ToSlash(dir), name)
 	}
-	return path.Join(baseDir, filepath.ToSlash(name)), nil
+	return path.Join(baseDir, name), nil // prepend the base directory
 }

@@ -195,11 +195,7 @@ func (z *Zip) extractFile(f File, to string) error {
 }
 
 func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
-	sourceAbs, err := filepath.Abs(source)
-	if err != nil {
-		return fmt.Errorf("getting absolute path: %v", err)
-	}
-	sourceInfo, err := os.Stat(sourceAbs)
+	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		return fmt.Errorf("%s: stat: %v", source, err)
 	}
@@ -207,7 +203,6 @@ func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 	if err != nil {
 		return fmt.Errorf("%s: getting absolute path of destination %s: %v", source, destination, err)
 	}
-	baseDir := makeBaseDir(topLevelFolder, sourceInfo)
 
 	return filepath.Walk(source, func(fpath string, info os.FileInfo, err error) error {
 		handleErr := func(err error) error {
@@ -235,7 +230,7 @@ func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 		}
 
 		// build the name to be used within the archive
-		nameInArchive, err := makeNameInArchive(sourceInfo, source, baseDir, fpath)
+		nameInArchive, err := makeNameInArchive(sourceInfo, source, topLevelFolder, fpath)
 		if err != nil {
 			return handleErr(err)
 		}
