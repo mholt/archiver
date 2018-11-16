@@ -60,14 +60,23 @@ type Zip struct {
 	ridx int
 }
 
+// CheckExt ensures the file extension matches the format.
+func (*Zip) CheckExt(filename string) error {
+	if !strings.HasSuffix(filename, ".zip") {
+		return fmt.Errorf("filename must have a .zip extension")
+	}
+	return nil
+}
+
 // Archive creates a .zip file at destination containing
 // the files listed in sources. The destination must end
 // with ".zip". File paths can be those of regular files
 // or directories. Regular files are stored at the 'root'
 // of the archive, and directories are recursively added.
 func (z *Zip) Archive(sources []string, destination string) error {
-	if !strings.HasSuffix(destination, ".zip") {
-		return fmt.Errorf("output filename must have .zip extension")
+	err := z.CheckExt(destination)
+	if err != nil {
+		return fmt.Errorf("output %s", err.Error())
 	}
 	if !z.OverwriteExisting && fileExists(destination) {
 		return fmt.Errorf("file already exists: %s", destination)

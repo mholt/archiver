@@ -53,13 +53,22 @@ type Tar struct {
 	cleanupWrapFn func()
 }
 
+// CheckExt ensures the file extension matches the format.
+func (*Tar) CheckExt(filename string) error {
+	if !strings.HasSuffix(filename, ".tar") {
+		return fmt.Errorf("filename must have a .tar extension")
+	}
+	return nil
+}
+
 // Archive creates a tarball file at destination containing
 // the files listed in sources. The destination must end with
 // ".tar". File paths can be those of regular files or
 // directories; directories will be recursively added.
 func (t *Tar) Archive(sources []string, destination string) error {
-	if t.writerWrapFn == nil && !strings.HasSuffix(destination, ".tar") {
-		return fmt.Errorf("output filename must have .tar extension")
+	err := t.CheckExt(destination)
+	if t.writerWrapFn == nil && err != nil {
+		return fmt.Errorf("output %s", err.Error())
 	}
 	if !t.OverwriteExisting && fileExists(destination) {
 		return fmt.Errorf("file already exists: %s", destination)

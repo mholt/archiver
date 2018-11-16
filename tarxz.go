@@ -16,15 +16,24 @@ type TarXz struct {
 	*Tar
 }
 
+// CheckExt ensures the file extension matches the format.
+func (*TarXz) CheckExt(filename string) error {
+	if !strings.HasSuffix(filename, ".tar.xz") &&
+		!strings.HasSuffix(filename, ".txz") {
+		return fmt.Errorf("filename must have a .tar.xz or .txz extension")
+	}
+	return nil
+}
+
 // Archive creates a compressed tar file at destination
 // containing the files listed in sources. The destination
-// must end with ".tar.gz" or ".txz". File paths can be
+// must end with ".tar.xz" or ".txz". File paths can be
 // those of regular files or directories; directories will
 // be recursively added.
 func (txz *TarXz) Archive(sources []string, destination string) error {
-	if !strings.HasSuffix(destination, ".tar.xz") &&
-		!strings.HasSuffix(destination, ".txz") {
-		return fmt.Errorf("output filename must have .tar.xz or .txz extension")
+	err := txz.CheckExt(destination)
+	if err != nil {
+		return fmt.Errorf("output %s", err.Error())
 	}
 	txz.wrapWriter()
 	return txz.Tar.Archive(sources, destination)

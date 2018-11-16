@@ -17,15 +17,24 @@ type TarGz struct {
 	CompressionLevel int
 }
 
+// CheckExt ensures the file extension matches the format.
+func (*TarGz) CheckExt(filename string) error {
+	if !strings.HasSuffix(filename, ".tar.gz") &&
+		!strings.HasSuffix(filename, ".tgz") {
+		return fmt.Errorf("filename must have a .tar.gz or .tgz extension")
+	}
+	return nil
+}
+
 // Archive creates a compressed tar file at destination
 // containing the files listed in sources. The destination
 // must end with ".tar.gz" or ".tgz". File paths can be
 // those of regular files or directories; directories will
 // be recursively added.
 func (tgz *TarGz) Archive(sources []string, destination string) error {
-	if !strings.HasSuffix(destination, ".tar.gz") &&
-		!strings.HasSuffix(destination, ".tgz") {
-		return fmt.Errorf("output filename must have .tar.gz or .tgz extension")
+	err := tgz.CheckExt(destination)
+	if err != nil {
+		return fmt.Errorf("output %s", err.Error())
 	}
 	tgz.wrapWriter()
 	return tgz.Tar.Archive(sources, destination)
