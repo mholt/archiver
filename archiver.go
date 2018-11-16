@@ -19,6 +19,7 @@ type Archiver interface {
 	// are walked and recursively added, preserving folder
 	// structure.
 	Archive(sources []string, destination string) error
+	CheckExt(name string) error
 }
 
 // Unarchiver is a type that can extract archive files

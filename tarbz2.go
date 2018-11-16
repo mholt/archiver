@@ -17,15 +17,24 @@ type TarBz2 struct {
 	CompressionLevel int
 }
 
+// CheckExt ensures the file extension matches the format.
+func (*TarBz2) CheckExt(filename string) error {
+	if !strings.HasSuffix(filename, ".tar.bz2") &&
+		!strings.HasSuffix(filename, ".tbz2") {
+		return fmt.Errorf("filename must have a .tar.bz2 or .tbz2 extension")
+	}
+	return nil
+}
+
 // Archive creates a compressed tar file at destination
 // containing the files listed in sources. The destination
 // must end with ".tar.bz2" or ".tbz2". File paths can be
 // those of regular files or directories; directories will
 // be recursively added.
 func (tbz2 *TarBz2) Archive(sources []string, destination string) error {
-	if !strings.HasSuffix(destination, ".tar.bz2") &&
-		!strings.HasSuffix(destination, ".tbz2") {
-		return fmt.Errorf("output filename must have .tar.bz2 or .tbz2 extension")
+	err := tbz2.CheckExt(destination)
+	if err != nil {
+		return fmt.Errorf("output %s", err.Error())
 	}
 	tbz2.wrapWriter()
 	return tbz2.Tar.Archive(sources, destination)
