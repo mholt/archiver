@@ -13,12 +13,18 @@ import (
 // Archiver is a type that can create an archive file
 // from a list of source file names.
 type Archiver interface {
+	ExtensionChecker
+
 	// Archive adds all the files or folders in sources
 	// to an archive to be created at destination. Files
 	// are added to the root of the archive, and directories
 	// are walked and recursively added, preserving folder
 	// structure.
 	Archive(sources []string, destination string) error
+}
+
+// ExtensionChecker validates file extensions
+type ExtensionChecker interface {
 	CheckExt(name string) error
 }
 
@@ -110,8 +116,9 @@ var ErrStopWalk = fmt.Errorf("walk stopped")
 // Compressor compresses to out what it reads from in.
 // It also ensures a compatible or matching file extension.
 type Compressor interface {
+	ExtensionChecker
+
 	Compress(in io.Reader, out io.Writer) error
-	CheckExt(filename string) error
 }
 
 // Decompressor decompresses to out what it reads from in.
