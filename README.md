@@ -45,7 +45,7 @@ Files are put into the root of the archive; directories are recursively added, p
 - bzip2
 - gzip
 - lz4
-- snappy
+- snappy (sz)
 - xz
 
 
@@ -92,7 +92,7 @@ drwxr-xr-x  matt    staff   0       2018-09-19 15:47:18 -0600 MDT   dist/
 -rw-r--r--  matt    staff   6148    2017-08-07 18:34:22 -0600 MDT   dist/.DS_Store
 -rw-r--r--  matt    staff   22481   2018-09-19 15:47:18 -0600 MDT   dist/CHANGES.txt
 -rw-r--r--  matt    staff   17189   2018-09-19 15:47:18 -0600 MDT   dist/EULA.txt
--rw-r--r--  matt    staff   25261   2016-03-07 16:32:00 -0700 MST	dist/LICENSES.txt
+-rw-r--r--  matt    staff   25261   2016-03-07 16:32:00 -0700 MST   dist/LICENSES.txt
 -rw-r--r--  matt    staff   1017    2018-09-19 15:47:18 -0600 MDT   dist/README.txt
 -rw-r--r--  matt    staff   288     2016-03-21 11:52:38 -0600 MDT   dist/gitcookie.sh.enc
 ...
@@ -178,15 +178,33 @@ if err != nil {
 }
 defer z.Close()
 
-for _, f := range files {
-	// ... open file and get the name for it within the archive ...
-	err = z.Write(File{
+for _, fname := range filenames {
+	info, err := os.Stat(fname)
+	if err != nil {
+		return err
+	}
+	
+	// get file's name for the inside of the archive
+	internalName, err := archiver.NameInArchive(info, fname, fname)
+	if err != nil {
+		return err
+	}
+
+	// open the file
+	file, err := os.Open(f)
+	if err != nil {
+		return err
+	}
+
+	// write it to the archive
+	err = z.Write(archiver.File{
 		FileInfo: archiver.FileInfo{
-			FileInfo:   f.FileInfo(),
-			CustomName: nameInArchive,
+			FileInfo:   info,
+			CustomName: internalName,
 		},
-		ReadCloser: f,
+		ReadCloser: file,
 	})
+	file.Close()
 	if err != nil {
 		return err
 	}

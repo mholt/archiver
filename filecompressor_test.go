@@ -21,9 +21,6 @@ func TestCheckExtension(t *testing.T) {
 	defer os.Remove(testfile.Name())
 	defer testfile.Close()
 
-	fmt.Println("TEST DIR:", testdir)
-	fmt.Println("TEST FILE:", testfile.Name())
-
 	for i, tc := range []struct {
 		checker   ExtensionChecker
 		ext       string // including leading dot

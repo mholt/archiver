@@ -265,3 +265,13 @@ func makeNameInArchive(sourceInfo os.FileInfo, source, baseDir, fpath string) (s
 	}
 	return path.Join(baseDir, name), nil // prepend the base directory
 }
+
+// NameInArchive returns a name for the file at fpath suitable for
+// the inside of an archive. The source and its associated sourceInfo
+// is the path where walking a directory started, and if no directory
+// was walked, source may == fpath. The returned name is essentially
+// the components of the path between source and fpath, preserving
+// the internal directory structure.
+func NameInArchive(sourceInfo os.FileInfo, source, fpath string) (string, error) {
+	return makeNameInArchive(sourceInfo, source, "", fpath)
+}

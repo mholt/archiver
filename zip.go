@@ -76,7 +76,7 @@ func (*Zip) CheckExt(filename string) error {
 func (z *Zip) Archive(sources []string, destination string) error {
 	err := z.CheckExt(destination)
 	if err != nil {
-		return fmt.Errorf("output %s", err.Error())
+		return fmt.Errorf("checking extension: %v", err)
 	}
 	if !z.OverwriteExisting && fileExists(destination) {
 		return fmt.Errorf("file already exists: %s", destination)
@@ -290,9 +290,6 @@ func (z *Zip) Write(f File) error {
 	if f.FileInfo.Name() == "" {
 		return fmt.Errorf("missing file name")
 	}
-	if f.ReadCloser == nil {
-		return fmt.Errorf("%s: no way to read file contents", f.Name())
-	}
 
 	header, err := zip.FileInfoHeader(f)
 	if err != nil {
@@ -321,6 +318,9 @@ func (z *Zip) Write(f File) error {
 	}
 
 	if header.Mode().IsRegular() {
+		if f.ReadCloser == nil {
+			return fmt.Errorf("%s: no way to read file contents", f.Name())
+		}
 		_, err := io.Copy(writer, f)
 		if err != nil {
 			return fmt.Errorf("%s: copying contents: %v", f.Name(), err)

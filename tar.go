@@ -68,7 +68,7 @@ func (*Tar) CheckExt(filename string) error {
 func (t *Tar) Archive(sources []string, destination string) error {
 	err := t.CheckExt(destination)
 	if t.writerWrapFn == nil && err != nil {
-		return fmt.Errorf("output %s", err.Error())
+		return fmt.Errorf("checking extension: %v", err)
 	}
 	if !t.OverwriteExisting && fileExists(destination) {
 		return fmt.Errorf("file already exists: %s", destination)
@@ -337,9 +337,7 @@ func (t *Tar) Write(f File) error {
 	if f.FileInfo.Name() == "" {
 		return fmt.Errorf("missing file name")
 	}
-	if f.ReadCloser == nil {
-		return fmt.Errorf("%s: no way to read file contents", f.Name())
-	}
+
 	hdr, err := tar.FileInfoHeader(f, f.Name())
 	if err != nil {
 		return fmt.Errorf("%s: making header: %v", f.Name(), err)
@@ -355,6 +353,9 @@ func (t *Tar) Write(f File) error {
 	}
 
 	if hdr.Typeflag == tar.TypeReg {
+		if f.ReadCloser == nil {
+			return fmt.Errorf("%s: no way to read file contents", f.Name())
+		}
 		_, err := io.Copy(t.tw, f)
 		if err != nil {
 			return fmt.Errorf("%s: copying contents: %v", f.Name(), err)
