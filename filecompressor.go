@@ -10,6 +10,7 @@ type FileCompressor struct {
 	Compressor
 	Decompressor
 
+	// Whether to overwrite existing files when creating files.
 	OverwriteExisting bool
 }
 

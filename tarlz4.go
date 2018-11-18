@@ -100,6 +100,14 @@ func (tlz4 *TarLz4) wrapReader() {
 
 func (tlz4 *TarLz4) String() string { return "tar.lz4" }
 
+// NewTarLz4 returns a new, default instance ready to be customized and used.
+func NewTarLz4() *TarLz4 {
+	return &TarLz4{
+		CompressionLevel: 9, // https://github.com/lz4/lz4/blob/1b819bfd633ae285df2dfe1b0589e1ec064f2873/lib/lz4hc.h#L48
+		Tar:              NewTar(),
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(TarLz4))
@@ -111,7 +119,4 @@ var (
 )
 
 // DefaultTarLz4 is a convenient archiver ready to use.
-var DefaultTarLz4 = &TarLz4{
-	CompressionLevel: 9, // https://github.com/lz4/lz4/blob/1b819bfd633ae285df2dfe1b0589e1ec064f2873/lib/lz4hc.h#L48
-	Tar:              DefaultTar,
-}
+var DefaultTarLz4 = NewTarLz4()

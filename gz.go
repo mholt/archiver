@@ -44,8 +44,18 @@ func (gz *Gz) CheckExt(filename string) error {
 
 func (gz *Gz) String() string { return "gz" }
 
+// NewGz returns a new, default instance ready to be customized and used.
+func NewGz() *Gz {
+	return &Gz{
+		CompressionLevel: gzip.DefaultCompression,
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Compressor(new(Gz))
 	_ = Decompressor(new(Gz))
 )
+
+// DefaultGz is a default instance that is conveniently ready to use.
+var DefaultGz = NewGz()

@@ -524,7 +524,7 @@ func (t *Tar) Extract(source, target, destination string) error {
 
 // Match returns true if the format of file matches this
 // type's format. It should not affect reader position.
-func (*Tar) Match(file *os.File) (bool, error) {
+func (*Tar) Match(file io.ReadSeeker) (bool, error) {
 	currentPos, err := file.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return false, err
@@ -580,6 +580,13 @@ func hasTarHeader(buf []byte) bool {
 
 func (t *Tar) String() string { return "tar" }
 
+// NewTar returns a new, default instance ready to be customized and used.
+func NewTar() *Tar {
+	return &Tar{
+		MkdirAll: true,
+	}
+}
+
 const tarBlockSize = 512
 
 // Compile-time checks to ensure type implements desired interfaces.
@@ -591,9 +598,8 @@ var (
 	_ = Walker(new(Tar))
 	_ = Extractor(new(Tar))
 	_ = Matcher(new(Tar))
+	_ = ExtensionChecker(new(Rar))
 )
 
-// DefaultTar is a convenient archiver ready to use.
-var DefaultTar = &Tar{
-	MkdirAll: true,
-}
+// DefaultTar is a default instance that is conveniently ready to use.
+var DefaultTar = NewTar()

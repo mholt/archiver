@@ -102,6 +102,14 @@ func (tgz *TarGz) wrapReader() {
 
 func (tgz *TarGz) String() string { return "tar.gz" }
 
+// NewTarGz returns a new, default instance ready to be customized and used.
+func NewTarGz() *TarGz {
+	return &TarGz{
+		CompressionLevel: gzip.DefaultCompression,
+		Tar:              NewTar(),
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(TarGz))
@@ -113,7 +121,4 @@ var (
 )
 
 // DefaultTarGz is a convenient archiver ready to use.
-var DefaultTarGz = &TarGz{
-	CompressionLevel: gzip.DefaultCompression,
-	Tar:              DefaultTar,
-}
+var DefaultTarGz = NewTarGz()

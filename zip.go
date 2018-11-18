@@ -491,7 +491,7 @@ func (z *Zip) Extract(source, target, destination string) error {
 
 // Match returns true if the format of file matches this
 // type's format. It should not affect reader position.
-func (*Zip) Match(file *os.File) (bool, error) {
+func (*Zip) Match(file io.ReadSeeker) (bool, error) {
 	currentPos, err := file.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return false, err
@@ -511,6 +511,15 @@ func (*Zip) Match(file *os.File) (bool, error) {
 
 func (z *Zip) String() string { return "zip" }
 
+// NewZip returns a new, default instance ready to be customized and used.
+func NewZip() *Zip {
+	return &Zip{
+		CompressionLevel:     flate.DefaultCompression,
+		MkdirAll:             true,
+		SelectiveCompression: true,
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(Zip))
@@ -520,6 +529,7 @@ var (
 	_ = Walker(new(Zip))
 	_ = Extractor(new(Zip))
 	_ = Matcher(new(Zip))
+	_ = ExtensionChecker(new(Zip))
 )
 
 // compressedFormats is a (non-exhaustive) set of lowercased
@@ -561,9 +571,5 @@ var compressedFormats = map[string]struct{}{
 	".zipx": {},
 }
 
-// DefaultZip is a convenient archiver ready to use.
-var DefaultZip = &Zip{
-	CompressionLevel:     flate.DefaultCompression,
-	MkdirAll:             true,
-	SelectiveCompression: true,
-}
+// DefaultZip is a default instance that is conveniently ready to use.
+var DefaultZip = NewZip()

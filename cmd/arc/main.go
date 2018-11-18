@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/mholt/archiver"
@@ -51,6 +50,8 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
+
+	fmt.Printf("VALUE: %#v\n", iface)
 
 	// run the desired command
 	switch subcommand {
@@ -176,29 +177,23 @@ func main() {
 }
 
 func getFormat(subcommand string) (interface{}, error) {
+	// prepare the filename, with which we will find a suitable format
 	formatPos := 1
 	if subcommand == "compress" {
 		formatPos = 2
 	}
-
-	// figure out which file format we're working with
-	var ext string
-	archiveName := flag.Arg(formatPos)
-	for _, format := range supportedFormats {
-		// match by extension, or, in the case of 'compress',
-		// check the format without the leading dot; it allows
-		// a shortcut to specify a format while replacing
-		// the original file on disk
-		if strings.HasSuffix(archiveName, format) ||
-			(subcommand == "compress" &&
-				archiveName == strings.TrimPrefix(format, ".")) {
-			ext = format
-			break
-		}
+	filename := flag.Arg(formatPos)
+	if subcommand == "compress" && !strings.Contains(filename, ".") {
+		filename = "." + filename // leading dot needed for extension matching
 	}
 
-	// configure an archiver
-	var iface interface{}
+	// get the format by filename extension
+	f, err := archiver.ByExtension(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	// prepare a single Tar, in case it's needed
 	mytar := &archiver.Tar{
 		OverwriteExisting:      overwriteExisting,
 		MkdirAll:               mkdirAll,
@@ -206,96 +201,51 @@ func getFormat(subcommand string) (interface{}, error) {
 		ContinueOnError:        continueOnError,
 	}
 
-	switch ext {
-	case ".rar":
-		iface = &archiver.Rar{
-			OverwriteExisting:      overwriteExisting,
-			MkdirAll:               mkdirAll,
-			ImplicitTopLevelFolder: implicitTopLevelFolder,
-			ContinueOnError:        continueOnError,
-			Password:               os.Getenv("ARCHIVE_PASSWORD"),
-		}
-
-	case ".tar":
-		iface = mytar
-
-	case ".tbz2":
-		fallthrough
-	case ".tar.bz2":
-		iface = &archiver.TarBz2{
-			Tar: mytar,
-		}
-
-	case ".tgz":
-		fallthrough
-	case ".tar.gz":
-		iface = &archiver.TarGz{
-			Tar:              mytar,
-			CompressionLevel: compressionLevel,
-		}
-
-	case ".tlz4":
-		fallthrough
-	case ".tar.lz4":
-		iface = &archiver.TarLz4{
-			Tar:              mytar,
-			CompressionLevel: compressionLevel,
-		}
-
-	case ".tsz":
-		fallthrough
-	case ".tar.sz":
-		iface = &archiver.TarSz{
-			Tar: mytar,
-		}
-
-	case ".txz":
-		fallthrough
-	case ".tar.xz":
-		iface = &archiver.TarXz{
-			Tar: mytar,
-		}
-
-	case ".zip":
-		iface = &archiver.Zip{
-			CompressionLevel:       compressionLevel,
-			OverwriteExisting:      overwriteExisting,
-			MkdirAll:               mkdirAll,
-			SelectiveCompression:   selectiveCompression,
-			ImplicitTopLevelFolder: implicitTopLevelFolder,
-			ContinueOnError:        continueOnError,
-		}
-
-	case ".gz":
-		iface = &archiver.Gz{
-			CompressionLevel: compressionLevel,
-		}
-
-	case ".bz2":
-		iface = &archiver.Bz2{
-			CompressionLevel: compressionLevel,
-		}
-
-	case ".lz4":
-		iface = &archiver.Lz4{
-			CompressionLevel: compressionLevel,
-		}
-
-	case ".sz":
-		iface = &archiver.Snappy{}
-
-	case ".xz":
-		iface = &archiver.Xz{}
-
+	// fully configure the new value
+	switch v := f.(type) {
+	case *archiver.Rar:
+		v.OverwriteExisting = overwriteExisting
+		v.MkdirAll = mkdirAll
+		v.ImplicitTopLevelFolder = implicitTopLevelFolder
+		v.ContinueOnError = continueOnError
+		v.Password = os.Getenv("ARCHIVE_PASSWORD")
+	case *archiver.Tar:
+		v = mytar
+	case *archiver.TarBz2:
+		v.Tar = mytar
+		v.CompressionLevel = compressionLevel
+	case *archiver.TarGz:
+		v.Tar = mytar
+		v.CompressionLevel = compressionLevel
+	case *archiver.TarLz4:
+		v.Tar = mytar
+		v.CompressionLevel = compressionLevel
+	case *archiver.TarSz:
+		v.Tar = mytar
+	case *archiver.TarXz:
+		v.Tar = mytar
+	case *archiver.Zip:
+		v.CompressionLevel = compressionLevel
+		v.OverwriteExisting = overwriteExisting
+		v.MkdirAll = mkdirAll
+		v.SelectiveCompression = selectiveCompression
+		v.ImplicitTopLevelFolder = implicitTopLevelFolder
+		v.ContinueOnError = continueOnError
+	case *archiver.Gz:
+		v.CompressionLevel = compressionLevel
+	case *archiver.Bz2:
+		v.CompressionLevel = compressionLevel
+	case *archiver.Lz4:
+		v.CompressionLevel = compressionLevel
+	case *archiver.Snappy:
+		// nothing to customize
+	case *archiver.Xz:
+		// nothing to customize
 	default:
-		archiveExt := filepath.Ext(archiveName)
-		if archiveExt == "" {
-			return nil, fmt.Errorf("format missing (use file extension to specify archive/compression format)")
-		}
-		return nil, fmt.Errorf("unsupported format '%s'", archiveExt)
+		return nil, fmt.Errorf("format does not support customization: %s", f)
 	}
 
-	return iface, nil
+	return f, nil
 }
 
 func fatal(v ...interface{}) {
@@ -314,31 +264,6 @@ func usageString() string {
 	flag.CommandLine.SetOutput(buf)
 	flag.CommandLine.PrintDefaults()
 	return buf.String()
-}
-
-// supportedFormats is the list of recognized
-// file extensions. They are in an ordered slice
-// because ordering is important, since some
-// extensions can be substrings of others.
-var supportedFormats = []string{
-	".tar.bz2",
-	".tar.gz",
-	".tar.lz4",
-	".tar.sz",
-	".tar.xz",
-	".rar",
-	".tar",
-	".zip",
-	".tbz2",
-	".tgz",
-	".tlz4",
-	".tsz",
-	".txz",
-	".gz",
-	".bz2",
-	".lz4",
-	".sz",
-	".xz",
 }
 
 const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help} [arguments...]

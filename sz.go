@@ -36,8 +36,16 @@ func (s *Snappy) CheckExt(filename string) error {
 
 func (s *Snappy) String() string { return "sz" }
 
+// NewSnappy returns a new, default instance ready to be customized and used.
+func NewSnappy() *Snappy {
+	return new(Snappy)
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Compressor(new(Snappy))
 	_ = Decompressor(new(Snappy))
 )
+
+// DefaultSnappy is a default instance that is conveniently ready to use.
+var DefaultSnappy = NewSnappy()

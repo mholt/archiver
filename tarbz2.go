@@ -104,6 +104,14 @@ func (tbz2 *TarBz2) wrapReader() {
 
 func (tbz2 *TarBz2) String() string { return "tar.bz2" }
 
+// NewTarBz2 returns a new, default instance ready to be customized and used.
+func NewTarBz2() *TarBz2 {
+	return &TarBz2{
+		CompressionLevel: bzip2.DefaultCompression,
+		Tar:              NewTar(),
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(TarBz2))
@@ -115,7 +123,4 @@ var (
 )
 
 // DefaultTarBz2 is a convenient archiver ready to use.
-var DefaultTarBz2 = &TarBz2{
-	CompressionLevel: bzip2.DefaultCompression,
-	Tar:              DefaultTar,
-}
+var DefaultTarBz2 = NewTarBz2()

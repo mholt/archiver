@@ -43,8 +43,16 @@ func (x *Xz) CheckExt(filename string) error {
 
 func (x *Xz) String() string { return "xz" }
 
+// NewXz returns a new, default instance ready to be customized and used.
+func NewXz() *Xz {
+	return new(Xz)
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Compressor(new(Xz))
 	_ = Decompressor(new(Xz))
 )
+
+// DefaultXz is a default instance that is conveniently ready to use.
+var DefaultXz = NewXz()

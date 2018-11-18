@@ -39,8 +39,18 @@ func (lz *Lz4) CheckExt(filename string) error {
 
 func (lz *Lz4) String() string { return "lz4" }
 
+// NewLz4 returns a new, default instance ready to be customized and used.
+func NewLz4() *Lz4 {
+	return &Lz4{
+		CompressionLevel: 9, // https://github.com/lz4/lz4/blob/1b819bfd633ae285df2dfe1b0589e1ec064f2873/lib/lz4hc.h#L48
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Compressor(new(Lz4))
 	_ = Decompressor(new(Lz4))
 )
+
+// DefaultLz4 is a default instance that is conveniently ready to use.
+var DefaultLz4 = NewLz4()

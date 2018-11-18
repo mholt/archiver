@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/nwaples/rardecode"
@@ -49,6 +50,14 @@ type Rar struct {
 
 	rr *rardecode.Reader     // underlying stream reader
 	rc *rardecode.ReadCloser // supports multi-volume archives (files only)
+}
+
+// CheckExt ensures the file extension matches the format.
+func (*Rar) CheckExt(filename string) error {
+	if !strings.HasSuffix(filename, ".rar") {
+		return fmt.Errorf("filename must have a .rar extension")
+	}
+	return nil
 }
 
 // Unarchive unpacks the .rar file at source to destination.
@@ -326,7 +335,7 @@ func (r *Rar) Extract(source, target, destination string) error {
 
 // Match returns true if the format of file matches this
 // type's format. It should not affect reader position.
-func (*Rar) Match(file *os.File) (bool, error) {
+func (*Rar) Match(file io.ReadSeeker) (bool, error) {
 	currentPos, err := file.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return false, err
@@ -348,6 +357,13 @@ func (*Rar) Match(file *os.File) (bool, error) {
 
 func (r *Rar) String() string { return "rar" }
 
+// NewRar returns a new, default instance ready to be customized and used.
+func NewRar() *Rar {
+	return &Rar{
+		MkdirAll: true,
+	}
+}
+
 type rarFileInfo struct {
 	fh *rardecode.FileHeader
 }
@@ -366,10 +382,9 @@ var (
 	_ = Walker(new(Rar))
 	_ = Extractor(new(Rar))
 	_ = Matcher(new(Rar))
+	_ = ExtensionChecker(new(Rar))
 	_ = os.FileInfo(rarFileInfo{})
 )
 
-// DefaultRar is a convenient archiver ready to use.
-var DefaultRar = &Rar{
-	MkdirAll: true,
-}
+// DefaultRar is a default instance that is conveniently ready to use.
+var DefaultRar = NewRar()

@@ -47,8 +47,18 @@ func (bz *Bz2) CheckExt(filename string) error {
 
 func (bz *Bz2) String() string { return "bz2" }
 
+// NewBz2 returns a new, default instance ready to be customized and used.
+func NewBz2() *Bz2 {
+	return &Bz2{
+		CompressionLevel: bzip2.DefaultCompression,
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Compressor(new(Bz2))
 	_ = Decompressor(new(Bz2))
 )
+
+// DefaultBz2 is a default instance that is conveniently ready to use.
+var DefaultBz2 = NewBz2()

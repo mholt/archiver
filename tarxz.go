@@ -98,6 +98,13 @@ func (txz *TarXz) wrapReader() {
 
 func (txz *TarXz) String() string { return "tar.xz" }
 
+// NewTarXz returns a new, default instance ready to be customized and used.
+func NewTarXz() *TarXz {
+	return &TarXz{
+		Tar: NewTar(),
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(TarXz))
@@ -109,6 +116,4 @@ var (
 )
 
 // DefaultTarXz is a convenient archiver ready to use.
-var DefaultTarXz = &TarXz{
-	Tar: DefaultTar,
-}
+var DefaultTarXz = NewTarXz()

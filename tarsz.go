@@ -93,6 +93,13 @@ func (tsz *TarSz) wrapReader() {
 
 func (tsz *TarSz) String() string { return "tar.sz" }
 
+// NewTarSz returns a new, default instance ready to be customized and used.
+func NewTarSz() *TarSz {
+	return &TarSz{
+		Tar: NewTar(),
+	}
+}
+
 // Compile-time checks to ensure type implements desired interfaces.
 var (
 	_ = Reader(new(TarSz))
@@ -104,6 +111,4 @@ var (
 )
 
 // DefaultTarSz is a convenient archiver ready to use.
-var DefaultTarSz = &TarSz{
-	Tar: DefaultTar,
-}
+var DefaultTarSz = NewTarSz()

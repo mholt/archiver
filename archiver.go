@@ -117,7 +117,6 @@ var ErrStopWalk = fmt.Errorf("walk stopped")
 // It also ensures a compatible or matching file extension.
 type Compressor interface {
 	ExtensionChecker
-
 	Compress(in io.Reader, out io.Writer) error
 }
 
@@ -131,7 +130,71 @@ type Decompressor interface {
 // Implementations should return the file's read position
 // to where it was when the method was called.
 type Matcher interface {
-	Match(*os.File) (bool, error)
+	Match(io.ReadSeeker) (bool, error)
+}
+
+// Archive creates an archive of the source files to a new file at destination.
+// The archive format is chosen implicitly by file extension.
+func Archive(sources []string, destination string) error {
+	aIface, err := ByExtension(destination)
+	if err != nil {
+		return err
+	}
+	a, ok := aIface.(Archiver)
+	if !ok {
+		return fmt.Errorf("format specified by destination filename is not an archive format: %s", destination)
+	}
+	return a.Archive(sources, destination)
+}
+
+// Unarchive unarchives the given archive file into the destination folder.
+// The archive format is selected implicitly based on the file's header.
+func Unarchive(source, destination string) error {
+	f, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	uaIface, err := ByHeader(f)
+	if err != nil {
+		f.Close()
+		return err
+	}
+	f.Close()
+	u, ok := uaIface.(Unarchiver)
+	if !ok {
+		return fmt.Errorf("format specified by destination filename is not an archive format: %s", destination)
+	}
+	return u.Unarchive(source, destination)
+}
+
+// CompressFile is a convenience function to simply compress a file.
+// The compression algorithm is selected implicitly based on the
+// destination's extension.
+func CompressFile(source, destination string) error {
+	cIface, err := ByExtension(destination)
+	if err != nil {
+		return err
+	}
+	c, ok := cIface.(Compressor)
+	if !ok {
+		return fmt.Errorf("format specified by destination filename is not a recognized compression algorithm: %s", destination)
+	}
+	return FileCompressor{Compressor: c}.CompressFile(source, destination)
+}
+
+// DecompressFile is a convenience function to simply compress a file.
+// The compression algorithm is selected implicitly based on the
+// source's extension.
+func DecompressFile(source, destination string) error {
+	cIface, err := ByExtension(source)
+	if err != nil {
+		return err
+	}
+	c, ok := cIface.(Decompressor)
+	if !ok {
+		return fmt.Errorf("format specified by source filename is not a recognized compression algorithm: %s", source)
+	}
+	return FileCompressor{Decompressor: c}.DecompressFile(source, destination)
 }
 
 func fileExists(name string) bool {
@@ -274,4 +337,95 @@ func makeNameInArchive(sourceInfo os.FileInfo, source, baseDir, fpath string) (s
 // the internal directory structure.
 func NameInArchive(sourceInfo os.FileInfo, source, fpath string) (string, error) {
 	return makeNameInArchive(sourceInfo, source, "", fpath)
+}
+
+// ByExtension returns an archiver and unarchiver, or compressor
+// and decompressor, based on the extension of the filename.
+func ByExtension(filename string) (interface{}, error) {
+	var ec interface{}
+	for _, c := range extCheckers {
+		if err := c.CheckExt(filename); err == nil {
+			ec = c
+			break
+		}
+	}
+	switch ec.(type) {
+	case *Rar:
+		return NewRar(), nil
+	case *Tar:
+		return NewTar(), nil
+	case *TarBz2:
+		return NewTarBz2(), nil
+	case *TarGz:
+		return NewTarGz(), nil
+	case *TarLz4:
+		return NewTarLz4(), nil
+	case *TarSz:
+		return NewTarSz(), nil
+	case *TarXz:
+		return NewTarXz(), nil
+	case *Zip:
+		return NewZip(), nil
+	case *Gz:
+		return NewGz(), nil
+	case *Bz2:
+		return NewBz2(), nil
+	case *Lz4:
+		return NewBz2(), nil
+	case *Snappy:
+		return NewSnappy(), nil
+	case *Xz:
+		return NewXz(), nil
+	}
+	return nil, fmt.Errorf("format unrecognized by filename: %s", filename)
+}
+
+// ByHeader returns the unarchiver value that matches the input's
+// file header. It does not affect the current read position.
+func ByHeader(input io.ReadSeeker) (Unarchiver, error) {
+	var matcher Matcher
+	for _, m := range matchers {
+		ok, err := m.Match(input)
+		if err != nil {
+			return nil, fmt.Errorf("matching on format %s: %v", m, err)
+		}
+		if ok {
+			matcher = m
+			break
+		}
+	}
+	switch matcher.(type) {
+	case *Zip:
+		return NewZip(), nil
+	case *Tar:
+		return NewTar(), nil
+	case *Rar:
+		return NewRar(), nil
+	}
+	return nil, fmt.Errorf("format unrecognized")
+}
+
+// extCheckers is a list of the format implementations
+// that can check extensions. Only to be used for
+// checking extensions - not any archival operations.
+var extCheckers = []ExtensionChecker{
+	&TarBz2{},
+	&TarGz{},
+	&TarLz4{},
+	&TarSz{},
+	&TarXz{},
+	&Rar{},
+	&Tar{},
+	&Zip{},
+	&Gz{},
+	&Bz2{},
+	&Lz4{},
+	&Snappy{},
+	&Xz{},
+}
+
+var matchers = []Matcher{
+	&Rar{},
+	&Tar{},
+	&Zip{},
 }
