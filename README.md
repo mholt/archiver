@@ -142,7 +142,17 @@ import "github.com/mholt/archiver"
 
 [See the package's GoDoc](https://godoc.org/github.com/mholt/archiver) for full API documentation.
 
-For example, creating an archive:
+For example, creating or unpacking an archive file:
+
+```go
+err := archiver.Archive([]string{"testdata", "other/file.txt"}, "test.zip")
+// ...
+err = archiver.Unarchive("test.tar.gz", "test")
+```
+
+The archive format is determined by file extension. (There are [several functions in this package](https://godoc.org/github.com/mholt/archiver) which perform a task by inferring the format from file extension or file header, including `Archive()`, `Unarchive()`, `CompressFile()`, and `DecompressFile()`.)
+
+To configure the archiver used or perform, create an instance of the format's type:
 
 ```go
 z := archiver.Zip{
@@ -210,6 +220,8 @@ for _, fname := range filenames {
 	}
 }
 ```
+
+The `archiver.File` type allows you to use actual files with archives, or to mimic files when you only have streams.
 
 There's a lot more that can be done, too. [See the GoDoc](https://godoc.org/github.com/mholt/archiver) for full API documentation.
 

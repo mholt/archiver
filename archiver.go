@@ -1,3 +1,16 @@
+// Package archiver facilitates high-level archival and compression operations
+// for a variety of formats and compression algorithms. There is a type
+// definition for each format or algorithm that is supported.
+//
+// Each format has an instance of the type that represents it already created
+// for convenience, called `Default*` (replace the wildcard with the format's
+// type name). They can be reused, but we recommend not changing their config
+// between uses. There is no real performance benefit of reusing an instance.
+// You can also use `New*()` to get a new instance of a type (such as
+// `NewZip()`) with sane defaults, which is safer if your program is changing
+// an instance's configuration.
+//
+// The types and functions in this package are not safe for concurrent use.
 package archiver
 
 import (
