@@ -285,12 +285,14 @@ func (t *Tar) writeWalk(source, topLevelFolder, destination string) error {
 			return handleErr(err)
 		}
 
-		file, err := os.Open(fpath)
-		if err != nil {
-			return handleErr(fmt.Errorf("%s: opening: %v", fpath, err))
+		var file io.ReadCloser
+		if info.Mode().IsRegular() {
+			file, err = os.Open(fpath)
+			if err != nil {
+				return handleErr(fmt.Errorf("%s: opening: %v", fpath, err))
+			}
+			defer file.Close()
 		}
-		defer file.Close()
-
 		err = t.Write(File{
 			FileInfo: FileInfo{
 				FileInfo:   info,
@@ -338,7 +340,15 @@ func (t *Tar) Write(f File) error {
 		return fmt.Errorf("missing file name")
 	}
 
-	hdr, err := tar.FileInfoHeader(f, f.Name())
+	var linkTarget string
+	if (f.Mode() & os.ModeSymlink) != 0 {
+		var err error
+		linkTarget, err = os.Readlink(f.Name())
+		if err != nil {
+			return fmt.Errorf("%s: readlink: %v", f.Name(), err)
+		}
+	}
+	hdr, err := tar.FileInfoHeader(f, filepath.ToSlash(linkTarget))
 	if err != nil {
 		return fmt.Errorf("%s: making header: %v", f.Name(), err)
 	}

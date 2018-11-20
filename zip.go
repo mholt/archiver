@@ -186,6 +186,15 @@ func (z *Zip) extractNext(to string) error {
 	if !ok {
 		return fmt.Errorf("expected header to be zip.FileHeader but was %T", f.Header)
 	}
+	if (header.FileInfo().Mode() & os.ModeSymlink) != 0 {
+		buffer := make([]byte, header.FileInfo().Size())
+		size, err := f.Read(buffer)
+		if err != nil && err != io.EOF {
+			return fmt.Errorf("%s: reading symlink target: %v", header.Name, err)
+		}
+		linkTarget := string(buffer[:size])
+		return writeNewSymbolicLink(filepath.Join(to, header.Name), linkTarget)
+	}
 	return z.extractFile(f, filepath.Join(to, header.Name))
 }
 
@@ -244,12 +253,14 @@ func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 			return handleErr(err)
 		}
 
-		file, err := os.Open(fpath)
-		if err != nil {
-			return handleErr(fmt.Errorf("%s: opening: %v", fpath, err))
+		var file io.ReadCloser
+		if info.Mode().IsRegular() {
+			file, err = os.Open(fpath)
+			if err != nil {
+				return handleErr(fmt.Errorf("%s: opening: %v", fpath, err))
+			}
+			defer file.Close()
 		}
-		defer file.Close()
-
 		err = z.Write(File{
 			FileInfo: FileInfo{
 				FileInfo:   info,
@@ -314,6 +325,18 @@ func (z *Zip) Write(f File) error {
 	}
 
 	if f.IsDir() {
+		return nil
+	}
+
+	if (header.Mode() & os.ModeSymlink) != 0 {
+		linkTarget, err := os.Readlink(f.Name())
+		if err != nil {
+			return fmt.Errorf("%s: readlink: %v", f.Name(), err)
+		}
+		_, err = writer.Write([]byte(filepath.ToSlash(linkTarget)))
+		if err != nil {
+			return fmt.Errorf("%s: writing symlink target: %v", f.Name(), err)
+		}
 		return nil
 	}
 

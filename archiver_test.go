@@ -343,19 +343,39 @@ func symmetricTest(t *testing.T, formatName, dest string) {
 			return nil
 		}
 
-		expectedFileInfo, err := os.Stat(origPath)
+		expectedFileInfo, err := os.Lstat(origPath)
 		if err != nil {
 			t.Fatalf("[%s] %s: Error obtaining original file info: %v", formatName, fpath, err)
 		}
+		actualFileInfo, err := os.Lstat(fpath)
+		if err != nil {
+			t.Fatalf("[%s] %s: Error obtaining actual file info: %v", formatName, fpath, err)
+		}
+
+		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
+			t.Fatalf("[%s] %s: File mode differed between on disk and compressed", formatName,
+				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
+		}
+
+		if (actualFileInfo.Mode() & os.ModeSymlink) != 0 {
+			expectedLinkTarget, err := os.Readlink(origPath)
+			if err != nil {
+				t.Fatalf("[%s] %s: Couldn't read original symlink target: %v", formatName, origPath, err)
+			}
+			actualLinkTarget, err := os.Readlink(fpath)
+			if err != nil {
+				t.Fatalf("[%s] %s: Couldn't read actual symlink target: %v", formatName, fpath, err)
+			}
+			if expectedLinkTarget != actualLinkTarget {
+				t.Fatalf("[%s] %s: Symlink targets differed between on disk and compressed", formatName, origPath)
+			}
+			return nil
+		}
+
 		expected, err := ioutil.ReadFile(origPath)
 		if err != nil {
 			t.Fatalf("[%s] %s: Couldn't open original file (%s) from disk: %v", formatName,
 				fpath, origPath, err)
-		}
-
-		actualFileInfo, err := os.Stat(fpath)
-		if err != nil {
-			t.Fatalf("[%s] %s: Error obtaining actual file info: %v", formatName, fpath, err)
 		}
 		actual, err := ioutil.ReadFile(fpath)
 		if err != nil {
