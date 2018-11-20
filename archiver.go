@@ -126,6 +126,10 @@ type WalkFunc func(f File) error
 // ErrStopWalk signals Walk to break without error.
 var ErrStopWalk = fmt.Errorf("walk stopped")
 
+// ErrFormatNotRecognized is an error that will be send if
+// the file or header is not a valid archive format.
+var ErrFormatNotRecognized = fmt.Errorf("format not recognized")
+
 // Compressor compresses to out what it reads from in.
 // It also ensures a compatible or matching file extension.
 type Compressor interface {
@@ -390,7 +394,7 @@ func ByExtension(filename string) (interface{}, error) {
 	case *Xz:
 		return NewXz(), nil
 	}
-	return nil, fmt.Errorf("format unrecognized by filename: %s", filename)
+	return nil, ErrFormatNotRecognized
 }
 
 // ByHeader returns the unarchiver value that matches the input's
@@ -415,7 +419,7 @@ func ByHeader(input io.ReadSeeker) (Unarchiver, error) {
 	case *Rar:
 		return NewRar(), nil
 	}
-	return nil, fmt.Errorf("format unrecognized")
+	return nil, ErrFormatNotRecognized
 }
 
 // extCheckers is a list of the format implementations
