@@ -1,16 +1,47 @@
-// Package archiver facilitates high-level archival and compression operations
-// for a variety of formats and compression algorithms. There is a type
-// definition for each format or algorithm that is supported.
+// Package archiver facilitates convenient, cross-platform, high-level archival
+// and compression operations for a variety of formats and compression algorithms.
 //
-// Each format has an instance of the type that represents it already created
-// for convenience, called `Default*` (replace the wildcard with the format's
-// type name). They can be reused, but we recommend not changing their config
-// between uses. There is no real performance benefit of reusing an instance.
-// You can also use `New*()` to get a new instance of a type (such as
-// `NewZip()`) with sane defaults, which is safer if your program is changing
-// an instance's configuration.
+// This package and its dependencies are written in pure Go (not cgo) and
+// have no external dependencies, so they should run on all major platforms.
+// (It also comes with a command for CLI use in the cmd/arc folder.)
 //
-// The types and functions in this package are not safe for concurrent use.
+// Each supported format or algorithm has a unique type definition that
+// implements the interfaces corresponding to the tasks they perform. For
+// example, the Tar type implements Reader, Writer, Archiver, Unarchiver,
+// Walker, and several other interfaces.
+//
+// The most common functions are implemented at the package level for
+// convenience: Archive, Unarchive, Walk, Extract, CompressFile, and
+// DecompressFile. With these, the format type is chosen implicitly,
+// and a sane default configuration is used.
+//
+// To customize a format's configuration, create an instance of its struct
+// with its fields set to the desired values. You can also use and customize
+// the handy Default* (replace the wildcard with the format's type name)
+// for a quick, one-off instance of the format's type.
+//
+// To obtain a new instance of a format's struct with the default config, use
+// the provided New*() functions. This is not required, however. An empty
+// struct of any type, for example &Zip{} is perfectly valid, so you may
+// create the structs manually, too. The examples on this page show how
+// either may be done.
+//
+// See the examples in this package for an idea of how to wield this package
+// for common tasks. Most of the examples which are specific to a certain
+// format type, for example Zip, can be applied to other types that implement
+// the same interfaces. For example, using Zip is very similar to using Tar
+// or TarGz (etc), and using Gz is very similar to using Sz or Xz (etc).
+//
+// When creating archives or compressing files using a specific instance of
+// the format's type, the name of the output file MUST match that of the
+// format, to prevent confusion later on. If you absolutely need a different
+// file extension, you may rename the file afterward.
+//
+// Values in this package are NOT safe for concurrent use. There is no
+// performance benefit of reusing them, and since they may contain important
+// state (especially while walking, reading, or writing), it is NOT
+// recommended to reuse values from this package or change their configuration
+// after they are in use.
 package archiver
 
 import (
@@ -155,7 +186,7 @@ func Archive(sources []string, destination string) error {
 	}
 	a, ok := aIface.(Archiver)
 	if !ok {
-		return fmt.Errorf("format specified by destination filename is not an archive format: %s", destination)
+		return fmt.Errorf("format specified by destination filename is not an archive format: %s (%T)", destination, aIface)
 	}
 	return a.Archive(sources, destination)
 }
@@ -175,9 +206,38 @@ func Unarchive(source, destination string) error {
 	f.Close()
 	u, ok := uaIface.(Unarchiver)
 	if !ok {
-		return fmt.Errorf("format specified by destination filename is not an archive format: %s", destination)
+		return fmt.Errorf("format specified by destination filename is not an archive format: %s (%T)", destination, uaIface)
 	}
 	return u.Unarchive(source, destination)
+}
+
+// Walk calls walkFn for each file within the given archive file.
+// The archive format is chosen implicitly.
+func Walk(archive string, walkFn WalkFunc) error {
+	wIface, err := ByExtension(archive)
+	if err != nil {
+		return err
+	}
+	w, ok := wIface.(Walker)
+	if !ok {
+		return fmt.Errorf("format specified by archive filename is not a walker format: %s (%T)", archive, wIface)
+	}
+	return w.Walk(archive, walkFn)
+}
+
+// Extract extracts a single file from the given source archive. If the target
+// is a directory, the entire folder will be extracted into destination. The
+// archive format is chosen implicitly.
+func Extract(source, target, destination string) error {
+	eIface, err := ByExtension(source)
+	if err != nil {
+		return err
+	}
+	e, ok := eIface.(Extractor)
+	if !ok {
+		return fmt.Errorf("format specified by source filename is not an extractor format: %s (%T)", source, eIface)
+	}
+	return e.Extract(source, target, destination)
 }
 
 // CompressFile is a convenience function to simply compress a file.
