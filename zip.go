@@ -329,11 +329,8 @@ func (z *Zip) Write(f File) error {
 		return fmt.Errorf("%s: making header: %v", f.Name(), err)
 	}
 
-	if f.IsDir() {
-		return nil
-	}
-
-	if (header.Mode() & os.ModeSymlink) != 0 {
+	switch header.Mode() & os.ModeType {
+	case os.ModeSymlink:
 		linkTarget, err := os.Readlink(f.Name())
 		if err != nil {
 			return fmt.Errorf("%s: readlink: %v", f.Name(), err)
@@ -342,10 +339,7 @@ func (z *Zip) Write(f File) error {
 		if err != nil {
 			return fmt.Errorf("%s: writing symlink target: %v", f.Name(), err)
 		}
-		return nil
-	}
-
-	if header.Mode().IsRegular() {
+	case 0: // regular file
 		if f.ReadCloser == nil {
 			return fmt.Errorf("%s: no way to read file contents", f.Name())
 		}
