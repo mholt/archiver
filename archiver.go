@@ -252,12 +252,10 @@ func writeNewSymbolicLink(fpath string, target string) error {
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
 	}
-
 	err = os.Symlink(target, fpath)
 	if err != nil {
 		return fmt.Errorf("%s: making symbolic link for: %v", fpath, err)
 	}
-
 	return nil
 }
 
@@ -266,13 +264,15 @@ func writeNewHardLink(fpath string, target string) error {
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
 	}
-
 	err = os.Link(target, fpath)
 	if err != nil {
 		return fmt.Errorf("%s: making hard link for: %v", fpath, err)
 	}
-
 	return nil
+}
+
+func isSymlink(fi os.FileInfo) bool {
+	return fi.Mode()&os.ModeSymlink != 0
 }
 
 // within returns true if sub is within or equal to parent.

@@ -340,15 +340,16 @@ func (t *Tar) Write(f File) error {
 		return fmt.Errorf("missing file name")
 	}
 
-	var linkTarget string
-	if (f.Mode() & os.ModeSymlink) != 0 {
+	filename := f.Name()
+	if isSymlink(f) {
 		var err error
-		linkTarget, err = os.Readlink(f.Name())
+		filename, err = os.Readlink(f.Name())
 		if err != nil {
 			return fmt.Errorf("%s: readlink: %v", f.Name(), err)
 		}
 	}
-	hdr, err := tar.FileInfoHeader(f, filepath.ToSlash(linkTarget))
+
+	hdr, err := tar.FileInfoHeader(f, filepath.ToSlash(filename))
 	if err != nil {
 		return fmt.Errorf("%s: making header: %v", f.Name(), err)
 	}
@@ -359,7 +360,7 @@ func (t *Tar) Write(f File) error {
 	}
 
 	if f.IsDir() {
-		return nil
+		return nil // directories have no contents
 	}
 
 	if hdr.Typeflag == tar.TypeReg {

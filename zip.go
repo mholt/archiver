@@ -182,14 +182,17 @@ func (z *Zip) extractNext(to string) error {
 		return err // don't wrap error; calling loop must break on io.EOF
 	}
 	defer f.Close()
+	return z.extractFile(f, to)
+}
+
+func (z *Zip) extractFile(f File, to string) error {
 	header, ok := f.Header.(zip.FileHeader)
 	if !ok {
 		return fmt.Errorf("expected header to be zip.FileHeader but was %T", f.Header)
 	}
-	return z.extractFile(f, filepath.Join(to, header.Name))
-}
 
-func (z *Zip) extractFile(f File, to string) error {
+	to = filepath.Join(to, header.Name)
+
 	// if a directory, no content; simply make the directory and return
 	if f.IsDir() {
 		return mkdir(to)
@@ -200,18 +203,15 @@ func (z *Zip) extractFile(f File, to string) error {
 		return fmt.Errorf("file already exists: %s", to)
 	}
 
-	header, ok := f.Header.(zip.FileHeader)
-	if !ok {
-		return fmt.Errorf("expected header to be zip.FileHeader but was %T", f.Header)
-	}
-	if (header.FileInfo().Mode() & os.ModeSymlink) != 0 {
-		buffer := make([]byte, header.FileInfo().Size())
-		size, err := f.Read(buffer)
-		if err != nil && err != io.EOF {
+	// extract symbolic links as symbolic links
+	if isSymlink(header.FileInfo()) {
+		// symlink target is the contents of the file
+		buf := new(bytes.Buffer)
+		_, err := io.Copy(buf, f)
+		if err != nil {
 			return fmt.Errorf("%s: reading symlink target: %v", header.Name, err)
 		}
-		linkTarget := string(buffer[:size])
-		return writeNewSymbolicLink(to, linkTarget)
+		return writeNewSymbolicLink(to, strings.TrimSpace(buf.String()))
 	}
 
 	return writeNewFile(to, f, f.Mode())
@@ -329,8 +329,15 @@ func (z *Zip) Write(f File) error {
 		return fmt.Errorf("%s: making header: %v", f.Name(), err)
 	}
 
-	switch header.Mode() & os.ModeType {
-	case os.ModeSymlink:
+	return z.writeFile(f, writer)
+}
+
+func (z *Zip) writeFile(f File, writer io.Writer) error {
+	if f.IsDir() {
+		return nil // directories have no contents
+	}
+	if isSymlink(f) {
+		// file body for symlinks is the symlink target
 		linkTarget, err := os.Readlink(f.Name())
 		if err != nil {
 			return fmt.Errorf("%s: readlink: %v", f.Name(), err)
@@ -339,14 +346,15 @@ func (z *Zip) Write(f File) error {
 		if err != nil {
 			return fmt.Errorf("%s: writing symlink target: %v", f.Name(), err)
 		}
-	case 0: // regular file
-		if f.ReadCloser == nil {
-			return fmt.Errorf("%s: no way to read file contents", f.Name())
-		}
-		_, err := io.Copy(writer, f)
-		if err != nil {
-			return fmt.Errorf("%s: copying contents: %v", f.Name(), err)
-		}
+		return nil
+	}
+
+	if f.ReadCloser == nil {
+		return fmt.Errorf("%s: no way to read file contents", f.Name())
+	}
+	_, err := io.Copy(writer, f)
+	if err != nil {
+		return fmt.Errorf("%s: copying contents: %v", f.Name(), err)
 	}
 
 	return nil
