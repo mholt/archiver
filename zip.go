@@ -186,15 +186,6 @@ func (z *Zip) extractNext(to string) error {
 	if !ok {
 		return fmt.Errorf("expected header to be zip.FileHeader but was %T", f.Header)
 	}
-	if (header.FileInfo().Mode() & os.ModeSymlink) != 0 {
-		buffer := make([]byte, header.FileInfo().Size())
-		size, err := f.Read(buffer)
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("%s: reading symlink target: %v", header.Name, err)
-		}
-		linkTarget := string(buffer[:size])
-		return writeNewSymbolicLink(filepath.Join(to, header.Name), linkTarget)
-	}
 	return z.extractFile(f, filepath.Join(to, header.Name))
 }
 
@@ -207,6 +198,20 @@ func (z *Zip) extractFile(f File, to string) error {
 	// do not overwrite existing files, if configured
 	if !z.OverwriteExisting && fileExists(to) {
 		return fmt.Errorf("file already exists: %s", to)
+	}
+
+	header, ok := f.Header.(zip.FileHeader)
+	if !ok {
+		return fmt.Errorf("expected header to be zip.FileHeader but was %T", f.Header)
+	}
+	if (header.FileInfo().Mode() & os.ModeSymlink) != 0 {
+		buffer := make([]byte, header.FileInfo().Size())
+		size, err := f.Read(buffer)
+		if err != nil && err != io.EOF {
+			return fmt.Errorf("%s: reading symlink target: %v", header.Name, err)
+		}
+		linkTarget := string(buffer[:size])
+		return writeNewSymbolicLink(to, linkTarget)
 	}
 
 	return writeNewFile(to, f, f.Mode())
