@@ -192,21 +192,15 @@ func Archive(sources []string, destination string) error {
 }
 
 // Unarchive unarchives the given archive file into the destination folder.
-// The archive format is selected implicitly based on the file's header.
+// The archive format is selected implicitly.
 func Unarchive(source, destination string) error {
-	f, err := os.Open(source)
+	uaIface, err := ByExtension(source)
 	if err != nil {
 		return err
 	}
-	uaIface, err := ByHeader(f)
-	if err != nil {
-		f.Close()
-		return err
-	}
-	f.Close()
 	u, ok := uaIface.(Unarchiver)
 	if !ok {
-		return fmt.Errorf("format specified by destination filename is not an archive format: %s (%T)", destination, uaIface)
+		return fmt.Errorf("format specified by source filename is not an archive format: %s (%T)", source, uaIface)
 	}
 	return u.Unarchive(source, destination)
 }

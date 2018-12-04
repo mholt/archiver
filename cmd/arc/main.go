@@ -51,8 +51,6 @@ func main() {
 		fatal(err)
 	}
 
-	fmt.Printf("VALUE: %#v\n", iface)
-
 	// run the desired command
 	switch subcommand {
 	case "archive":
@@ -63,11 +61,11 @@ func main() {
 		err = a.Archive(flag.Args()[2:], flag.Arg(1))
 
 	case "unarchive":
-		a, ok := iface.(archiver.Unarchiver)
+		u, ok := iface.(archiver.Unarchiver)
 		if !ok {
 			fatalf("the unarchive command does not support the %s format", iface)
 		}
-		err = a.Unarchive(flag.Arg(1), flag.Arg(2))
+		err = u.Unarchive(flag.Arg(1), flag.Arg(2))
 
 	case "extract":
 		e, ok := iface.(archiver.Extractor)
@@ -124,7 +122,7 @@ func main() {
 			return nil
 		})
 
-		fmt.Printf("total %d", count)
+		fmt.Printf("total %d\n", count)
 
 	case "compress":
 		c, ok := iface.(archiver.Compressor)
