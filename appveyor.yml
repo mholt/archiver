@@ -1,3 +1,7 @@
+# set git config to clone with symlinks enabled on windows
+init:
+  - git config --global core.symlinks true
+
 version: "{build}"
 
 clone_folder: c:\gopath\src\github.com\mholt\archiver
