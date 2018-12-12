@@ -1,6 +1,9 @@
 ---
 name: Bug report
 about: For behaviors which violate documentation or cause incorrect results
+title: ''
+labels: ''
+assignees: ''
 
 ---
 

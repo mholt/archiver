@@ -1,6 +1,9 @@
 ---
 name: New format request
 about: Request a new archival or compression format
+title: ''
+labels: ''
+assignees: ''
 
 ---
 
