@@ -52,6 +52,18 @@ type Rar struct {
 	rc *rardecode.ReadCloser // supports multi-volume archives (files only)
 }
 
+func (r *Rar) Archive(sources []string, destination string) error {
+	panic("implement me")
+}
+
+func (r *Rar) ArchiveToStream(output io.Writer, sources []string) error {
+	panic("implement me")
+}
+
+func (r *Rar) UnarchiveFromStream(input io.Reader, destination string) error {
+	panic("implement me")
+}
+
 // CheckExt ensures the file extension matches the format.
 func (*Rar) CheckExt(filename string) error {
 	if !strings.HasSuffix(filename, ".rar") {

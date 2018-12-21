@@ -3,3 +3,4 @@ _gitignore
 builds/
 *.test
 cmd/archiver/archiver
+.idea
