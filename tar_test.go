@@ -69,7 +69,6 @@ func TestTar(t *testing.T) {
 		}
 	}
 
-
 	t.Run("Create tar and untar it to a new location using Archive/Unarchive", func(t *testing.T) {
 		filesInInputDir, err := ioutil.ReadDir(inputDir)
 		if err != nil {
