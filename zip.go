@@ -60,6 +60,14 @@ type Zip struct {
 	ridx int
 }
 
+func (z *Zip) UnarchiveFromStream(input io.Reader, destination string) error {
+	panic("implement me")
+}
+
+func (z *Zip) ArchiveToStream(output io.Writer, sources []string) error {
+	panic("implement me")
+}
+
 // CheckExt ensures the file extension matches the format.
 func (*Zip) CheckExt(filename string) error {
 	if !strings.HasSuffix(filename, ".zip") {

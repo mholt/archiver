@@ -51,6 +51,8 @@ type Tar struct {
 	readerWrapFn  func(io.Reader) (io.Reader, error)
 	writerWrapFn  func(io.Writer) (io.Writer, error)
 	cleanupWrapFn func()
+
+	destination string
 }
 
 // CheckExt ensures the file extension matches the format.
@@ -61,22 +63,43 @@ func (*Tar) CheckExt(filename string) error {
 	return nil
 }
 
+func (t *Tar) setDetination(destination string) {
+	t.destination = destination
+}
+
+func (t *Tar) archive(sources []string) error {
+	var topLevelFolder string
+	if t.ImplicitTopLevelFolder && multipleTopLevels(sources) {
+		topLevelFolder = folderNameFromFileName(t.destination)
+	}
+
+	for _, source := range sources {
+		err := t.writeWalk(source, topLevelFolder, t.destination)
+		if err != nil {
+			return fmt.Errorf("walking %s: %v", source, err)
+		}
+	}
+
+	return nil
+}
+
 // Archive creates a tarball file at destination containing
 // the files listed in sources. The destination must end with
 // ".tar". File paths can be those of regular files or
 // directories; directories will be recursively added.
 func (t *Tar) Archive(sources []string, destination string) error {
-	err := t.CheckExt(destination)
+	t.setDetination(destination)
+	err := t.CheckExt(t.destination)
 	if t.writerWrapFn == nil && err != nil {
 		return fmt.Errorf("checking extension: %v", err)
 	}
-	if !t.OverwriteExisting && fileExists(destination) {
-		return fmt.Errorf("file already exists: %s", destination)
+	if !t.OverwriteExisting && fileExists(t.destination) {
+		return fmt.Errorf("file already exists: %s", t.destination)
 	}
 
 	// make the folder to contain the resulting archive
 	// if it does not already exist
-	destDir := filepath.Dir(destination)
+	destDir := filepath.Dir(t.destination)
 	if t.MkdirAll && !fileExists(destDir) {
 		err := mkdir(destDir)
 		if err != nil {
@@ -84,9 +107,9 @@ func (t *Tar) Archive(sources []string, destination string) error {
 		}
 	}
 
-	out, err := os.Create(destination)
+	out, err := os.Create(t.destination)
 	if err != nil {
-		return fmt.Errorf("creating %s: %v", destination, err)
+		return fmt.Errorf("creating %s: %v", t.destination, err)
 	}
 	defer out.Close()
 
@@ -96,56 +119,18 @@ func (t *Tar) Archive(sources []string, destination string) error {
 	}
 	defer t.Close()
 
-	var topLevelFolder string
-	if t.ImplicitTopLevelFolder && multipleTopLevels(sources) {
-		topLevelFolder = folderNameFromFileName(destination)
-	}
-
-	for _, source := range sources {
-		err := t.writeWalk(source, topLevelFolder, destination)
-		if err != nil {
-			return fmt.Errorf("walking %s: %v", source, err)
-		}
-	}
-
-	return nil
+	return t.archive(sources)
 }
 
-// Unarchive unpacks the .tar file at source to destination.
-// Destination will be treated as a folder name.
-func (t *Tar) Unarchive(source, destination string) error {
-	if !fileExists(destination) && t.MkdirAll {
-		err := mkdir(destination)
-		if err != nil {
-			return fmt.Errorf("preparing destination: %v", err)
-		}
-	}
-
-	// if the files in the archive do not all share a common
-	// root, then make sure we extract to a single subfolder
-	// rather than potentially littering the destination...
-	if t.ImplicitTopLevelFolder {
-		var err error
-		destination, err = t.addTopLevelFolder(source, destination)
-		if err != nil {
-			return fmt.Errorf("scanning source archive: %v", err)
-		}
-	}
-
-	file, err := os.Open(source)
-	if err != nil {
-		return fmt.Errorf("opening source archive: %v", err)
-	}
-	defer file.Close()
-
-	err = t.Open(file, 0)
+func (t *Tar) unarchive(source io.Reader) error {
+	err := t.Open(source, 0)
 	if err != nil {
 		return fmt.Errorf("opening tar archive for reading: %v", err)
 	}
 	defer t.Close()
 
 	for {
-		err := t.untarNext(destination)
+		err := t.untarNext(t.destination)
 		if err == io.EOF {
 			break
 		}
@@ -159,6 +144,37 @@ func (t *Tar) Unarchive(source, destination string) error {
 	}
 
 	return nil
+}
+
+// Unarchive unpacks the .tar file at source to destination.
+// Destination will be treated as a folder name.
+func (t *Tar) Unarchive(source, destination string) error {
+	t.setDetination(destination)
+	if !fileExists(t.destination) && t.MkdirAll {
+		err := mkdir(t.destination)
+		if err != nil {
+			return fmt.Errorf("preparing destination: %v", err)
+		}
+	}
+
+	// if the files in the archive do not all share a common
+	// root, then make sure we extract to a single subfolder
+	// rather than potentially littering the destination...
+	if t.ImplicitTopLevelFolder {
+		dst, err := t.addTopLevelFolder(source, t.destination)
+		if err != nil {
+			return fmt.Errorf("scanning source archive: %v", err)
+		}
+		t.setDetination(dst)
+	}
+
+	tar, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("opening source archive: %v", err)
+	}
+	defer tar.Close()
+
+	return t.unarchive(tar)
 }
 
 // addTopLevelFolder scans the files contained inside
@@ -434,6 +450,11 @@ func (t *Tar) Close() error {
 	if t.cleanupWrapFn != nil {
 		t.cleanupWrapFn()
 	}
+
+	if t.destination != "" {
+		t.destination = ""
+	}
+
 	return err
 }
 
@@ -587,6 +608,21 @@ func hasTarHeader(buf []byte) bool {
 	}
 
 	return true
+}
+
+func (t *Tar) ArchiveToStream(output io.Writer, sources []string) error {
+	err := t.Create(output)
+	if err != nil {
+		return fmt.Errorf("creating tar: %v", err)
+	}
+	defer t.Close()
+
+	return t.archive(sources)
+}
+
+func (t *Tar) UnarchiveFromStream(input io.Reader, destination string) error {
+	t.setDetination(destination)
+	return t.unarchive(input)
 }
 
 func (t *Tar) String() string { return "tar" }

@@ -65,6 +65,7 @@ type Archiver interface {
 	// are walked and recursively added, preserving folder
 	// structure.
 	Archive(sources []string, destination string) error
+	ArchiveToStream(output io.Writer, sources []string) error
 }
 
 // ExtensionChecker validates file extensions
@@ -76,6 +77,7 @@ type ExtensionChecker interface {
 // into a folder.
 type Unarchiver interface {
 	Unarchive(source, destination string) error
+	UnarchiveFromStream(input io.Reader, destination string) error
 }
 
 // Writer can write discrete byte streams of files to
