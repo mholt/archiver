@@ -231,7 +231,7 @@ func (t *Tar) untarFile(f File, to string) error {
 
 	switch hdr.Typeflag {
 	case tar.TypeDir:
-		return mkdir(to, 0755)
+		return mkdir(to, f.Mode())
 	case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
 		return writeNewFile(to, f, f.Mode())
 	case tar.TypeSymlink:

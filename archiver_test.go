@@ -253,6 +253,27 @@ func TestArchiveUnarchive(t *testing.T) {
 	}
 }
 
+func TestArchiveUnarchiveWithFolderPermissions(t *testing.T) {
+	dir := "testdata/proverbs/extra"
+	currentPerms, err := os.Stat(dir)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	err = os.Chmod(dir, 0700)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	defer func() {
+		err := os.Chmod(dir, currentPerms.Mode())
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+	}()
+
+	TestArchiveUnarchive(t)
+}
+
 func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
 	auStr := fmt.Sprintf("%s", au)
 
@@ -333,16 +354,6 @@ func symmetricTest(t *testing.T, formatName, dest string) {
 			t.Fatalf("[%s] %s: Error inducing original file path: %v", formatName, fpath, err)
 		}
 
-		if info.IsDir() {
-			// stat dir instead of read file
-			_, err = os.Stat(origPath)
-			if err != nil {
-				t.Fatalf("[%s] %s: Couldn't stat original directory (%s): %v", formatName,
-					fpath, origPath, err)
-			}
-			return nil
-		}
-
 		expectedFileInfo, err := os.Lstat(origPath)
 		if err != nil {
 			t.Fatalf("[%s] %s: Error obtaining original file info: %v", formatName, fpath, err)
@@ -355,6 +366,16 @@ func symmetricTest(t *testing.T, formatName, dest string) {
 		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
 			t.Fatalf("[%s] %s: File mode differed between on disk and compressed", formatName,
 				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
+		}
+
+		if info.IsDir() {
+			// stat dir instead of read file
+			_, err = os.Stat(origPath)
+			if err != nil {
+				t.Fatalf("[%s] %s: Couldn't stat original directory (%s): %v", formatName,
+					fpath, origPath, err)
+			}
+			return nil
 		}
 
 		if (actualFileInfo.Mode() & os.ModeSymlink) != 0 {
@@ -382,10 +403,6 @@ func symmetricTest(t *testing.T, formatName, dest string) {
 			t.Fatalf("[%s] %s: Couldn't open new file from disk: %v", formatName, fpath, err)
 		}
 
-		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
-			t.Fatalf("[%s] %s: File mode differed between on disk and compressed", formatName,
-				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
-		}
 		if !bytes.Equal(expected, actual) {
 			t.Fatalf("[%s] %s: File contents differed between on disk and compressed", formatName, origPath)
 		}
