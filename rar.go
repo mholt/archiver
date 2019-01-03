@@ -162,7 +162,7 @@ func (r *Rar) unrarFile(f File, to string) error {
 	if !ok {
 		return fmt.Errorf("expected header to be *rardecode.FileHeader but was %T", f.Header)
 	}
-	
+
 	if f.IsDir() {
 		err := mkdir(to)
 		if err != nil {
