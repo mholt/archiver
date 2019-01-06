@@ -217,7 +217,8 @@ func (z *Zip) extractFile(f File, to string) error {
 	return writeNewFile(to, f, f.Mode())
 }
 
-func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
+func (z *Zip) writeWalk(sourceRaw, topLevelFolder, destination string) error {
+	source, _, _ := wldChk(sourceRaw)
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		return fmt.Errorf("%s: stat: %v", source, err)
@@ -226,59 +227,104 @@ func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 	if err != nil {
 		return fmt.Errorf("%s: getting absolute path of destination %s: %v", source, destination, err)
 	}
+	filesList := dirlist(sourceRaw)
 
-	return filepath.Walk(source, func(fpath string, info os.FileInfo, err error) error {
-		handleErr := func(err error) error {
-			if z.ContinueOnError {
-				log.Printf("[ERROR] Walking %s: %v", fpath, err)
-				return nil
-			}
-			return err
-		}
+	//return filepath.Walk(source, func(fpath string, info os.FileInfo, err error) error {
+	for _, fpath := range filesList {
+		err := z.file2zip(sourceInfo, source, topLevelFolder, fpath, destAbs)
 		if err != nil {
-			return handleErr(fmt.Errorf("traversing %s: %v", fpath, err))
+			fmt.Errorf("file2zip error: %v", err)
 		}
-		if info == nil {
-			return handleErr(fmt.Errorf("%s: no file info", fpath))
-		}
+	}
 
-		// make sure we do not copy the output file into the output
-		// file; that results in an infinite loop and disk exhaustion!
-		fpathAbs, err := filepath.Abs(fpath)
-		if err != nil {
-			return handleErr(fmt.Errorf("%s: getting absolute path: %v", fpath, err))
-		}
-		if within(fpathAbs, destAbs) {
+	return nil
+}
+
+//sorry for that long as camel caravan func. im fear destroy anything
+func (z *Zip) file2zip(sourceInfo os.FileInfo, source, topLevelFolder, fpath, destAbs string) error {
+	info, err := os.Stat(fpath)
+	if err != nil {
+		log.Printf("[ERROR] os.Stat %s: %v", fpath, err)
+	}
+	handleErr := func(err error) error {
+		if z.ContinueOnError {
+			log.Printf("[ERROR] Walking %s: %v", fpath, err)
 			return nil
 		}
+		return err
+	}
 
-		// build the name to be used within the archive
-		nameInArchive, err := makeNameInArchive(sourceInfo, source, topLevelFolder, fpath)
+	// make sure we do not copy the output file into the output
+	// file; that results in an infinite loop and disk exhaustion!
+	fpathAbs, err := filepath.Abs(fpath)
+	if err != nil {
+		return handleErr(fmt.Errorf("%s: getting absolute path: %v", fpath, err))
+	}
+	if within(fpathAbs, destAbs) {
+		return nil
+	}
+
+	// build the name to be used within the archive
+	nameInArchive, err := makeNameInArchive(sourceInfo, source, topLevelFolder, fpath)
+	if err != nil {
+		return handleErr(err)
+	}
+
+	var file io.ReadCloser
+	if info.Mode().IsRegular() {
+		file, err = os.Open(fpath)
 		if err != nil {
-			return handleErr(err)
+			return handleErr(fmt.Errorf("%s: opening: %v", fpath, err))
 		}
+		defer file.Close()
+	}
+	err = z.Write(File{
+		FileInfo: FileInfo{
+			FileInfo:   info,
+			CustomName: nameInArchive,
+		},
+		ReadCloser: file,
+	})
+	if err != nil {
+		return handleErr(fmt.Errorf("%s: writing: %s", fpath, err))
+	}
+	return nil
+}
 
-		var file io.ReadCloser
-		if info.Mode().IsRegular() {
-			file, err = os.Open(fpath)
-			if err != nil {
-				return handleErr(fmt.Errorf("%s: opening: %v", fpath, err))
-			}
-			defer file.Close()
-		}
-		err = z.Write(File{
-			FileInfo: FileInfo{
-				FileInfo:   info,
-				CustomName: nameInArchive,
-			},
-			ReadCloser: file,
-		})
-		if err != nil {
-			return handleErr(fmt.Errorf("%s: writing: %s", fpath, err))
-		}
-
+func dirlist(adress string) []string {
+	adress, ext, wCardBool := wldChk(adress) //wildcard cheker (have || not)
+	rawlist := []string{}                    //for all files
+	outlist := []string{}                    //for files after wildcard filter
+	fileinf := []os.FileInfo{}               //for FileIsDir method
+	err := filepath.Walk(adress, func(oneFile string, info os.FileInfo, err error) error {
+		rawlist = append(rawlist, oneFile)
+		fileinf = append(fileinf, info)
 		return nil
 	})
+	if err != nil {
+		fmt.Errorf("dirlist() adress filepath.Walk", err)
+	}
+	if wCardBool == true { //wildCard filter
+
+		for _, file := range rawlist {
+			if filepath.Ext(file) == ext {
+				outlist = append(outlist, file)
+			}
+		}
+		return outlist
+
+	} else {
+		return rawlist
+	}
+
+}
+
+func wldChk(adress string) (string, string, bool) {
+	if strings.Contains(adress, "*") {
+		return strings.Split(adress, "*")[0], strings.Split(adress, "*")[1], true
+	} else {
+		return adress, adress, false
+	}
 }
 
 // Create opens z for writing a ZIP archive to out.
