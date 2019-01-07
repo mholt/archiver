@@ -251,6 +251,26 @@ func TestArchiveUnarchive(t *testing.T) {
 		}
 		testArchiveUnarchive(t, au)
 	}
+
+	{
+		au := DefaultRar
+		auStr := fmt.Sprintf("%s", au)
+
+		tmp, err := ioutil.TempDir("", "archiver_test")
+		if err != nil {
+			t.Fatalf("[%s] %v", auStr, err)
+		}
+		defer os.RemoveAll(tmp)
+
+		dest := filepath.Join(tmp, "extraction_test_"+auStr)
+		os.Mkdir(dest, 0755)
+
+		file := "testdata/testdata.rar"
+		err = au.Unarchive(file, dest)
+		if err != nil {
+			t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", auStr, file, dest, err)
+		}
+	}
 }
 
 func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
