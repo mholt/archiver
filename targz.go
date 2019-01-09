@@ -100,6 +100,30 @@ func (tgz *TarGz) wrapReader() {
 	}
 }
 
+// Match returns true if the format of file matches this
+// type's format. It should not affect reader position.
+func (*TarGz) Match(file io.ReadSeeker) (bool, error) {
+	currentPos, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	defer file.Seek(currentPos, io.SeekStart)
+	//Check Gzip format
+	in, err := gzip.NewReader(file)
+	if err != nil {
+		if err.Error() == "gzip: invalid header" {
+			return false, nil
+		}
+		return false, err
+	}
+	//Check Tar format
+	buf2 := make([]byte, tarBlockSize)
+	if _, err = io.ReadFull(in, buf2); err != nil {
+		return false, err
+	}
+	return hasTarHeader(buf2), nil
+}
+
 func (tgz *TarGz) String() string { return "tar.gz" }
 
 // NewTarGz returns a new, default instance ready to be customized and used.

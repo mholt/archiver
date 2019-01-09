@@ -474,6 +474,8 @@ func ByHeader(input io.ReadSeeker) (Unarchiver, error) {
 		return NewTar(), nil
 	case *Rar:
 		return NewRar(), nil
+	case *TarGz:
+		return NewTarGz(), nil
 	}
 	return nil, ErrFormatNotRecognized
 }
@@ -501,4 +503,5 @@ var matchers = []Matcher{
 	&Rar{},
 	&Tar{},
 	&Zip{},
+	&TarGz{},
 }
