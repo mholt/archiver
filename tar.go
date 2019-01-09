@@ -78,7 +78,7 @@ func (t *Tar) Archive(sources []string, destination string) error {
 	// if it does not already exist
 	destDir := filepath.Dir(destination)
 	if t.MkdirAll && !fileExists(destDir) {
-		err := mkdir(destDir)
+		err := mkdir(destDir, 0755)
 		if err != nil {
 			return fmt.Errorf("making folder for destination: %v", err)
 		}
@@ -115,7 +115,7 @@ func (t *Tar) Archive(sources []string, destination string) error {
 // Destination will be treated as a folder name.
 func (t *Tar) Unarchive(source, destination string) error {
 	if !fileExists(destination) && t.MkdirAll {
-		err := mkdir(destination)
+		err := mkdir(destination, 0755)
 		if err != nil {
 			return fmt.Errorf("preparing destination: %v", err)
 		}
@@ -231,7 +231,7 @@ func (t *Tar) untarFile(f File, to string) error {
 
 	switch hdr.Typeflag {
 	case tar.TypeDir:
-		return mkdir(to)
+		return mkdir(to, f.Mode())
 	case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
 		return writeNewFile(to, f, f.Mode())
 	case tar.TypeSymlink:

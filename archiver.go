@@ -273,8 +273,8 @@ func fileExists(name string) bool {
 	return !os.IsNotExist(err)
 }
 
-func mkdir(dirPath string) error {
-	err := os.MkdirAll(dirPath, 0755)
+func mkdir(dirPath string, dirMode os.FileMode) error {
+	err := os.MkdirAll(dirPath, dirMode)
 	if err != nil {
 		return fmt.Errorf("%s: making directory: %v", dirPath, err)
 	}
