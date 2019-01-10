@@ -86,7 +86,7 @@ func (z *Zip) Archive(sources []string, destination string) error {
 	// if it does not already exist
 	destDir := filepath.Dir(destination)
 	if z.MkdirAll && !fileExists(destDir) {
-		err := mkdir(destDir)
+		err := mkdir(destDir, 0755)
 		if err != nil {
 			return fmt.Errorf("making folder for destination: %v", err)
 		}
@@ -123,7 +123,7 @@ func (z *Zip) Archive(sources []string, destination string) error {
 // Destination will be treated as a folder name.
 func (z *Zip) Unarchive(source, destination string) error {
 	if !fileExists(destination) && z.MkdirAll {
-		err := mkdir(destination)
+		err := mkdir(destination, 0755)
 		if err != nil {
 			return fmt.Errorf("preparing destination: %v", err)
 		}
@@ -195,7 +195,7 @@ func (z *Zip) extractFile(f File, to string) error {
 
 	// if a directory, no content; simply make the directory and return
 	if f.IsDir() {
-		return mkdir(to)
+		return mkdir(to, f.Mode())
 	}
 
 	// do not overwrite existing files, if configured
