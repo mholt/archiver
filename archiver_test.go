@@ -265,11 +265,15 @@ func TestArchiveUnarchive(t *testing.T) {
 		dest := filepath.Join(tmp, "extraction_test_"+auStr)
 		os.Mkdir(dest, 0755)
 
-		file := "testdata/testdata.rar"
+		file := "testdata.rar"
 		err = au.Unarchive(file, dest)
 		if err != nil {
 			t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", auStr, file, dest, err)
 		}
+
+		// Check that what was extracted is what was compressed
+		// Extracting links isn't implemented yet (in github.com/nwaples/rardecode lib there are no methods to get symlink info)
+		symmetricTest(t, auStr, dest, false)
 	}
 }
 
@@ -301,7 +305,7 @@ func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
 	}
 
 	// Check that what was extracted is what was compressed
-	symmetricTest(t, auStr, dest)
+	symmetricTest(t, auStr, dest, true)
 }
 
 // testMatching tests that au can match the format of archiveFile.
@@ -332,7 +336,7 @@ func testMatching(t *testing.T, au archiverUnarchiver, archiveFile string) {
 
 // symmetricTest compares the contents of a destination directory to the contents
 // of the test corpus and tests that they are equal.
-func symmetricTest(t *testing.T, formatName, dest string) {
+func symmetricTest(t *testing.T, formatName, dest string, testSymlinks bool) {
 	var expectedFileCount int
 	filepath.Walk("testdata", func(fpath string, info os.FileInfo, err error) error {
 		expectedFileCount++
@@ -366,6 +370,9 @@ func symmetricTest(t *testing.T, formatName, dest string) {
 		expectedFileInfo, err := os.Lstat(origPath)
 		if err != nil {
 			t.Fatalf("[%s] %s: Error obtaining original file info: %v", formatName, fpath, err)
+		}
+		if !testSymlinks && (expectedFileInfo.Mode()&os.ModeSymlink) != 0 {
+			return nil
 		}
 		actualFileInfo, err := os.Lstat(fpath)
 		if err != nil {
