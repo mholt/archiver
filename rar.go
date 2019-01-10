@@ -164,13 +164,9 @@ func (r *Rar) unrarFile(f File, to string) error {
 	}
 
 	if f.IsDir() {
-		err := mkdir(to)
+		err := mkdir(to, hdr.Mode())
 		if err != nil {
 			return fmt.Errorf("making directories: %v", err)
-		}
-		err = os.Chmod(to, hdr.Mode())
-		if err != nil {
-			return fmt.Errorf("changing dir mode: %v", err)
 		}
 		return nil
 	}
