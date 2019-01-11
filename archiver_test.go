@@ -263,7 +263,8 @@ func TestRarUnarchive(t *testing.T) {
 
 	// Check that what was extracted is what was compressed
 	// Extracting links isn't implemented yet (in github.com/nwaples/rardecode lib there are no methods to get symlink info)
-	symmetricTest(t, auStr, dest, false)
+	// Files access modes may differs on different machines, we are comparing extracted(as archive host) and local git clone
+	symmetricTest(t, auStr, dest, false, false)
 
 }
 
@@ -327,7 +328,7 @@ func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
 	}
 
 	// Check that what was extracted is what was compressed
-	symmetricTest(t, auStr, dest, true)
+	symmetricTest(t, auStr, dest, true, true)
 }
 
 // testMatching tests that au can match the format of archiveFile.
@@ -358,7 +359,7 @@ func testMatching(t *testing.T, au archiverUnarchiver, archiveFile string) {
 
 // symmetricTest compares the contents of a destination directory to the contents
 // of the test corpus and tests that they are equal.
-func symmetricTest(t *testing.T, formatName, dest string, testSymlinks bool) {
+func symmetricTest(t *testing.T, formatName, dest string, testSymlinks, testModes bool) {
 	var expectedFileCount int
 	filepath.Walk("testdata", func(fpath string, info os.FileInfo, err error) error {
 		if testSymlinks || (info.Mode()&os.ModeSymlink) == 0 {
@@ -395,7 +396,7 @@ func symmetricTest(t *testing.T, formatName, dest string, testSymlinks bool) {
 			t.Fatalf("[%s] %s: Error obtaining actual file info: %v", formatName, fpath, err)
 		}
 
-		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
+		if testModes && actualFileInfo.Mode() != expectedFileInfo.Mode() {
 			t.Fatalf("[%s] %s: File mode differed between on disk and compressed", formatName,
 				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
 		}
