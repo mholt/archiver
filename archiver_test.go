@@ -242,6 +242,31 @@ func TestMakeNameInArchive(t *testing.T) {
 	}
 }
 
+func TestRarUnarchive(t *testing.T) {
+	au := DefaultRar
+	auStr := fmt.Sprintf("%s", au)
+
+	tmp, err := ioutil.TempDir("", "archiver_test")
+	if err != nil {
+		t.Fatalf("[%s] %v", auStr, err)
+	}
+	defer os.RemoveAll(tmp)
+
+	dest := filepath.Join(tmp, "extraction_test_"+auStr)
+	os.Mkdir(dest, 0755)
+
+	file := "testdata.rar"
+	err = au.Unarchive(file, dest)
+	if err != nil {
+		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", auStr, file, dest, err)
+	}
+
+	// Check that what was extracted is what was compressed
+	// Extracting links isn't implemented yet (in github.com/nwaples/rardecode lib there are no methods to get symlink info)
+	symmetricTest(t, auStr, dest, false)
+
+}
+
 func TestArchiveUnarchive(t *testing.T) {
 	for _, af := range archiveFormats {
 		au, ok := af.(archiverUnarchiver)
@@ -250,30 +275,6 @@ func TestArchiveUnarchive(t *testing.T) {
 			continue
 		}
 		testArchiveUnarchive(t, au)
-	}
-
-	{
-		au := DefaultRar
-		auStr := fmt.Sprintf("%s", au)
-
-		tmp, err := ioutil.TempDir("", "archiver_test")
-		if err != nil {
-			t.Fatalf("[%s] %v", auStr, err)
-		}
-		defer os.RemoveAll(tmp)
-
-		dest := filepath.Join(tmp, "extraction_test_"+auStr)
-		os.Mkdir(dest, 0755)
-
-		file := "testdata.rar"
-		err = au.Unarchive(file, dest)
-		if err != nil {
-			t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", auStr, file, dest, err)
-		}
-
-		// Check that what was extracted is what was compressed
-		// Extracting links isn't implemented yet (in github.com/nwaples/rardecode lib there are no methods to get symlink info)
-		symmetricTest(t, auStr, dest, false)
 	}
 }
 
@@ -360,7 +361,9 @@ func testMatching(t *testing.T, au archiverUnarchiver, archiveFile string) {
 func symmetricTest(t *testing.T, formatName, dest string, testSymlinks bool) {
 	var expectedFileCount int
 	filepath.Walk("testdata", func(fpath string, info os.FileInfo, err error) error {
-		expectedFileCount++
+		if testSymlinks || (info.Mode()&os.ModeSymlink) == 0 {
+			expectedFileCount++
+		}
 		return nil
 	})
 
@@ -371,7 +374,9 @@ func symmetricTest(t *testing.T, formatName, dest string, testSymlinks bool) {
 		if fpath == dest {
 			return nil
 		}
-		actualFileCount++
+		if testSymlinks || (info.Mode()&os.ModeSymlink) == 0 {
+			actualFileCount++
+		}
 
 		origPath, err := filepath.Rel(dest, fpath)
 		if err != nil {
