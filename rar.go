@@ -185,6 +185,10 @@ func (r *Rar) unrarFile(f File, to string) error {
 		return fmt.Errorf("making parent directories: %v", err)
 	}
 
+	if (hdr.Mode()&os.ModeSymlink) != 0 {
+		return nil
+	}
+
 	return writeNewFile(to, r.rr, hdr.Mode())
 }
 
