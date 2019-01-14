@@ -242,6 +242,32 @@ func TestMakeNameInArchive(t *testing.T) {
 	}
 }
 
+func TestRarUnarchive(t *testing.T) {
+	au := DefaultRar
+	auStr := fmt.Sprintf("%s", au)
+
+	tmp, err := ioutil.TempDir("", "archiver_test")
+	if err != nil {
+		t.Fatalf("[%s] %v", auStr, err)
+	}
+	defer os.RemoveAll(tmp)
+
+	dest := filepath.Join(tmp, "extraction_test_"+auStr)
+	os.Mkdir(dest, 0755)
+
+	file := "testdata.rar"
+	err = au.Unarchive(file, dest)
+	if err != nil {
+		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", auStr, file, dest, err)
+	}
+
+	// Check that what was extracted is what was compressed
+	// Extracting links isn't implemented yet (in github.com/nwaples/rardecode lib there are no methods to get symlink info)
+	// Files access modes may differs on different machines, we are comparing extracted(as archive host) and local git clone
+	symmetricTest(t, auStr, dest, false, false)
+
+}
+
 func TestArchiveUnarchive(t *testing.T) {
 	for _, af := range archiveFormats {
 		au, ok := af.(archiverUnarchiver)
@@ -302,7 +328,7 @@ func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
 	}
 
 	// Check that what was extracted is what was compressed
-	symmetricTest(t, auStr, dest)
+	symmetricTest(t, auStr, dest, true, true)
 }
 
 // testMatching tests that au can match the format of archiveFile.
@@ -333,10 +359,12 @@ func testMatching(t *testing.T, au archiverUnarchiver, archiveFile string) {
 
 // symmetricTest compares the contents of a destination directory to the contents
 // of the test corpus and tests that they are equal.
-func symmetricTest(t *testing.T, formatName, dest string) {
+func symmetricTest(t *testing.T, formatName, dest string, testSymlinks, testModes bool) {
 	var expectedFileCount int
 	filepath.Walk("testdata", func(fpath string, info os.FileInfo, err error) error {
-		expectedFileCount++
+		if testSymlinks || (info.Mode()&os.ModeSymlink) == 0 {
+			expectedFileCount++
+		}
 		return nil
 	})
 
@@ -347,7 +375,9 @@ func symmetricTest(t *testing.T, formatName, dest string) {
 		if fpath == dest {
 			return nil
 		}
-		actualFileCount++
+		if testSymlinks || (info.Mode()&os.ModeSymlink) == 0 {
+			actualFileCount++
+		}
 
 		origPath, err := filepath.Rel(dest, fpath)
 		if err != nil {
@@ -358,12 +388,15 @@ func symmetricTest(t *testing.T, formatName, dest string) {
 		if err != nil {
 			t.Fatalf("[%s] %s: Error obtaining original file info: %v", formatName, fpath, err)
 		}
+		if !testSymlinks && (expectedFileInfo.Mode()&os.ModeSymlink) != 0 {
+			return nil
+		}
 		actualFileInfo, err := os.Lstat(fpath)
 		if err != nil {
 			t.Fatalf("[%s] %s: Error obtaining actual file info: %v", formatName, fpath, err)
 		}
 
-		if actualFileInfo.Mode() != expectedFileInfo.Mode() {
+		if testModes && actualFileInfo.Mode() != expectedFileInfo.Mode() {
 			t.Fatalf("[%s] %s: File mode differed between on disk and compressed", formatName,
 				expectedFileInfo.Mode().String()+" : "+actualFileInfo.Mode().String())
 		}

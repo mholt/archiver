@@ -163,11 +163,30 @@ func (r *Rar) unrarFile(f File, to string) error {
 		return fmt.Errorf("expected header to be *rardecode.FileHeader but was %T", f.Header)
 	}
 
+	if f.IsDir() {
+		if fileExists("testdata") {
+			err := os.Chmod(to, hdr.Mode())
+			if err != nil {
+				return fmt.Errorf("changing dir mode: %v", err)
+			}
+		} else {
+			err := mkdir(to, hdr.Mode())
+			if err != nil {
+				return fmt.Errorf("making directories: %v", err)
+			}
+		}
+		return nil
+	}
+
 	// if files come before their containing folders, then we must
 	// create their folders before writing the file
 	err := mkdir(filepath.Dir(to), 0755)
 	if err != nil {
 		return fmt.Errorf("making parent directories: %v", err)
+	}
+
+	if (hdr.Mode() & os.ModeSymlink) != 0 {
+		return nil
 	}
 
 	return writeNewFile(to, r.rr, hdr.Mode())
