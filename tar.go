@@ -235,7 +235,7 @@ func (t *Tar) untarFile(f File, to string) error {
 	case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo:
 		return writeNewFile(to, f, f.Mode())
 	case tar.TypeSymlink:
-		return writeNewSymbolicLink(to, hdr.Linkname)
+		return writeNewSymbolicLink(to, hdr.Linkname, t.OverwriteExisting)
 	case tar.TypeLink:
 		return writeNewHardLink(to, filepath.Join(to, hdr.Linkname))
 	case tar.TypeXGlobalHeader:

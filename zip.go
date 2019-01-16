@@ -211,7 +211,7 @@ func (z *Zip) extractFile(f File, to string) error {
 		if err != nil {
 			return fmt.Errorf("%s: reading symlink target: %v", header.Name, err)
 		}
-		return writeNewSymbolicLink(to, strings.TrimSpace(buf.String()))
+		return writeNewSymbolicLink(to, strings.TrimSpace(buf.String()), z.OverwriteExisting)
 	}
 
 	return writeNewFile(to, f, f.Mode())
