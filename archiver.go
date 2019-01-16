@@ -305,10 +305,13 @@ func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
 	return nil
 }
 
-func writeNewSymbolicLink(fpath string, target string) error {
+func writeNewSymbolicLink(fpath string, target string, overwriteExisting bool) error {
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
+	}
+	if overwriteExisting {
+		_ = os.Remove(fpath)
 	}
 	err = os.Symlink(target, fpath)
 	if err != nil {
