@@ -310,6 +310,14 @@ func writeNewSymbolicLink(fpath string, target string) error {
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
 	}
+
+	_, err = os.Lstat(fpath);
+	if err == nil {
+		if err := os.Remove(fpath); err != nil {
+			return fmt.Errorf("%s: failed to unlink: %+v", fpath, err)
+		}
+	}
+
 	err = os.Symlink(target, fpath)
 	if err != nil {
 		return fmt.Errorf("%s: making symbolic link for: %v", fpath, err)
@@ -322,6 +330,14 @@ func writeNewHardLink(fpath string, target string) error {
 	if err != nil {
 		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
 	}
+
+	_, err = os.Lstat(fpath);
+	if err == nil {
+		if err := os.Remove(fpath); err != nil {
+			return fmt.Errorf("%s: failed to unlink: %+v", fpath, err)
+		}
+	}
+
 	err = os.Link(target, fpath)
 	if err != nil {
 		return fmt.Errorf("%s: making hard link for: %v", fpath, err)
