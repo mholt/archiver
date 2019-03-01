@@ -21,6 +21,7 @@ var (
 	selectiveCompression   bool
 	implicitTopLevelFolder bool
 	continueOnError        bool
+	filenameEncoding       string
 )
 
 func init() {
@@ -30,6 +31,7 @@ func init() {
 	flag.BoolVar(&selectiveCompression, "smart", true, "Only compress files which are not already compressed (zip only)")
 	flag.BoolVar(&implicitTopLevelFolder, "folder-safe", true, "If an archive does not have a single top-level folder, create one implicitly")
 	flag.BoolVar(&continueOnError, "allow-errors", true, "Log errors and continue processing")
+	flag.StringVar(&filenameEncoding, "filename-encoding", "", "Specify encoding if filename was not utf8 encoded")
 }
 
 func main() {
@@ -229,6 +231,7 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.SelectiveCompression = selectiveCompression
 		v.ImplicitTopLevelFolder = implicitTopLevelFolder
 		v.ContinueOnError = continueOnError
+		v.FilenameEncoding = filenameEncoding
 	case *archiver.Gz:
 		v.CompressionLevel = compressionLevel
 	case *archiver.Bz2:
