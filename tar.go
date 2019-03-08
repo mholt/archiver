@@ -512,6 +512,11 @@ func (t *Tar) Extract(source, target, destination string) error {
 			}
 			th.Name = end
 
+			// relativize any hardlink names
+			if th.Typeflag == tar.TypeLink {
+				th.Linkname = filepath.Join(filepath.Base(filepath.Dir(th.Linkname)), filepath.Base(th.Linkname))
+			}
+
 			err = t.untarFile(f, destination, th)
 			if err != nil {
 				return fmt.Errorf("extracting file %s: %v", th.Name, err)
