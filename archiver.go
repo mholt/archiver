@@ -460,7 +460,7 @@ func ByExtension(filename string) (interface{}, error) {
 	case *Bz2:
 		return NewBz2(), nil
 	case *Lz4:
-		return NewBz2(), nil
+		return NewLz4(), nil
 	case *Snappy:
 		return NewSnappy(), nil
 	case *Xz:
