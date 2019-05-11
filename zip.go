@@ -91,6 +91,17 @@ func (*Zip) CheckExt(filename string) error {
 	return nil
 }
 
+// CheckPath ensures the file extension matches the format.
+func (*Zip) CheckPath(to, filename string) error {
+	to, _ = filepath.Abs(to) //explicit the destination folder to prevent that 'string.HasPrefix' check can be 'bypassed' when no destination folder is supplied in input
+	dest := filepath.Join(to, filename)
+	//prevent path traversal attacks
+	if !strings.HasPrefix(dest, to) {
+		return fmt.Errorf("illegal file path: %s", filename)
+	}
+	return nil
+}
+
 // Registering a global decompressor is not reentrant and may panic
 func registerDecompressor(zr *zip.Reader) {
 	// register zstd decompressor
@@ -231,6 +242,11 @@ func (z *Zip) extractNext(to string) error {
 		return err // don't wrap error; calling loop must break on io.EOF
 	}
 	defer f.Close()
+
+	errPath := z.CheckPath(to, f.Header.(zip.FileHeader).Name)
+	if errPath != nil {
+		return fmt.Errorf("checking path traversal attempt: %v", errPath)
+	}
 	return z.extractFile(f, to)
 }
 
@@ -629,6 +645,7 @@ var (
 	_ = Extractor(new(Zip))
 	_ = Matcher(new(Zip))
 	_ = ExtensionChecker(new(Zip))
+	_ = FilenameChecker(new(Zip))
 )
 
 // compressedFormats is a (non-exhaustive) set of lowercased
