@@ -225,7 +225,7 @@ func (z *Zip) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if z.ContinueOnError {
+			if z.ContinueOnError || strings.Contains(err.Error(), "illegal file path") {
 				log.Printf("[ERROR] Reading file in zip archive: %v", err)
 				continue
 			}
