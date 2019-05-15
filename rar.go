@@ -105,7 +105,7 @@ func (r *Rar) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if r.ContinueOnError {
+			if r.ContinueOnError || strings.Contains(err.Error(), "illegal file path") {
 				log.Printf("[ERROR] Reading file in rar archive: %v", err)
 				continue
 			}

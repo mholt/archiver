@@ -452,6 +452,57 @@ func symmetricTest(t *testing.T, formatName, dest string, testSymlinks, testMode
 	}
 }
 
+// test at runtime if the CheckFilename function is behaving properly for the archive formats
+func TestSafeExtraction(t *testing.T) {
+
+	testArchives := []string{
+		"testdata/testarchives/evilarchives/evil.zip",
+		"testdata/testarchives/evilarchives/evil.tar",
+		"testdata/testarchives/evilarchives/evil.tar.gz",
+		"testdata/testarchives/evilarchives/evil.tar.bz2",
+	}
+
+	for _, archiveName := range testArchives {
+
+		expected := true // 'evilfile' should not be extracted outside of destination directory and 'safefile' should be extracted anyway in the destination folder anyway 
+
+		if _, err := os.Stat(archiveName); os.IsNotExist(err) {
+			t.Errorf("archive not found")
+		}
+
+		actual := CheckFilenames(archiveName)
+
+		if actual != expected {
+			t.Errorf("CheckFilename is misbehaving for archive format type %s", filepath.Ext(archiveName))
+		}
+	}
+}
+
+func CheckFilenames(archiveName string) bool {
+
+	evilNotExtracted := false // by default we cannot assume that the path traversal filename is mitigated by CheckFilename
+	safeExtracted := false    // by default we cannot assume that a benign file can be extracted successfully
+
+	// clean the destination folder after this test
+	defer os.RemoveAll("testdata/testarchives/destarchives/")
+
+	err := Unarchive(archiveName, "testdata/testarchives/destarchives/")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// is 'evilfile' prevented to be extracted outside of the destination folder?
+	if _, err := os.Stat("testdata/testarchives/evilfile"); os.IsNotExist(err) {
+		evilNotExtracted = true
+	}
+	// is 'safefile' safely extracted without errors inside the destination path?
+	if _, err := os.Stat("testdata/testarchives/destarchives/safedir/safefile"); !os.IsNotExist(err) {
+		safeExtracted = true
+	}
+
+	return evilNotExtracted && safeExtracted
+}
+
 var archiveFormats = []interface{}{
 	DefaultZip,
 	DefaultTar,
@@ -484,3 +535,4 @@ func (ffi fakeFileInfo) Mode() os.FileMode  { return ffi.mode }
 func (ffi fakeFileInfo) ModTime() time.Time { return ffi.modTime }
 func (ffi fakeFileInfo) IsDir() bool        { return ffi.isDir }
 func (ffi fakeFileInfo) Sys() interface{}   { return ffi.sys }
+
