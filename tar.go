@@ -161,7 +161,7 @@ func (t *Tar) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if t.ContinueOnError {
+			if t.ContinueOnError || strings.Contains(err.Error(), "illegal file path") {
 				log.Printf("[ERROR] Reading file in tar archive: %v", err)
 				continue
 			}
