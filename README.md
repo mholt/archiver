@@ -1,11 +1,11 @@
 archiver [![archiver GoDoc](https://img.shields.io/badge/reference-godoc-blue.svg?style=flat-square)](https://godoc.org/github.com/mholt/archiver) <a href="https://dev.azure.com/mholt-dev/Archiver/_build"><img src="https://img.shields.io/azure-devops/build/mholt-dev/1e14e7f7-f929-4fec-a1db-fa5a3c0d4ca9/2/master.svg?label=cross-platform%20tests&style=flat-square"></a>
 ========
 
-Introducing **Archiver 3.1** - a cross-platform, multi-format archive utility and Go library. A powerful and flexible library meets an elegant CLI in this generic replacement for several of platform-specific, format-specific archive utilities.
+Introducing **Archiver 3.1** - a cross-platform, multi-format archive utility and Go library. A powerful and flexible library meets an elegant CLI in this generic replacement for several platform-specific, format-specific archive utilities.
 
 ## Features
 
-Package archiver makes it trivially easy to make and extract common archive formats such as zip and tarball (and its compressed variants). Simply name the input and output file(s). The `arc` command runs the same on all platforms and has no external dependencies (not even libc). It is powered by the Go standard library and several third-party, pure-Go libraries.
+Package archiver makes it trivially easy to make and extract common archive formats such as tarball (and its compressed variants) and zip. Simply name the input and output file(s). The `arc` command runs the same on all platforms and has no external dependencies (not even libc). It is powered by the Go standard library and several third-party, pure-Go libraries.
 
 Files are put into the root of the archive; directories are recursively added, preserving structure.
 
@@ -29,18 +29,6 @@ Files are put into the root of the archive; directories are recursively added, p
 - Open password-protected RAR archives
 - Optionally continue with other files after an error
 
-### Supported archive formats
-
-- .zip
-- .tar
-- .tar.gz or .tgz
-- .tar.bz2 or .tbz2
-- .tar.xz or .txz
-- .tar.lz4 or .tlz4
-- .tar.sz or .tsz
-- .tar.zst
-- .rar (open only)
-
 ### Supported compression formats
 
 - bzip2
@@ -49,6 +37,18 @@ Files are put into the root of the archive; directories are recursively added, p
 - snappy (sz)
 - xz
 - Zstandard (zstd)
+
+### Supported archive formats
+
+- .zip
+- .tar
+- .tar.bz2 or .tbz2
+- .tar.gz or .tgz
+- .tar.lz4 or .tlz4
+- .tar.sz or .tsz
+- .tar.xz or .txz
+- .tar.zst
+- .rar (open only)
 
 
 ## Install
