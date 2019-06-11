@@ -453,6 +453,8 @@ func ByExtension(filename string) (interface{}, error) {
 		return NewTarSz(), nil
 	case *TarXz:
 		return NewTarXz(), nil
+	case *TarZstd:
+		return NewTarZstd(), nil
 	case *Zip:
 		return NewZip(), nil
 	case *Gz:
@@ -465,6 +467,8 @@ func ByExtension(filename string) (interface{}, error) {
 		return NewSnappy(), nil
 	case *Xz:
 		return NewXz(), nil
+	case *Zstd:
+		return NewZstd(), nil
 	}
 	return nil, fmt.Errorf("format unrecognized by filename: %s", filename)
 }
@@ -505,6 +509,7 @@ var extCheckers = []ExtensionChecker{
 	&TarLz4{},
 	&TarSz{},
 	&TarXz{},
+	&TarZstd{},
 	&Rar{},
 	&Tar{},
 	&Zip{},
@@ -513,6 +518,7 @@ var extCheckers = []ExtensionChecker{
 	&Lz4{},
 	&Snappy{},
 	&Xz{},
+	&Zstd{},
 }
 
 var matchers = []Matcher{

@@ -222,6 +222,8 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.Tar = mytar
 	case *archiver.TarXz:
 		v.Tar = mytar
+	case *archiver.TarZstd:
+		v.Tar = mytar
 	case *archiver.Zip:
 		v.CompressionLevel = compressionLevel
 		v.OverwriteExisting = overwriteExisting
@@ -238,6 +240,8 @@ func getFormat(subcommand string) (interface{}, error) {
 	case *archiver.Snappy:
 		// nothing to customize
 	case *archiver.Xz:
+		// nothing to customize
+	case *archiver.Zstd:
 		// nothing to customize
 	default:
 		return nil, fmt.Errorf("format does not support customization: %s", f)
@@ -299,7 +303,9 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help
       .tar.lz4
       .tlz4
       .tar.sz
-      .tsz
+	  .tsz
+	  .zst
+	  .tar.zst
       .rar (open only)
       .bz2
       .gz

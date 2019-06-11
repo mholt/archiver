@@ -38,6 +38,7 @@ Files are put into the root of the archive; directories are recursively added, p
 - .tar.xz or .txz
 - .tar.lz4 or .tlz4
 - .tar.sz or .tsz
+- .tar.zst
 - .rar (open only)
 
 ### Supported compression formats
@@ -47,6 +48,7 @@ Files are put into the root of the archive; directories are recursively added, p
 - lz4
 - snappy (sz)
 - xz
+- Zstandard (zstd)
 
 
 ## Install
