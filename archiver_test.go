@@ -459,6 +459,7 @@ var archiveFormats = []interface{}{
 	DefaultTarLz4,
 	DefaultTarSz,
 	DefaultTarXz,
+	DefaultTarZstd,
 }
 
 type archiverUnarchiver interface {
