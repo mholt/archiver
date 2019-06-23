@@ -21,6 +21,7 @@ Files are put into the root of the archive; directories are recursively added, p
 
 ### Format-dependent features
 
+- Gzip is multithreaded
 - Optionally create a top-level folder to avoid littering a directory or archive root with files
 - Toggle overwrite existing files
 - Adjust compression level

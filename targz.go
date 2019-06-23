@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	pgzip "github.com/klauspost/pgzip"
 )
 
 // TarGz facilitates gzip compression
@@ -15,6 +17,9 @@ type TarGz struct {
 	// The compression level to use, as described
 	// in the compress/gzip package.
 	CompressionLevel int
+
+	// Disables parallel gzip.
+	SingleThreaded bool
 }
 
 // CheckExt ensures the file extension matches the format.
@@ -77,10 +82,14 @@ func (tgz *TarGz) Extract(source, target, destination string) error {
 }
 
 func (tgz *TarGz) wrapWriter() {
-	var gzw *gzip.Writer
+	var gzw io.WriteCloser
 	tgz.Tar.writerWrapFn = func(w io.Writer) (io.Writer, error) {
 		var err error
-		gzw, err = gzip.NewWriterLevel(w, tgz.CompressionLevel)
+		if tgz.SingleThreaded {
+			gzw, err = gzip.NewWriterLevel(w, tgz.CompressionLevel)
+		} else {
+			gzw, err = pgzip.NewWriterLevel(w, tgz.CompressionLevel)
+		}
 		return gzw, err
 	}
 	tgz.Tar.cleanupWrapFn = func() {
@@ -89,10 +98,14 @@ func (tgz *TarGz) wrapWriter() {
 }
 
 func (tgz *TarGz) wrapReader() {
-	var gzr *gzip.Reader
+	var gzr io.ReadCloser
 	tgz.Tar.readerWrapFn = func(r io.Reader) (io.Reader, error) {
 		var err error
-		gzr, err = gzip.NewReader(r)
+		if tgz.SingleThreaded {
+			gzr, err = gzip.NewReader(r)
+		} else {
+			gzr, err = pgzip.NewReader(r)
+		}
 		return gzr, err
 	}
 	tgz.Tar.cleanupWrapFn = func() {

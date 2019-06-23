@@ -8,6 +8,7 @@ require (
 	github.com/golang/snappy v0.0.1
 	github.com/google/go-cmp v0.3.0 // indirect
 	github.com/klauspost/compress v1.7.1
+	github.com/klauspost/pgzip v1.2.1
 	github.com/nwaples/rardecode v1.0.0
 	github.com/pierrec/lz4 v2.0.5+incompatible
 	github.com/ulikunitz/xz v0.5.6
