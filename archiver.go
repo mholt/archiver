@@ -443,6 +443,8 @@ func ByExtension(filename string) (interface{}, error) {
 		return NewRar(), nil
 	case *Tar:
 		return NewTar(), nil
+	case *TarBrotli:
+		return NewTarBrotli(), nil
 	case *TarBz2:
 		return NewTarBz2(), nil
 	case *TarGz:
@@ -504,6 +506,7 @@ func ByHeader(input io.ReadSeeker) (Unarchiver, error) {
 // that can check extensions. Only to be used for
 // checking extensions - not any archival operations.
 var extCheckers = []ExtensionChecker{
+	&TarBrotli{},
 	&TarBz2{},
 	&TarGz{},
 	&TarLz4{},
@@ -513,6 +516,7 @@ var extCheckers = []ExtensionChecker{
 	&Rar{},
 	&Tar{},
 	&Zip{},
+	&Brotli{},
 	&Gz{},
 	&Bz2{},
 	&Lz4{},

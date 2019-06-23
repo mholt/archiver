@@ -209,6 +209,9 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.Password = os.Getenv("ARCHIVE_PASSWORD")
 	case *archiver.Tar:
 		v = mytar
+	case *archiver.TarBrotli:
+		v.Tar = mytar
+		v.Quality = compressionLevel
 	case *archiver.TarBz2:
 		v.Tar = mytar
 		v.CompressionLevel = compressionLevel
@@ -233,6 +236,8 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.ContinueOnError = continueOnError
 	case *archiver.Gz:
 		v.CompressionLevel = compressionLevel
+	case *archiver.Brotli:
+		v.Quality = compressionLevel
 	case *archiver.Bz2:
 		v.CompressionLevel = compressionLevel
 	case *archiver.Lz4:
@@ -293,7 +298,9 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help
     The format of the archive is determined by its
     file extension. Supported extensions:
       .zip
-      .tar
+	  .tar
+	  .tar.br
+	  .tbr
       .tar.gz
       .tgz
       .tar.bz2
