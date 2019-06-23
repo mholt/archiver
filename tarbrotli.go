@@ -76,7 +76,8 @@ func (tbr *TarBrotli) Extract(source, target, destination string) error {
 func (tbr *TarBrotli) wrapWriter() {
 	var brw *brotli.Writer
 	tbr.Tar.writerWrapFn = func(w io.Writer) (io.Writer, error) {
-		return brotli.NewWriterLevel(w, tbr.Quality), nil
+		brw = brotli.NewWriterLevel(w, tbr.Quality)
+		return brw, nil
 	}
 	tbr.Tar.cleanupWrapFn = func() {
 		brw.Close()
