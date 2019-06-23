@@ -298,9 +298,9 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help
     The format of the archive is determined by its
     file extension. Supported extensions:
       .zip
-	  .tar
-	  .tar.br
-	  .tbr
+      .tar
+      .tar.br
+      .tbr
       .tar.gz
       .tgz
       .tar.bz2
@@ -310,9 +310,9 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help
       .tar.lz4
       .tlz4
       .tar.sz
-	  .tsz
-	  .zst
-	  .tar.zst
+      .tsz
+      .zst
+      .tar.zst
       .rar (open only)
       .bz2
       .gz
