@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/mholt/archiver"
@@ -58,7 +59,14 @@ func main() {
 		if !ok {
 			fatalf("the archive command does not support the %s format", iface)
 		}
-		err = a.Archive(flag.Args()[2:], flag.Arg(1))
+		sources := flag.Args()[2:]
+		if len(flag.Args()) == 3 {
+			sources, err = filepath.Glob(flag.Args()[2])
+			if err != nil {
+				fatalf(err.Error())
+			}
+		}
+		err = a.Archive(sources, flag.Arg(1))
 
 	case "unarchive":
 		u, ok := iface.(archiver.Unarchiver)
