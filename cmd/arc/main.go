@@ -59,13 +59,16 @@ func main() {
 		if !ok {
 			fatalf("the archive command does not support the %s format", iface)
 		}
-		sources := flag.Args()[2:]
-		if len(flag.Args()) == 3 {
-			sources, err = filepath.Glob(flag.Args()[2])
+
+		var sources []string
+		for _, src := range flag.Args()[2:] {
+			srcs, err := filepath.Glob(src)
 			if err != nil {
 				fatalf(err.Error())
 			}
+			sources = append(sources, srcs...)
 		}
+
 		err = a.Archive(sources, flag.Arg(1))
 
 	case "unarchive":
