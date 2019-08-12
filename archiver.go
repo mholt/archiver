@@ -253,8 +253,8 @@ func CompressFile(source, destination string) error {
 	return FileCompressor{Compressor: c}.CompressFile(source, destination)
 }
 
-// DecompressFile is a convenience function to simply compress a file.
-// The compression algorithm is selected implicitly based on the
+// DecompressFile is a convenience function to simply decompress a file.
+// The decompression algorithm is selected implicitly based on the
 // source's extension.
 func DecompressFile(source, destination string) error {
 	cIface, err := ByExtension(source)
