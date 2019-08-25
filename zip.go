@@ -50,6 +50,11 @@ type Zip struct {
 	// especially on extraction.
 	ImplicitTopLevelFolder bool
 
+	// When zipping parent/folderName
+	// the zip file will contain parent/folderName
+	// as opposed to just folderName
+	KeepParentDirectories bool
+
 	// If true, errors encountered during reading
 	// or writing a single file will be logged and
 	// the operation will continue on remaining files.
@@ -256,6 +261,9 @@ func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 		nameInArchive, err := makeNameInArchive(sourceInfo, source, topLevelFolder, fpath)
 		if err != nil {
 			return handleErr(err)
+		}
+		if z.KeepParentDirectories {
+			nameInArchive = filepath.ToSlash(fpath)
 		}
 
 		var file io.ReadCloser
