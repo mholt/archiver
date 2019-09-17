@@ -609,7 +609,7 @@ var (
 	_ = Walker(new(Tar))
 	_ = Extractor(new(Tar))
 	_ = Matcher(new(Tar))
-	_ = ExtensionChecker(new(Rar))
+	_ = ExtensionChecker(new(Tar))
 )
 
 // DefaultTar is a default instance that is conveniently ready to use.
