@@ -138,7 +138,13 @@ func (t *Tar) Unarchive(source, destination string) error {
 	}
 	defer file.Close()
 
-	err = t.Open(file, 0)
+	return t.UnarchiveIO(file, 0, destination)
+}
+
+// Unarchive unpacks the .tar file stream to destination.
+// dest will be treated as a folder name.
+func (t *Tar) UnarchiveIO(in io.Reader, size int64, destination string) error {
+	err := t.Open(in, 0)
 	if err != nil {
 		return fmt.Errorf("opening tar archive for reading: %v", err)
 	}

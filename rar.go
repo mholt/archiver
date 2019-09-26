@@ -82,7 +82,19 @@ func (r *Rar) Unarchive(source, destination string) error {
 		}
 	}
 
-	err := r.OpenFile(source)
+	file, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("opening source archive: %v", err)
+	}
+	defer file.Close()
+
+	return r.UnarchiveIO(file, 0, destination)
+}
+
+// Unarchive unpacks the .rar file stream to destination.
+// dest will be treated as a folder name.
+func (r *Rar) UnarchiveIO(in io.Reader, size int64, destination string) error {
+	err := r.Open(in, 0)
 	if err != nil {
 		return fmt.Errorf("opening rar archive for reading: %v", err)
 	}

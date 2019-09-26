@@ -78,6 +78,12 @@ type Unarchiver interface {
 	Unarchive(source, destination string) error
 }
 
+// UnarchiverIO is a type that can extract archive files
+// into a folder.
+type UnarchiverIO interface {
+	UnarchiveIO(in io.Reader, size int64, destination string) error
+}
+
 // Writer can write discrete byte streams of files to
 // an output stream.
 type Writer interface {

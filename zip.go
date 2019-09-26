@@ -140,16 +140,15 @@ func (z *Zip) Unarchive(source, destination string) error {
 		return fmt.Errorf("statting source file: %v", err)
 	}
 
-	err = z.Open(file, fileInfo.Size())
-	if err != nil {
-		return fmt.Errorf("opening zip archive for reading: %v", err)
-	}
-	defer z.Close()
-
 	// if the files in the archive do not all share a common
 	// root, then make sure we extract to a single subfolder
 	// rather than potentially littering the destination...
 	if z.ImplicitTopLevelFolder {
+		err = z.Open(file, fileInfo.Size())
+		if err != nil {
+			return fmt.Errorf("opening zip archive for reading: %v", err)
+		}
+		defer z.Close()
 		files := make([]string, len(z.zr.File))
 		for i := range z.zr.File {
 			files[i] = z.zr.File[i].Name
@@ -158,6 +157,18 @@ func (z *Zip) Unarchive(source, destination string) error {
 			destination = filepath.Join(destination, folderNameFromFileName(source))
 		}
 	}
+
+	return z.UnarchiveIO(file, fileInfo.Size(), destination)
+}
+
+// Unarchive unpacks the .zip file stream to destination.
+// dest will be treated as a folder name.
+func (z *Zip) UnarchiveIO(in io.Reader, size int64, destination string) error {
+	err := z.Open(in, size)
+	if err != nil {
+		return fmt.Errorf("opening zip archive for reading: %v", err)
+	}
+	defer z.Close()
 
 	for {
 		err := z.extractNext(destination)
