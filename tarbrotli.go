@@ -79,8 +79,8 @@ func (tbr *TarBrotli) wrapWriter() {
 		brw = brotli.NewWriterLevel(w, tbr.Quality)
 		return brw, nil
 	}
-	tbr.Tar.cleanupWrapFn = func() {
-		brw.Close()
+	tbr.Tar.cleanupWrapFn = func() error {
+		return brw.Close()
 	}
 }
 

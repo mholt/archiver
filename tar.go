@@ -50,7 +50,7 @@ type Tar struct {
 
 	readerWrapFn  func(io.Reader) (io.Reader, error)
 	writerWrapFn  func(io.Writer) (io.Writer, error)
-	cleanupWrapFn func()
+	cleanupWrapFn func() error
 }
 
 // CheckExt ensures the file extension matches the format.
@@ -165,7 +165,7 @@ func (t *Tar) Unarchive(source, destination string) error {
 // the tarball named sourceArchive and returns a modified
 // destination if all the files do not share the same
 // top-level folder.
-func (t *Tar) addTopLevelFolder(sourceArchive, destination string) (string, error) {
+func (t *Tar) addTopLevelFolder(sourceArchive, destination string) (out string, err error) {
 	file, err := os.Open(sourceArchive)
 	if err != nil {
 		return "", fmt.Errorf("opening source archive: %v", err)
@@ -182,7 +182,12 @@ func (t *Tar) addTopLevelFolder(sourceArchive, destination string) (string, erro
 		}
 	}
 	if t.cleanupWrapFn != nil {
-		defer t.cleanupWrapFn()
+		defer func() {
+			err2 := t.cleanupWrapFn()
+			if err == nil {
+				err = err2
+			}
+		}()
 	}
 
 	tr := tar.NewReader(reader)
@@ -418,8 +423,7 @@ func (t *Tar) Read() (File, error) {
 }
 
 // Close closes the tar archive(s) opened by Create and Open.
-func (t *Tar) Close() error {
-	var err error
+func (t *Tar) Close() (err error) {
 	if t.tr != nil {
 		t.tr = nil
 	}
@@ -432,24 +436,38 @@ func (t *Tar) Close() error {
 	// (say that ten times fast) happens AFTER the
 	// underlying stream is closed
 	if t.cleanupWrapFn != nil {
-		t.cleanupWrapFn()
+		if err2 := t.cleanupWrapFn(); err2 != nil {
+			if err == nil {
+				err = err2
+			}
+		}
 	}
-	return err
+	return
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (t *Tar) Walk(archive string, walkFn WalkFunc) error {
+func (t *Tar) Walk(archive string, walkFn WalkFunc) (err error) {
 	file, err := os.Open(archive)
 	if err != nil {
 		return fmt.Errorf("opening archive file: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		err2 := file.Close()
+		if err == nil {
+			err = err2
+		}
+	}()
 
 	err = t.Open(file, 0)
 	if err != nil {
 		return fmt.Errorf("opening archive: %v", err)
 	}
-	defer t.Close()
+	defer func() {
+		err2 := t.Close()
+		if err == nil {
+			err = err2
+		}
+	}()
 
 	for {
 		f, err := t.Read()

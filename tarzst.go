@@ -92,8 +92,8 @@ func (tzst *TarZstd) wrapWriter() {
 		zstdw, err = zstd.NewWriter(w, tzst.eopts...)
 		return zstdw, err
 	}
-	tzst.Tar.cleanupWrapFn = func() {
-		zstdw.Close()
+	tzst.Tar.cleanupWrapFn = func() error {
+		return zstdw.Close()
 	}
 }
 
@@ -104,8 +104,9 @@ func (tzst *TarZstd) wrapReader() {
 		zstdr, err = zstd.NewReader(r, tzst.dopts...)
 		return zstdr, err
 	}
-	tzst.Tar.cleanupWrapFn = func() {
+	tzst.Tar.cleanupWrapFn = func() error {
 		zstdr.Close()
+		return nil
 	}
 }
 

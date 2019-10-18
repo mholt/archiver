@@ -85,8 +85,8 @@ func (tbz2 *TarBz2) wrapWriter() {
 		})
 		return bz2w, err
 	}
-	tbz2.Tar.cleanupWrapFn = func() {
-		bz2w.Close()
+	tbz2.Tar.cleanupWrapFn = func() error {
+		return bz2w.Close()
 	}
 }
 
@@ -97,8 +97,8 @@ func (tbz2 *TarBz2) wrapReader() {
 		bz2r, err = bzip2.NewReader(r, nil)
 		return bz2r, err
 	}
-	tbz2.Tar.cleanupWrapFn = func() {
-		bz2r.Close()
+	tbz2.Tar.cleanupWrapFn = func() error {
+		return bz2r.Close()
 	}
 }
 
