@@ -11,6 +11,9 @@ import (
 // TarZstd facilitates Zstandard compression
 // (RFC 8478) of tarball archives.
 type TarZstd struct {
+	eopts []zstd.EOption
+	dopts []zstd.DOption
+
 	*Tar
 }
 
@@ -20,6 +23,16 @@ func (*TarZstd) CheckExt(filename string) error {
 		return fmt.Errorf("filename must have a .tar.zst extension")
 	}
 	return nil
+}
+
+// SetEncoderOptions allows you to configure the underlying zstandard encoder
+func (t *TarZstd) SetEncoderOptions(opts ...zstd.EOption) {
+	t.eopts = opts
+}
+
+// SetEncoderOptions allows you to configure the underlying zstandard decoder
+func (t *TarZstd) SetDecoderOptions(opts ...zstd.DOption) {
+	t.dopts = opts
 }
 
 // Archive creates a compressed tar file at destination
@@ -76,7 +89,7 @@ func (tzst *TarZstd) wrapWriter() {
 	var zstdw *zstd.Encoder
 	tzst.Tar.writerWrapFn = func(w io.Writer) (io.Writer, error) {
 		var err error
-		zstdw, err = zstd.NewWriter(w)
+		zstdw, err = zstd.NewWriter(w, tzst.eopts...)
 		return zstdw, err
 	}
 	tzst.Tar.cleanupWrapFn = func() {
@@ -88,7 +101,7 @@ func (tzst *TarZstd) wrapReader() {
 	var zstdr *zstd.Decoder
 	tzst.Tar.readerWrapFn = func(r io.Reader) (io.Reader, error) {
 		var err error
-		zstdr, err = zstd.NewReader(r)
+		zstdr, err = zstd.NewReader(r, tzst.dopts...)
 		return zstdr, err
 	}
 	tzst.Tar.cleanupWrapFn = func() {
