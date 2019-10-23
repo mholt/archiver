@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
@@ -90,6 +91,26 @@ func (tbz2 *TarBz2) wrapWriter() {
 	}
 }
 
+// Match returns true if the format of file matches this
+// type's format. It should not affect reader position.
+func (*TarBz2) Match(file io.ReadSeeker) (bool, error) {
+	currentPos, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return false, err
+	}
+	defer file.Seek(currentPos, io.SeekStart)
+
+	buf := make([]byte, 3)
+	if n, err := file.Read(buf); err != nil || n < 3 {
+		return false, nil
+	}
+	return bytes.Equal(buf, []byte("BZh")), nil
+}
+
 func (tbz2 *TarBz2) wrapReader() {
 	var bz2r *bzip2.Reader
 	tbz2.Tar.readerWrapFn = func(r io.Reader) (io.Reader, error) {
@@ -120,6 +141,7 @@ var (
 	_ = Unarchiver(new(TarBz2))
 	_ = Walker(new(TarBz2))
 	_ = Extractor(new(TarBz2))
+	_ = Matcher(new(TarBz2))
 )
 
 // DefaultTarBz2 is a convenient archiver ready to use.
