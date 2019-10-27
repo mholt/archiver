@@ -500,6 +500,8 @@ func ByHeader(input io.ReadSeeker) (Unarchiver, error) {
 		return NewRar(), nil
 	case *TarBz2:
 		return NewTarBz2(), nil
+	case *TarGz:
+		return NewTarGz(), nil
 	}
 	return nil, ErrFormatNotRecognized
 }
