@@ -92,8 +92,8 @@ func (tgz *TarGz) wrapWriter() {
 		}
 		return gzw, err
 	}
-	tgz.Tar.cleanupWrapFn = func() {
-		gzw.Close()
+	tgz.Tar.cleanupWrapFn = func() error {
+		return gzw.Close()
 	}
 }
 
@@ -108,8 +108,8 @@ func (tgz *TarGz) wrapReader() {
 		}
 		return gzr, err
 	}
-	tgz.Tar.cleanupWrapFn = func() {
-		gzr.Close()
+	tgz.Tar.cleanupWrapFn = func() error {
+		return gzr.Close()
 	}
 }
 

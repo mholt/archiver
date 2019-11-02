@@ -87,8 +87,8 @@ func (tlz4 *TarLz4) wrapWriter() {
 		lz4w.Header.CompressionLevel = tlz4.CompressionLevel
 		return lz4w, nil
 	}
-	tlz4.Tar.cleanupWrapFn = func() {
-		lz4w.Close()
+	tlz4.Tar.cleanupWrapFn = func() error {
+		return lz4w.Close()
 	}
 }
 

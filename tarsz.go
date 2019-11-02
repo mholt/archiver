@@ -80,8 +80,8 @@ func (tsz *TarSz) wrapWriter() {
 		sw = snappy.NewWriter(w)
 		return sw, nil
 	}
-	tsz.Tar.cleanupWrapFn = func() {
-		sw.Close()
+	tsz.Tar.cleanupWrapFn = func() error {
+		return sw.Close()
 	}
 }
 

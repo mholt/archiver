@@ -82,8 +82,8 @@ func (txz *TarXz) wrapWriter() {
 		xzw, err = xz.NewWriter(w)
 		return xzw, err
 	}
-	txz.Tar.cleanupWrapFn = func() {
-		xzw.Close()
+	txz.Tar.cleanupWrapFn = func() error {
+		return xzw.Close()
 	}
 }
 
