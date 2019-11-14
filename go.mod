@@ -3,7 +3,7 @@ module github.com/mholt/archiver/v3
 go 1.12
 
 require (
-	github.com/andybalholm/brotli v0.0.0-20190621154722-5f990b63d2d6
+	github.com/andybalholm/brotli v1.0.0
 	github.com/dsnet/compress v0.0.1
 	github.com/golang/snappy v0.0.1
 	github.com/klauspost/compress v1.9.2
