@@ -53,7 +53,7 @@ Tar files can optionally be compressed using any of the above compression format
 ## Install
 
 ```bash
-go get -u github.com/mholt/archiver/cmd/arc
+go get -u github.com/mholt/archiver/v3/cmd/arc
 ```
 
 Or download binaries from the [releases](https://github.com/mholt/archiver/releases) page.
@@ -145,7 +145,7 @@ Flags are specified before the subcommand. Use `arc help` or `arc -h` to get usa
 The archiver package allows you to easily create and open archives, walk their contents, extract specific files, compress and decompress files, and even stream archives in and out using pure io.Reader and io.Writer interfaces, without ever needing to touch the disk.
 
 ```go
-import "github.com/mholt/archiver"
+import "github.com/mholt/archiver/v3"
 ```
 
 [See the package's GoDoc](https://godoc.org/github.com/mholt/archiver) for full API documentation.
