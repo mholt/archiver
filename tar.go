@@ -206,7 +206,7 @@ func (t *Tar) addTopLevelFolder(sourceArchive, destination string) (string, erro
 	return destination, nil
 }
 
-func (t *Tar) untarNext(to string) error {
+func (t *Tar) untarNext(destination string) error {
 	f, err := t.Read()
 	if err != nil {
 		return err // don't wrap error; calling loop must break on io.EOF
@@ -215,18 +215,15 @@ func (t *Tar) untarNext(to string) error {
 	if !ok {
 		return fmt.Errorf("expected header to be *tar.Header but was %T", f.Header)
 	}
-	return t.untarFile(f, filepath.Join(to, header.Name))
+	return t.untarFile(f, destination, header)
 }
 
-func (t *Tar) untarFile(f File, to string) error {
+func (t *Tar) untarFile(f File, destination string, hdr *tar.Header) error {
+	to := filepath.Join(destination, hdr.Name)
+
 	// do not overwrite existing files, if configured
 	if !f.IsDir() && !t.OverwriteExisting && fileExists(to) {
 		return fmt.Errorf("file already exists: %s", to)
-	}
-
-	hdr, ok := f.Header.(*tar.Header)
-	if !ok {
-		return fmt.Errorf("expected header to be *tar.Header but was %T", f.Header)
 	}
 
 	switch hdr.Typeflag {
@@ -237,7 +234,7 @@ func (t *Tar) untarFile(f File, to string) error {
 	case tar.TypeSymlink:
 		return writeNewSymbolicLink(to, hdr.Linkname)
 	case tar.TypeLink:
-		return writeNewHardLink(to, filepath.Join(to, hdr.Linkname))
+		return writeNewHardLink(to, filepath.Join(destination, hdr.Linkname))
 	case tar.TypeXGlobalHeader:
 		return nil // ignore the pax global header from git-generated tarballs
 	default:
@@ -513,9 +510,14 @@ func (t *Tar) Extract(source, target, destination string) error {
 			if err != nil {
 				return fmt.Errorf("relativizing paths: %v", err)
 			}
-			joined := filepath.Join(destination, end)
+			th.Name = end
 
-			err = t.untarFile(f, joined)
+			// relativize any hardlink names
+			if th.Typeflag == tar.TypeLink {
+				th.Linkname = filepath.Join(filepath.Base(filepath.Dir(th.Linkname)), filepath.Base(th.Linkname))
+			}
+
+			err = t.untarFile(f, destination, th)
 			if err != nil {
 				return fmt.Errorf("extracting file %s: %v", th.Name, err)
 			}
