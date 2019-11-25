@@ -331,6 +331,31 @@ func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
 
 	// Check that what was extracted is what was compressed
 	symmetricTest(t, auStr, dest, true, true)
+
+	// Test writing archive to in-memory bytes and then writing those
+	bytesBuf := &bytes.Buffer{}
+	err = au.WriterArchive([]string{"testdata/corpus"}, bytesBuf)
+	if err != nil {
+		t.Fatalf("[%s] making archive: didn't expect an error, but got: %v", auStr, err)
+	}
+
+	// write in-memory bytes to file
+	bytesOutFile := filepath.Join(tmp, "archiver_test_bytes."+auStr)
+	err = ioutil.WriteFile(bytesOutFile, bytesBuf.Bytes(), 0644)
+	if err != nil {
+		t.Fatalf("[%s] writing in-memory bytes to output file %s", auStr, bytesOutFile)
+	}
+
+	// Test extracting archive
+	bytesDest := filepath.Join(tmp, "extraction_test_bytes_"+auStr)
+	os.Mkdir(bytesDest, 0755)
+	err = au.Unarchive(bytesOutFile, bytesDest)
+	if err != nil {
+		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", auStr, bytesOutFile, bytesDest, err)
+	}
+
+	// Check that what was extracted is what was compressed
+	symmetricTest(t, auStr, bytesDest, true, true)
 }
 
 // testMatching tests that au can match the format of archiveFile.
@@ -465,6 +490,7 @@ var archiveFormats = []interface{}{
 
 type archiverUnarchiver interface {
 	Archiver
+	WriterArchiver
 	Unarchiver
 }
 

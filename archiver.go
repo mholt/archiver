@@ -67,6 +67,13 @@ type Archiver interface {
 	Archive(sources []string, destination string) error
 }
 
+// WriterArchiver is a type that can create an archive
+// from a list of source file names and write it to an
+// io.Writer.
+type WriterArchiver interface {
+	WriterArchive(sources []string, destination io.Writer) error
+}
+
 // ExtensionChecker validates file extensions
 type ExtensionChecker interface {
 	CheckExt(name string) error

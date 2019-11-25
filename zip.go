@@ -98,7 +98,23 @@ func (z *Zip) Archive(sources []string, destination string) error {
 	}
 	defer out.Close()
 
-	err = z.Create(out)
+	return z.doWriterArchive(sources, out, destination)
+}
+
+// WriterArchive writes a zip file to the destination io.Writer
+// containing the files listed in sources. File paths can be
+// those of regular files or directories; directories will be
+// recursively added.
+func (z *Zip) WriterArchive(sources []string, destination io.Writer) error {
+	return z.doWriterArchive(sources, destination, "")
+}
+
+// doWriterArchive performs the operation of writing an archive that consists of the source files to the destination
+// writer. If the destination writer is a file, then destinationFile is the path to the file and is used for determining
+// the top-level folder name (if ImplicitToplevelFolder is true and there are multiple top-level source files) and
+// ensuring that the source is not written in the destination.
+func (z *Zip) doWriterArchive(sources []string, destination io.Writer, destinationFile string) error {
+	err := z.Create(destination)
 	if err != nil {
 		return fmt.Errorf("creating zip: %v", err)
 	}
@@ -106,11 +122,15 @@ func (z *Zip) Archive(sources []string, destination string) error {
 
 	var topLevelFolder string
 	if z.ImplicitTopLevelFolder && multipleTopLevels(sources) {
-		topLevelFolder = folderNameFromFileName(destination)
+		if destinationFile != "" {
+			topLevelFolder = folderNameFromFileName(destinationFile)
+		} else {
+			topLevelFolder = "archive"
+		}
 	}
 
 	for _, source := range sources {
-		err := z.writeWalk(source, topLevelFolder, destination)
+		err := z.writeWalk(source, topLevelFolder, destinationFile)
 		if err != nil {
 			return fmt.Errorf("walking %s: %v", source, err)
 		}
@@ -222,9 +242,13 @@ func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 	if err != nil {
 		return fmt.Errorf("%s: stat: %v", source, err)
 	}
-	destAbs, err := filepath.Abs(destination)
-	if err != nil {
-		return fmt.Errorf("%s: getting absolute path of destination %s: %v", source, destination, err)
+
+	var destAbs string
+	if destination != "" {
+		destAbs, err = filepath.Abs(destination)
+		if err != nil {
+			return fmt.Errorf("%s: getting absolute path of destination %s: %v", source, destination, err)
+		}
 	}
 
 	return filepath.Walk(source, func(fpath string, info os.FileInfo, err error) error {
@@ -242,14 +266,16 @@ func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 			return handleErr(fmt.Errorf("%s: no file info", fpath))
 		}
 
-		// make sure we do not copy the output file into the output
-		// file; that results in an infinite loop and disk exhaustion!
-		fpathAbs, err := filepath.Abs(fpath)
-		if err != nil {
-			return handleErr(fmt.Errorf("%s: getting absolute path: %v", fpath, err))
-		}
-		if within(fpathAbs, destAbs) {
-			return nil
+		if destAbs != "" {
+			// make sure we do not copy the output file into the output
+			// file; that results in an infinite loop and disk exhaustion!
+			fpathAbs, err := filepath.Abs(fpath)
+			if err != nil {
+				return handleErr(fmt.Errorf("%s: getting absolute path: %v", fpath, err))
+			}
+			if within(fpathAbs, destAbs) {
+				return nil
+			}
 		}
 
 		// build the name to be used within the archive

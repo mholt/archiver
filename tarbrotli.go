@@ -37,6 +37,15 @@ func (tbr *TarBrotli) Archive(sources []string, destination string) error {
 	return tbr.Tar.Archive(sources, destination)
 }
 
+// WriterArchive writes a compressed tar file to the destination
+// io.Writer containing the files listed in sources. File paths
+// can be those of regular files or directories; directories will
+// be recursively added.
+func (tbr *TarBrotli) WriterArchive(sources []string, destination io.Writer) error {
+	tbr.wrapWriter()
+	return tbr.Tar.WriterArchive(sources, destination)
+}
+
 // Unarchive unpacks the compressed tarball at
 // source to destination. Destination will be
 // treated as a folder name.
@@ -105,6 +114,7 @@ var (
 	_ = Reader(new(TarBrotli))
 	_ = Writer(new(TarBrotli))
 	_ = Archiver(new(TarBrotli))
+	_ = WriterArchiver(new(TarBrotli))
 	_ = Unarchiver(new(TarBrotli))
 	_ = Walker(new(TarBrotli))
 	_ = Extractor(new(TarBrotli))
