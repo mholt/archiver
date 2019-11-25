@@ -80,8 +80,16 @@ steps:
 
 - bash: |
     go mod tidy
-    diff -u <(echo -n) <(git diff go.mod)
-    diff -u <(echo -n) <(git diff go.sum)
+    if [ ! -z "$(git status --porcelain go.mod)" ]; then
+      printf "go.mod has modifications\n"
+      git diff go.mod
+      exit 1
+    fi
+    if [ ! -z "$(git status --porcelain go.sum)" ]; then
+      printf "go.sum has modifications\n"
+      git diff go.sum
+      exit 1
+    fi
   workingDirectory: '$(modulePath)'
   displayName: Ensure that module definition and checksums are correct
 
