@@ -79,6 +79,7 @@ steps:
   displayName: Print Go version and environment
 
 - bash: |
+    git config --global core.autocrlf false
     go mod tidy
     if [ ! -z "$(git status --porcelain go.mod)" ]; then
       printf "go.mod has modifications\n"
