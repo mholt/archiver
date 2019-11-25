@@ -78,7 +78,7 @@ steps:
     env
   displayName: Print Go version and environment
 
-- bash: |
+- script: |
     go mod tidy
     diff -u <(echo -n) <(git diff go.mod)
     diff -u <(echo -n) <(git diff go.sum)
