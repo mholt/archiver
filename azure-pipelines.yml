@@ -81,6 +81,9 @@ steps:
 - script: |
     go get -v -t -d ./...
     golangci-lint run -E gofmt -E goimports -E misspell
+    go mod tidy
+    diff -u <(echo -n) <(git diff go.mod)
+    diff -u <(echo -n) <(git diff go.sum)
     go test -race ./...
   workingDirectory: '$(modulePath)'
   displayName: Run tests
