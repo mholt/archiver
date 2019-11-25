@@ -78,12 +78,15 @@ steps:
     env
   displayName: Print Go version and environment
 
-- script: |
-    go get -v -t -d ./...
-    golangci-lint run -E gofmt -E goimports -E misspell
+- bash: |
     go mod tidy
     diff -u <(echo -n) <(git diff go.mod)
     diff -u <(echo -n) <(git diff go.sum)
+  displayName: Ensure that module definition and checksums are correct
+
+- script: |
+    go get -v -t -d ./...
+    golangci-lint run -E gofmt -E goimports -E misspell
     go test -race ./...
   workingDirectory: '$(modulePath)'
   displayName: Run tests
