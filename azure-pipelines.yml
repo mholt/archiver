@@ -78,10 +78,11 @@ steps:
     env
   displayName: Print Go version and environment
 
-- script: |
+- bash: |
     go mod tidy
     diff -u <(echo -n) <(git diff go.mod)
     diff -u <(echo -n) <(git diff go.sum)
+  workingDirectory: '$(modulePath)'
   displayName: Ensure that module definition and checksums are correct
 
 - script: |
