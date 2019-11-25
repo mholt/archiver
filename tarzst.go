@@ -44,6 +44,14 @@ func (tzst *TarZstd) Unarchive(source, destination string) error {
 	return tzst.Tar.Unarchive(source, destination)
 }
 
+// ReaderUnarchive unpacks the compressed tarball
+// provided by source to destination. Destination
+// will be treated as a folder name.
+func (tzst *TarZstd) ReaderUnarchive(source io.Reader, _ int64, destination string) error {
+	tzst.wrapReader()
+	return tzst.Tar.ReaderUnarchive(source, 0, destination)
+}
+
 // Walk calls walkFn for each visited item in archive.
 func (tzst *TarZstd) Walk(archive string, walkFn WalkFunc) error {
 	tzst.wrapReader()
@@ -111,6 +119,7 @@ var (
 	_ = Writer(new(TarZstd))
 	_ = Archiver(new(TarZstd))
 	_ = Unarchiver(new(TarZstd))
+	_ = ReaderUnarchiver(new(Rar))
 	_ = Walker(new(TarZstd))
 	_ = ExtensionChecker(new(TarZstd))
 	_ = Extractor(new(TarZstd))
