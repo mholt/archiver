@@ -26,6 +26,10 @@ variables:
   #GO111MODULE: on
 
 steps:
+
+- bash: git config --global core.autocrlf false
+  displayName: "Disable line ending conversion for git to"
+
 - bash: |
     latestGo=$(curl "https://golang.org/VERSION?m=text")
     echo "##vso[task.setvariable variable=LATEST_GO]$latestGo"
