@@ -26,6 +26,12 @@ variables:
   #GO111MODULE: on
 
 steps:
+
+- bash: git config --global core.autocrlf false
+  displayName: "Disable line ending conversion for git to"
+
+- checkout: self
+
 - bash: |
     latestGo=$(curl "https://golang.org/VERSION?m=text")
     echo "##vso[task.setvariable variable=LATEST_GO]$latestGo"
@@ -77,6 +83,21 @@ steps:
     printf "\n\nSystem environment:\n\n"
     env
   displayName: Print Go version and environment
+
+- bash: |
+    go mod tidy
+    if [ ! -z "$(git status --porcelain go.mod)" ]; then
+      printf "go.mod has modifications\n"
+      git diff go.mod
+      exit 1
+    fi
+    if [ ! -z "$(git status --porcelain go.sum)" ]; then
+      printf "go.sum has modifications\n"
+      git diff go.sum
+      exit 1
+    fi
+  workingDirectory: '$(modulePath)'
+  displayName: Ensure that module definition and checksums are correct
 
 - script: |
     go get -v -t -d ./...
