@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"bytes"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -64,6 +65,26 @@ func (tgz *TarGz) Walk(archive string, walkFn WalkFunc) error {
 func (tgz *TarGz) Create(out io.Writer) error {
 	tgz.wrapWriter()
 	return tgz.Tar.Create(out)
+}
+
+// Match returns true if the format of file matches this
+// type's format. It should not affect reader position.
+func (*TarGz) Match(in io.ReadSeeker) (bool, error) {
+	currentPos, err := in.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	_, err = in.Seek(0, 0)
+	if err != nil {
+		return false, err
+	}
+	defer in.Seek(currentPos, io.SeekStart)
+
+	buf := make([]byte, 4)
+	if n, err := in.Read(buf); err != nil || n < 4 {
+		return false, nil
+	}
+	return bytes.Equal(buf, []byte{31, 139, 8, 0}), nil
 }
 
 // Open opens t for reading a compressed archive from
@@ -131,6 +152,7 @@ var (
 	_ = Unarchiver(new(TarGz))
 	_ = Walker(new(TarGz))
 	_ = Extractor(new(TarGz))
+	_ = Matcher(new(TarGz))
 )
 
 // DefaultTarGz is a convenient archiver ready to use.
