@@ -464,7 +464,7 @@ func TestSafeExtraction(t *testing.T) {
 
 	for _, archiveName := range testArchives {
 
-		expected := true // 'evilfile' should not be extracted outside of destination directory and 'safefile' should be extracted anyway in the destination folder anyway 
+		expected := true // 'evilfile' should not be extracted outside of destination directory and 'safefile' should be extracted anyway in the destination folder anyway
 
 		if _, err := os.Stat(archiveName); os.IsNotExist(err) {
 			t.Errorf("archive not found")
@@ -535,4 +535,3 @@ func (ffi fakeFileInfo) Mode() os.FileMode  { return ffi.mode }
 func (ffi fakeFileInfo) ModTime() time.Time { return ffi.modTime }
 func (ffi fakeFileInfo) IsDir() bool        { return ffi.isDir }
 func (ffi fakeFileInfo) Sys() interface{}   { return ffi.sys }
-

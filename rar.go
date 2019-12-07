@@ -63,7 +63,7 @@ func (*Rar) CheckExt(filename string) error {
 // CheckPath ensures that the filename has not been crafted to perform path traversal attacks
 func (*Rar) CheckPath(to, filename string) error {
 	to, _ = filepath.Abs(to) //explicit the destination folder to prevent that 'string.HasPrefix' check can be 'bypassed' when no destination folder is supplied in input
-	dest := filepath.Join(to, filename) 
+	dest := filepath.Join(to, filename)
 	//prevent path traversal attacks
 	if !strings.HasPrefix(dest, to) {
 		return fmt.Errorf("illegal file path: %s", filename)
@@ -162,11 +162,11 @@ func (r *Rar) unrarNext(to string) error {
 	if !ok {
 		return fmt.Errorf("expected header to be *rardecode.FileHeader but was %T", f.Header)
 	}
-	
+
 	errPath := r.CheckPath(to, header.Name)
 	if errPath != nil {
 		return fmt.Errorf("checking path traversal attempt: %v", errPath)
-	}	
+	}
 
 	return r.unrarFile(f, filepath.Join(to, header.Name))
 }
