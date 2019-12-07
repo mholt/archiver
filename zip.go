@@ -71,7 +71,7 @@ func (*Zip) CheckExt(filename string) error {
 // CheckPath ensures the file extension matches the format.
 func (*Zip) CheckPath(to, filename string) error {
 	to, _ = filepath.Abs(to) //explicit the destination folder to prevent that 'string.HasPrefix' check can be 'bypassed' when no destination folder is supplied in input
-	dest := filepath.Join(to, filename) 
+	dest := filepath.Join(to, filename)
 	//prevent path traversal attacks
 	if !strings.HasPrefix(dest, to) {
 		return fmt.Errorf("illegal file path: %s", filename)
@@ -193,14 +193,13 @@ func (z *Zip) extractNext(to string) error {
 		return err // don't wrap error; calling loop must break on io.EOF
 	}
 	defer f.Close()
-	
+
 	errPath := z.CheckPath(to, f.Header.(zip.FileHeader).Name)
 	if errPath != nil {
 		return fmt.Errorf("checking path traversal attempt: %v", errPath)
 	}
 	return z.extractFile(f, to)
 }
-
 
 func (z *Zip) extractFile(f File, to string) error {
 	header, ok := f.Header.(zip.FileHeader)
