@@ -1,9 +1,7 @@
 package archiver
 
 import (
-	"archive/zip"
 	"bytes"
-	"compress/flate"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +9,9 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/klauspost/compress/flate"
+	"github.com/klauspost/compress/zip"
 )
 
 // Zip provides facilities for operating ZIP archives.
