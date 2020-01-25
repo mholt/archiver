@@ -242,6 +242,34 @@ func TestMakeNameInArchive(t *testing.T) {
 	}
 }
 
+func TestByHeader(t *testing.T) {
+	for _, tc := range []struct {
+		desc     string
+		fpath    string
+		expected string
+	}{
+		{"gzip", "testdata/formats/empty_file.gz", "gz"},
+		{"bz2", "testdata/formats/empty_file.bz2", "bz2"},
+		{"xz", "testdata/formats/empty_file.xz", "xz"},
+	} {
+		tc := tc
+		t.Run(tc.desc, func(t *testing.T) {
+			f, err := os.Open(tc.fpath)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ft, err := ByHeader(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.expected != fmt.Sprint(ft) {
+				t.Fatalf("expected %s != actual %s", tc.expected, ft)
+			}
+		})
+	}
+}
+
 // TODO: We need a new .rar file since we moved the test corpus into the testdata/corpus subfolder.
 /*
 func TestRarUnarchive(t *testing.T) {

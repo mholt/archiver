@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 
+	ftmatcher "github.com/h2non/filetype/matchers"
 	pgzip "github.com/klauspost/pgzip"
 )
 
@@ -55,6 +56,27 @@ func (gz *Gz) CheckExt(filename string) error {
 		return fmt.Errorf("filename must have a .gz extension")
 	}
 	return nil
+}
+
+// Match returns true if the format of file matches this
+// type's format. It should not affect reader position.
+func (gz *Gz) Match(file io.ReadSeeker) (bool, error) {
+	currentPos, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return false, err
+	}
+	defer file.Seek(currentPos, io.SeekStart)
+
+	var buf = make([]byte, 3)
+	if _, err = io.ReadFull(file, buf); err != nil {
+		return false, nil
+	}
+
+	return ftmatcher.Gz(buf), nil
 }
 
 func (gz *Gz) String() string { return "gz" }
