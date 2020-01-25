@@ -475,11 +475,11 @@ func ByExtension(filename string) (interface{}, error) {
 	return nil, fmt.Errorf("format unrecognized by filename: %s", filename)
 }
 
-// ByHeader returns the unarchiver value that matches the input's
-// file header. It does not affect the current read position.
-// If the file's header is not a recognized archive format, then
+// ByHeader returns an archiver and unarchiver, or compressor and decompressor,
+// that matches the input's file header. It does not affect the current read
+// position.  If the file's header is not a recognized archive format, then
 // ErrFormatNotRecognized will be returned.
-func ByHeader(input io.ReadSeeker) (Unarchiver, error) {
+func ByHeader(input io.ReadSeeker) (interface{}, error) {
 	var matcher Matcher
 	for _, m := range matchers {
 		ok, err := m.Match(input)
@@ -498,6 +498,12 @@ func ByHeader(input io.ReadSeeker) (Unarchiver, error) {
 		return NewTar(), nil
 	case *Rar:
 		return NewRar(), nil
+	case *Gz:
+		return NewGz(), nil
+	case *Bz2:
+		return NewBz2(), nil
+	case *Xz:
+		return NewXz(), nil
 	}
 	return nil, ErrFormatNotRecognized
 }
@@ -529,4 +535,7 @@ var matchers = []Matcher{
 	&Rar{},
 	&Tar{},
 	&Zip{},
+	&Gz{},
+	&Bz2{},
+	&Xz{},
 }

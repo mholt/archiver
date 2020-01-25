@@ -5,6 +5,7 @@ import (
 	"io"
 	"path/filepath"
 
+	ftmatcher "github.com/h2non/filetype/matchers"
 	"github.com/ulikunitz/xz"
 	fastxz "github.com/xi2/xz"
 )
@@ -39,6 +40,27 @@ func (x *Xz) CheckExt(filename string) error {
 		return fmt.Errorf("filename must have a .xz extension")
 	}
 	return nil
+}
+
+// Match returns true if the format of file matches this
+// type's format. It should not affect reader position.
+func (x *Xz) Match(file io.ReadSeeker) (bool, error) {
+	currentPos, err := file.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return false, err
+	}
+	defer file.Seek(currentPos, io.SeekStart)
+
+	var buf = make([]byte, 6)
+	if _, err = io.ReadFull(file, buf); err != nil {
+		return false, nil
+	}
+
+	return ftmatcher.Xz(buf), nil
 }
 
 func (x *Xz) String() string { return "xz" }
