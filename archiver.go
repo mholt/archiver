@@ -103,6 +103,8 @@ type Extractor interface {
 // File provides methods for accessing information about
 // or contents of a file within an archive.
 type File struct {
+	FullPath string
+
 	os.FileInfo
 
 	// The original header info; depends on
