@@ -17,8 +17,7 @@ type TarSz struct {
 
 // CheckExt ensures the file extension matches the format.
 func (*TarSz) CheckExt(filename string) error {
-	if !strings.HasSuffix(filename, ".tar.sz") &&
-		!strings.HasSuffix(filename, ".tsz") {
+	if !(strings.HasSuffix(filename, ".tar.sz") || strings.HasSuffix(filename, ".tsz")) {
 		return fmt.Errorf("filename must have a .tar.sz or .tsz extension")
 	}
 	return nil

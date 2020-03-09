@@ -19,8 +19,7 @@ type TarBz2 struct {
 
 // CheckExt ensures the file extension matches the format.
 func (*TarBz2) CheckExt(filename string) error {
-	if !strings.HasSuffix(filename, ".tar.bz2") &&
-		!strings.HasSuffix(filename, ".tbz2") {
+	if !(strings.HasSuffix(filename, ".tar.bz2") || strings.HasSuffix(filename, ".tbz2")) {
 		return fmt.Errorf("filename must have a .tar.bz2 or .tbz2 extension")
 	}
 	return nil

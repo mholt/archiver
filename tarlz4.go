@@ -22,8 +22,7 @@ type TarLz4 struct {
 
 // CheckExt ensures the file extension matches the format.
 func (*TarLz4) CheckExt(filename string) error {
-	if !strings.HasSuffix(filename, ".tar.lz4") &&
-		!strings.HasSuffix(filename, ".tlz4") {
+	if !(strings.HasSuffix(filename, ".tar.lz4") || strings.HasSuffix(filename, ".tlz4")) {
 
 		return fmt.Errorf("filename must have a .tar.lz4 or .tlz4 extension")
 	}
