@@ -6,8 +6,8 @@ require (
 	github.com/andybalholm/brotli v1.0.0
 	github.com/dsnet/compress v0.0.1
 	github.com/golang/snappy v0.0.1
-	github.com/klauspost/compress v1.9.2
-	github.com/klauspost/pgzip v1.2.1
+	github.com/klauspost/compress v1.10.3
+	github.com/klauspost/pgzip v1.2.2
 	github.com/nwaples/rardecode v1.0.0
 	github.com/pierrec/lz4/v3 v3.0.1
 	github.com/ulikunitz/xz v0.5.6
