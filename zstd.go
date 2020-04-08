@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -43,6 +44,25 @@ func (zs *Zstd) CheckExt(filename string) error {
 }
 
 func (zs *Zstd) String() string { return "zstd" }
+
+func (zs *Zstd) Match(in io.ReadSeeker) (bool, error) {
+	currentPos, err := in.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = in.Seek(0, 0)
+	if err != nil {
+		return false, err
+	}
+	defer in.Seek(currentPos, io.SeekStart)
+
+	buf := make([]byte, 4)
+	if n, err := in.Read(buf); err != nil || n < 4 {
+		return false, nil
+	}
+	return bytes.Equal(buf, []byte{40, 181, 47, 253}), nil
+}
 
 // NewZstd returns a new, default instance ready to be customized and used.
 func NewZstd() *Zstd {
