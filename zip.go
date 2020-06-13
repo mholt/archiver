@@ -6,11 +6,25 @@ import (
 	"compress/flate"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/dsnet/compress/bzip2"
+	"github.com/klauspost/compress/zstd"
+	"github.com/ulikunitz/xz/lzma"
+)
+
+// Compression methods.
+const (
+	Store   uint16 = 0  // no compression
+	Deflate uint16 = 8  // DEFLATE compressed
+	BZIP2   uint16 = 12 // bzip2
+	LZMA    uint16 = 14 //LZMA
+	ZSTD    uint16 = 20 //see https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT.
 )
 
 // Zip provides facilities for operating ZIP archives.
@@ -145,7 +159,6 @@ func (z *Zip) Unarchive(source, destination string) error {
 		return fmt.Errorf("opening zip archive for reading: %v", err)
 	}
 	defer z.Close()
-
 	// if the files in the archive do not all share a common
 	// root, then make sure we extract to a single subfolder
 	// rather than potentially littering the destination...
@@ -376,6 +389,28 @@ func (z *Zip) Open(in io.Reader, size int64) error {
 	if err != nil {
 		return fmt.Errorf("creating reader: %v", err)
 	}
+	// register zstd decompressor
+	z.zr.RegisterDecompressor(ZSTD, func(r io.Reader) io.ReadCloser {
+		zr, err := zstd.NewReader(r)
+		if err != nil {
+			return nil
+		}
+		return zr.IOReadCloser()
+	})
+	z.zr.RegisterDecompressor(BZIP2, func(r io.Reader) io.ReadCloser {
+		bz2r, err := bzip2.NewReader(r, nil)
+		if err != nil {
+			return nil
+		}
+		return bz2r
+	})
+	z.zr.RegisterDecompressor(LZMA, func(r io.Reader) io.ReadCloser {
+		lr, err := lzma.NewReader(r)
+		if err != nil {
+			return nil
+		}
+		return ioutil.NopCloser(lr)
+	})
 	z.ridx = 0
 	return nil
 }
