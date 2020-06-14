@@ -483,7 +483,27 @@ func (z *Zip) Walk(archive string, walkFn WalkFunc) error {
 		return fmt.Errorf("opening zip reader: %v", err)
 	}
 	defer zr.Close()
-
+	zr.RegisterDecompressor(ZSTD, func(r io.Reader) io.ReadCloser {
+		zr, err := zstd.NewReader(r)
+		if err != nil {
+			return nil
+		}
+		return zr.IOReadCloser()
+	})
+	zr.RegisterDecompressor(BZIP2, func(r io.Reader) io.ReadCloser {
+		bz2r, err := bzip2.NewReader(r, nil)
+		if err != nil {
+			return nil
+		}
+		return bz2r
+	})
+	zr.RegisterDecompressor(LZMA, func(r io.Reader) io.ReadCloser {
+		lr, err := lzma.NewReader(r)
+		if err != nil {
+			return nil
+		}
+		return ioutil.NopCloser(lr)
+	})
 	for _, zf := range zr.File {
 		zfrc, err := zf.Open()
 		if err != nil {
