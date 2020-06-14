@@ -69,9 +69,11 @@ type Zip struct {
 	// the operation will continue on remaining files.
 	ContinueOnError bool
 
-	zw   *zip.Writer
-	zr   *zip.Reader
-	ridx int
+	//Compression algorithm
+	CompressionAlgorithm uint16
+	zw                   *zip.Writer
+	zr                   *zip.Reader
+	ridx                 int
 }
 
 // CheckExt ensures the file extension matches the format.
@@ -305,6 +307,20 @@ func (z *Zip) Create(out io.Writer) error {
 			return flate.NewWriter(out, z.CompressionLevel)
 		})
 	}
+	switch z.CompressionAlgorithm {
+	case BZIP2:
+		z.zw.RegisterCompressor(BZIP2, func(out io.Writer) (io.WriteCloser, error) {
+			return bzip2.NewWriter(out, &bzip2.WriterConfig{Level: z.CompressionLevel})
+		})
+	case LZMA:
+		z.zw.RegisterCompressor(LZMA, func(out io.Writer) (io.WriteCloser, error) {
+			return lzma.NewWriter(out)
+		})
+	case ZSTD:
+		z.zw.RegisterCompressor(ZSTD, func(out io.Writer) (io.WriteCloser, error) {
+			return zstd.NewWriter(out)
+		})
+	}
 	return nil
 }
 
@@ -333,7 +349,11 @@ func (z *Zip) Write(f File) error {
 		if _, ok := compressedFormats[ext]; ok && z.SelectiveCompression {
 			header.Method = zip.Store
 		} else {
-			header.Method = zip.Deflate
+			if z.CompressionAlgorithm > 0 {
+				header.Method = z.CompressionAlgorithm // zip or zstd
+			} else {
+				header.Method = zip.Deflate
+			}
 		}
 	}
 
