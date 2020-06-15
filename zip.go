@@ -18,14 +18,18 @@ import (
 	"github.com/ulikunitz/xz/lzma"
 )
 
+// ZipCompressionMethod Compression type
+type ZipCompressionMethod uint16
+
 // Compression methods.
+// see https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT.
 const (
-	Store      uint16 = 0  // no compression
-	Deflate    uint16 = 8  // DEFLATE compressed
-	BZIP2      uint16 = 12 // bzip2
-	LZMA       uint16 = 14 //LZMA
-	ZSTD       uint16 = 20 //see https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT.
-	WINZIPZSTD uint16 = 93
+	Store      ZipCompressionMethod = 0
+	Deflate    ZipCompressionMethod = 8
+	BZIP2      ZipCompressionMethod = 12
+	LZMA       ZipCompressionMethod = 14
+	ZSTD       ZipCompressionMethod = 20
+	WINZIPZSTD ZipCompressionMethod = 93
 )
 
 // Zip provides facilities for operating ZIP archives.
@@ -70,8 +74,8 @@ type Zip struct {
 	// the operation will continue on remaining files.
 	ContinueOnError bool
 
-	//Compression algorithm
-	FileMethod     uint16
+	// Compression algorithm
+	FileMethod     ZipCompressionMethod
 	zw             *zip.Writer
 	zr             *zip.Reader
 	ridx           int
@@ -93,21 +97,21 @@ func (z *Zip) registerDecompressor() {
 	}
 	z.decinitialized = true
 	// register zstd decompressor
-	z.zr.RegisterDecompressor(ZSTD, func(r io.Reader) io.ReadCloser {
+	z.zr.RegisterDecompressor(uint16(ZSTD), func(r io.Reader) io.ReadCloser {
 		zr, err := zstd.NewReader(r)
 		if err != nil {
 			return nil
 		}
 		return zr.IOReadCloser()
 	})
-	z.zr.RegisterDecompressor(BZIP2, func(r io.Reader) io.ReadCloser {
+	z.zr.RegisterDecompressor(uint16(BZIP2), func(r io.Reader) io.ReadCloser {
 		bz2r, err := bzip2.NewReader(r, nil)
 		if err != nil {
 			return nil
 		}
 		return bz2r
 	})
-	z.zr.RegisterDecompressor(LZMA, func(r io.Reader) io.ReadCloser {
+	z.zr.RegisterDecompressor(uint16(LZMA), func(r io.Reader) io.ReadCloser {
 		lr, err := lzma.NewReader(r)
 		if err != nil {
 			return nil
@@ -115,7 +119,7 @@ func (z *Zip) registerDecompressor() {
 		return ioutil.NopCloser(lr)
 	})
 	// WinZip zstd support
-	z.zr.RegisterDecompressor(WINZIPZSTD, func(r io.Reader) io.ReadCloser {
+	z.zr.RegisterDecompressor(uint16(WINZIPZSTD), func(r io.Reader) io.ReadCloser {
 		zr, err := zstd.NewReader(r)
 		if err != nil {
 			return nil
@@ -201,6 +205,7 @@ func (z *Zip) Unarchive(source, destination string) error {
 		return fmt.Errorf("opening zip archive for reading: %v", err)
 	}
 	defer z.Close()
+
 	// if the files in the archive do not all share a common
 	// root, then make sure we extract to a single subfolder
 	// rather than potentially littering the destination...
@@ -349,15 +354,15 @@ func (z *Zip) Create(out io.Writer) error {
 	}
 	switch z.FileMethod {
 	case BZIP2:
-		z.zw.RegisterCompressor(BZIP2, func(out io.Writer) (io.WriteCloser, error) {
+		z.zw.RegisterCompressor(uint16(BZIP2), func(out io.Writer) (io.WriteCloser, error) {
 			return bzip2.NewWriter(out, &bzip2.WriterConfig{Level: z.CompressionLevel})
 		})
 	case LZMA:
-		z.zw.RegisterCompressor(LZMA, func(out io.Writer) (io.WriteCloser, error) {
+		z.zw.RegisterCompressor(uint16(LZMA), func(out io.Writer) (io.WriteCloser, error) {
 			return lzma.NewWriter(out)
 		})
 	case ZSTD:
-		z.zw.RegisterCompressor(ZSTD, func(out io.Writer) (io.WriteCloser, error) {
+		z.zw.RegisterCompressor(uint16(ZSTD), func(out io.Writer) (io.WriteCloser, error) {
 			return zstd.NewWriter(out)
 		})
 	}
@@ -389,7 +394,7 @@ func (z *Zip) Write(f File) error {
 		if _, ok := compressedFormats[ext]; ok && z.SelectiveCompression {
 			header.Method = zip.Store
 		} else {
-			header.Method = z.FileMethod
+			header.Method = uint16(z.FileMethod)
 		}
 	}
 
