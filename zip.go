@@ -24,12 +24,11 @@ type ZipCompressionMethod uint16
 // Compression methods.
 // see https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT.
 const (
-	Store      ZipCompressionMethod = 0
-	Deflate    ZipCompressionMethod = 8
-	BZIP2      ZipCompressionMethod = 12
-	LZMA       ZipCompressionMethod = 14
-	ZSTD       ZipCompressionMethod = 20
-	WINZIPZSTD ZipCompressionMethod = 93
+	Store   ZipCompressionMethod = 0
+	Deflate ZipCompressionMethod = 8
+	BZIP2   ZipCompressionMethod = 12
+	LZMA    ZipCompressionMethod = 14
+	ZSTD    ZipCompressionMethod = 93
 )
 
 // Zip provides facilities for operating ZIP archives.
@@ -117,14 +116,6 @@ func (z *Zip) registerDecompressor() {
 			return nil
 		}
 		return ioutil.NopCloser(lr)
-	})
-	// WinZip zstd support
-	z.zr.RegisterDecompressor(uint16(WINZIPZSTD), func(r io.Reader) io.ReadCloser {
-		zr, err := zstd.NewReader(r)
-		if err != nil {
-			return nil
-		}
-		return zr.IOReadCloser()
 	})
 }
 
