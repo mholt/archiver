@@ -91,29 +91,31 @@ func (*Zip) CheckExt(filename string) error {
 	return nil
 }
 
-func init() {
-	zip.RegisterDecompressor(uint16(ZSTD), func(r io.Reader) io.ReadCloser {
+// Registering a global decompressor is not reentrant and may panic
+func registerDecompressor(zr *zip.Reader) {
+	// register zstd decompressor
+	zr.RegisterDecompressor(uint16(ZSTD), func(r io.Reader) io.ReadCloser {
 		zr, err := zstd.NewReader(r)
 		if err != nil {
 			return nil
 		}
 		return zr.IOReadCloser()
 	})
-	zip.RegisterDecompressor(uint16(BZIP2), func(r io.Reader) io.ReadCloser {
+	zr.RegisterDecompressor(uint16(BZIP2), func(r io.Reader) io.ReadCloser {
 		bz2r, err := bzip2.NewReader(r, nil)
 		if err != nil {
 			return nil
 		}
 		return bz2r
 	})
-	// zip.RegisterDecompressor(uint16(LZMA), func(r io.Reader) io.ReadCloser {
+	// zr.RegisterDecompressor(uint16(LZMA), func(r io.Reader) io.ReadCloser {
 	// 	lr, err := lzma.NewReader(r)
 	// 	if err != nil {
 	// 		return nil
 	// 	}
 	// 	return ioutil.NopCloser(lr)
 	// })
-	zip.RegisterDecompressor(uint16(XZ), func(r io.Reader) io.ReadCloser {
+	zr.RegisterDecompressor(uint16(XZ), func(r io.Reader) io.ReadCloser {
 		xr, err := xz.NewReader(r)
 		if err != nil {
 			return nil
@@ -448,6 +450,7 @@ func (z *Zip) Open(in io.Reader, size int64) error {
 	if err != nil {
 		return fmt.Errorf("creating reader: %v", err)
 	}
+	registerDecompressor(z.zr)
 	z.ridx = 0
 	return nil
 }
@@ -504,6 +507,7 @@ func (z *Zip) Walk(archive string, walkFn WalkFunc) error {
 		return fmt.Errorf("opening zip reader: %v", err)
 	}
 	defer zr.Close()
+	registerDecompressor(&zr.Reader)
 	for _, zf := range zr.File {
 		zfrc, err := zf.Open()
 		if err != nil {
