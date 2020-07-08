@@ -108,13 +108,6 @@ func registerDecompressor(zr *zip.Reader) {
 		}
 		return bz2r
 	})
-	// zr.RegisterDecompressor(uint16(LZMA), func(r io.Reader) io.ReadCloser {
-	// 	lr, err := lzma.NewReader(r)
-	// 	if err != nil {
-	// 		return nil
-	// 	}
-	// 	return ioutil.NopCloser(lr)
-	// })
 	zr.RegisterDecompressor(uint16(XZ), func(r io.Reader) io.ReadCloser {
 		xr, err := xz.NewReader(r)
 		if err != nil {
@@ -353,10 +346,6 @@ func (z *Zip) Create(out io.Writer) error {
 		z.zw.RegisterCompressor(uint16(BZIP2), func(out io.Writer) (io.WriteCloser, error) {
 			return bzip2.NewWriter(out, &bzip2.WriterConfig{Level: z.CompressionLevel})
 		})
-	// case LZMA:
-	// 	z.zw.RegisterCompressor(uint16(LZMA), func(out io.Writer) (io.WriteCloser, error) {
-	// 		return lzma.NewWriter(out)
-	// 	})
 	case ZSTD:
 		z.zw.RegisterCompressor(uint16(ZSTD), func(out io.Writer) (io.WriteCloser, error) {
 			return zstd.NewWriter(out)
