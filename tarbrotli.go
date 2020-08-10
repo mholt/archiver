@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/andybalholm/brotli"
+	"github.com/mholt/archiver/v3/common"
 )
 
 // TarBrotli facilitates brotli compression of tarball archives.
@@ -46,7 +47,7 @@ func (tbr *TarBrotli) Unarchive(source, destination string) error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (tbr *TarBrotli) Walk(archive string, walkFn WalkFunc) error {
+func (tbr *TarBrotli) Walk(archive string, walkFn common.WalkFunc) error {
 	tbr.wrapReader()
 	return tbr.Tar.Walk(archive, walkFn)
 }

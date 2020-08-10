@@ -48,10 +48,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
-	"runtime"
-	"strings"
+
+	"github.com/mholt/archiver/v3/common"
 )
 
 // Archiver is a type that can create an archive file
@@ -66,6 +65,9 @@ type Archiver interface {
 	// structure.
 	Archive(sources []string, destination string) error
 }
+
+type File = common.File
+type FileInfo = common.FileInfo
 
 // ExtensionChecker validates file extensions
 type ExtensionChecker interface {
@@ -87,7 +89,7 @@ type Unarchiver interface {
 // an output stream.
 type Writer interface {
 	Create(out io.Writer) error
-	Write(f File) error
+	Write(f common.File) error
 	Close() error
 }
 
@@ -95,7 +97,7 @@ type Writer interface {
 // an input stream.
 type Reader interface {
 	Open(in io.Reader, size int64) error
-	Read() (File, error)
+	Read() (common.File, error)
 	Close() error
 }
 
@@ -103,37 +105,6 @@ type Reader interface {
 // archive to a specific destination folder on disk.
 type Extractor interface {
 	Extract(source, target, destination string) error
-}
-
-// File provides methods for accessing information about
-// or contents of a file within an archive.
-type File struct {
-	os.FileInfo
-
-	// The original header info; depends on
-	// type of archive -- could be nil, too.
-	Header interface{}
-
-	// Allow the file contents to be read (and closed)
-	io.ReadCloser
-}
-
-// FileInfo is an os.FileInfo but optionally with
-// a custom name, useful if dealing with files that
-// are not actual files on disk, or which have a
-// different name in an archive than on disk.
-type FileInfo struct {
-	os.FileInfo
-	CustomName string
-}
-
-// Name returns fi.CustomName if not empty;
-// otherwise it returns fi.FileInfo.Name().
-func (fi FileInfo) Name() string {
-	if fi.CustomName != "" {
-		return fi.CustomName
-	}
-	return fi.FileInfo.Name()
 }
 
 // ReadFakeCloser is an io.Reader that has
@@ -149,18 +120,11 @@ func (rfc ReadFakeCloser) Close() error { return nil }
 // Walker can walk an archive file and return information
 // about each item in the archive.
 type Walker interface {
-	Walk(archive string, walkFn WalkFunc) error
+	Walk(archive string, walkFn common.WalkFunc) error
 }
 
-// WalkFunc is called at each item visited by Walk.
-// If an error is returned, the walk may continue
-// if the Walker is configured to continue on error.
-// The sole exception is the error value ErrStopWalk,
-// which stops the walk without an actual error.
-type WalkFunc func(f File) error
-
 // ErrStopWalk signals Walk to break without error.
-var ErrStopWalk = fmt.Errorf("walk stopped")
+var ErrStopWalk = common.ErrStopWalk
 
 // ErrFormatNotRecognized is an error that will be
 // returned if the file is not a valid archive format.
@@ -216,7 +180,7 @@ func Unarchive(source, destination string) error {
 
 // Walk calls walkFn for each file within the given archive file.
 // The archive format is chosen implicitly.
-func Walk(archive string, walkFn WalkFunc) error {
+func Walk(archive string, walkFn common.WalkFunc) error {
 	wIface, err := ByExtension(archive)
 	if err != nil {
 		return err
@@ -273,64 +237,6 @@ func DecompressFile(source, destination string) error {
 	return FileCompressor{Decompressor: c}.DecompressFile(source, destination)
 }
 
-func fileExists(name string) bool {
-	_, err := os.Stat(name)
-	return !os.IsNotExist(err)
-}
-
-func mkdir(dirPath string, dirMode os.FileMode) error {
-	err := os.MkdirAll(dirPath, dirMode)
-	if err != nil {
-		return fmt.Errorf("%s: making directory: %v", dirPath, err)
-	}
-	return nil
-}
-
-func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
-	err := os.MkdirAll(filepath.Dir(fpath), 0755)
-	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
-	}
-
-	out, err := os.Create(fpath)
-	if err != nil {
-		return fmt.Errorf("%s: creating new file: %v", fpath, err)
-	}
-	defer out.Close()
-
-	err = out.Chmod(fm)
-	if err != nil && runtime.GOOS != "windows" {
-		return fmt.Errorf("%s: changing file mode: %v", fpath, err)
-	}
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return fmt.Errorf("%s: writing file: %v", fpath, err)
-	}
-	return nil
-}
-
-func writeNewSymbolicLink(fpath string, target string) error {
-	err := os.MkdirAll(filepath.Dir(fpath), 0755)
-	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
-	}
-
-	_, err = os.Lstat(fpath)
-	if err == nil {
-		err = os.Remove(fpath)
-		if err != nil {
-			return fmt.Errorf("%s: failed to unlink: %+v", fpath, err)
-		}
-	}
-
-	err = os.Symlink(target, fpath)
-	if err != nil {
-		return fmt.Errorf("%s: making symbolic link for: %v", fpath, err)
-	}
-	return nil
-}
-
 func writeNewHardLink(fpath string, target string) error {
 	err := os.MkdirAll(filepath.Dir(fpath), 0755)
 	if err != nil {
@@ -352,77 +258,6 @@ func writeNewHardLink(fpath string, target string) error {
 	return nil
 }
 
-func isSymlink(fi os.FileInfo) bool {
-	return fi.Mode()&os.ModeSymlink != 0
-}
-
-// within returns true if sub is within or equal to parent.
-func within(parent, sub string) bool {
-	rel, err := filepath.Rel(parent, sub)
-	if err != nil {
-		return false
-	}
-	return !strings.Contains(rel, "..")
-}
-
-// multipleTopLevels returns true if the paths do not
-// share a common top-level folder.
-func multipleTopLevels(paths []string) bool {
-	if len(paths) < 2 {
-		return false
-	}
-	var lastTop string
-	for _, p := range paths {
-		p = strings.TrimPrefix(strings.Replace(p, `\`, "/", -1), "/")
-		for {
-			next := path.Dir(p)
-			if next == "." {
-				break
-			}
-			p = next
-		}
-		if lastTop == "" {
-			lastTop = p
-		}
-		if p != lastTop {
-			return true
-		}
-	}
-	return false
-}
-
-// folderNameFromFileName returns a name for a folder
-// that is suitable based on the filename, which will
-// be stripped of its extensions.
-func folderNameFromFileName(filename string) string {
-	base := filepath.Base(filename)
-	firstDot := strings.Index(base, ".")
-	if firstDot > -1 {
-		return base[:firstDot]
-	}
-	return base
-}
-
-// makeNameInArchive returns the filename for the file given by fpath to be used within
-// the archive. sourceInfo is the FileInfo obtained by calling os.Stat on source, and baseDir
-// is an optional base directory that becomes the root of the archive. fpath should be the
-// unaltered file path of the file given to a filepath.WalkFunc.
-func makeNameInArchive(sourceInfo os.FileInfo, source, baseDir, fpath string) (string, error) {
-	name := filepath.Base(fpath) // start with the file or dir name
-	if sourceInfo.IsDir() {
-		// preserve internal directory structure; that's the path components
-		// between the source directory's leaf and this file's leaf
-		dir, err := filepath.Rel(filepath.Dir(source), filepath.Dir(fpath))
-		if err != nil {
-			return "", err
-		}
-		// prepend the internal directory structure to the leaf name,
-		// and convert path separators to forward slashes as per spec
-		name = path.Join(filepath.ToSlash(dir), name)
-	}
-	return path.Join(baseDir, name), nil // prepend the base directory
-}
-
 // NameInArchive returns a name for the file at fpath suitable for
 // the inside of an archive. The source and its associated sourceInfo
 // is the path where walking a directory started, and if no directory
@@ -430,7 +265,7 @@ func makeNameInArchive(sourceInfo os.FileInfo, source, baseDir, fpath string) (s
 // the components of the path between source and fpath, preserving
 // the internal directory structure.
 func NameInArchive(sourceInfo os.FileInfo, source, fpath string) (string, error) {
-	return makeNameInArchive(sourceInfo, source, "", fpath)
+	return common.MakeNameInArchive(sourceInfo, source, "", fpath)
 }
 
 // ByExtension returns an archiver and unarchiver, or compressor

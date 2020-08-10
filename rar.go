@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mholt/archiver/v3/common"
 	"github.com/nwaples/rardecode"
 )
 
@@ -70,7 +71,7 @@ func (*Rar) CheckPath(to, filename string) error {
 	dest := filepath.Join(to, filename)
 	//prevent path traversal attacks
 	if !strings.HasPrefix(dest, to) {
-		return &IllegalPathError{AbsolutePath: dest, Filename: filename}
+		return &common.IllegalPathError{AbsolutePath: dest, Filename: filename}
 	}
 	return nil
 }
@@ -79,8 +80,8 @@ func (*Rar) CheckPath(to, filename string) error {
 // Destination will be treated as a folder name. It supports
 // multi-volume archives.
 func (r *Rar) Unarchive(source, destination string) error {
-	if !fileExists(destination) && r.MkdirAll {
-		err := mkdir(destination, 0755)
+	if !common.FileExists(destination) && r.MkdirAll {
+		err := common.Mkdir(destination, 0755)
 		if err != nil {
 			return fmt.Errorf("preparing destination: %v", err)
 		}
@@ -109,7 +110,7 @@ func (r *Rar) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if r.ContinueOnError || IsIllegalPathError(err) {
+			if r.ContinueOnError || common.IsIllegalPathError(err) {
 				log.Printf("[ERROR] Reading file in rar archive: %v", err)
 				continue
 			}
@@ -148,8 +149,8 @@ func (r *Rar) addTopLevelFolder(sourceArchive, destination string) (string, erro
 		files = append(files, hdr.Name)
 	}
 
-	if multipleTopLevels(files) {
-		destination = filepath.Join(destination, folderNameFromFileName(sourceArchive))
+	if common.MultipleTopLevels(files) {
+		destination = filepath.Join(destination, common.FolderNameFromFileName(sourceArchive))
 	}
 
 	return destination, nil
@@ -186,9 +187,9 @@ func (r *Rar) unrarNext(to string) error {
 	return r.unrarFile(f, filepath.Join(to, header.Name))
 }
 
-func (r *Rar) unrarFile(f File, to string) error {
+func (r *Rar) unrarFile(f common.File, to string) error {
 	// do not overwrite existing files, if configured
-	if !f.IsDir() && !r.OverwriteExisting && fileExists(to) {
+	if !f.IsDir() && !r.OverwriteExisting && common.FileExists(to) {
 		return fmt.Errorf("file already exists: %s", to)
 	}
 
@@ -198,13 +199,13 @@ func (r *Rar) unrarFile(f File, to string) error {
 	}
 
 	if f.IsDir() {
-		if fileExists("testdata") {
+		if common.FileExists("testdata") {
 			err := os.Chmod(to, hdr.Mode())
 			if err != nil {
 				return fmt.Errorf("changing dir mode: %v", err)
 			}
 		} else {
-			err := mkdir(to, hdr.Mode())
+			err := common.Mkdir(to, hdr.Mode())
 			if err != nil {
 				return fmt.Errorf("making directories: %v", err)
 			}
@@ -214,7 +215,7 @@ func (r *Rar) unrarFile(f File, to string) error {
 
 	// if files come before their containing folders, then we must
 	// create their folders before writing the file
-	err := mkdir(filepath.Dir(to), 0755)
+	err := common.Mkdir(filepath.Dir(to), 0755)
 	if err != nil {
 		return fmt.Errorf("making parent directories: %v", err)
 	}
@@ -223,7 +224,7 @@ func (r *Rar) unrarFile(f File, to string) error {
 		return nil
 	}
 
-	return writeNewFile(to, r.rr, hdr.Mode())
+	return common.WriteNewFile(to, r.rr, hdr.Mode())
 }
 
 // OpenFile opens filename for reading. This method supports
@@ -257,17 +258,17 @@ func (r *Rar) Open(in io.Reader, size int64) error {
 // already been opened for reading. If there are no
 // more files, the error is io.EOF. The File must
 // be closed when finished reading from it.
-func (r *Rar) Read() (File, error) {
+func (r *Rar) Read() (common.File, error) {
 	if r.rr == nil {
-		return File{}, fmt.Errorf("rar archive is not open")
+		return common.File{}, fmt.Errorf("rar archive is not open")
 	}
 
 	hdr, err := r.rr.Next()
 	if err != nil {
-		return File{}, err // don't wrap error; preserve io.EOF
+		return common.File{}, err // don't wrap error; preserve io.EOF
 	}
 
-	file := File{
+	file := common.File{
 		FileInfo:   rarFileInfo{hdr},
 		Header:     hdr,
 		ReadCloser: ReadFakeCloser{r.rr},
@@ -291,7 +292,7 @@ func (r *Rar) Close() error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (r *Rar) Walk(archive string, walkFn WalkFunc) error {
+func (r *Rar) Walk(archive string, walkFn common.WalkFunc) error {
 	file, err := os.Open(archive)
 	if err != nil {
 		return fmt.Errorf("opening archive file: %v", err)
@@ -344,7 +345,7 @@ func (r *Rar) Extract(source, target, destination string) error {
 	// until we are no longer within that directory
 	var targetDirPath string
 
-	return r.Walk(source, func(f File) error {
+	return r.Walk(source, func(f common.File) error {
 		th, ok := f.Header.(*rardecode.FileHeader)
 		if !ok {
 			return fmt.Errorf("expected header to be *rardecode.FileHeader but was %T", f.Header)
@@ -357,7 +358,7 @@ func (r *Rar) Extract(source, target, destination string) error {
 			targetDirPath = path.Dir(name)
 		}
 
-		if within(target, th.Name) {
+		if common.Within(target, th.Name) {
 			// either this is the exact file we want, or is
 			// in the directory we want to extract
 

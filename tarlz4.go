@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mholt/archiver/v3/common"
 	"github.com/pierrec/lz4/v4"
 )
 
@@ -53,7 +54,7 @@ func (tlz4 *TarLz4) Unarchive(source, destination string) error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (tlz4 *TarLz4) Walk(archive string, walkFn WalkFunc) error {
+func (tlz4 *TarLz4) Walk(archive string, walkFn common.WalkFunc) error {
 	tlz4.wrapReader()
 	return tlz4.Tar.Walk(archive, walkFn)
 }

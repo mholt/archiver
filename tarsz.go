@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/golang/snappy"
+	"github.com/mholt/archiver/v3/common"
 )
 
 // TarSz facilitates Snappy compression
@@ -47,7 +48,7 @@ func (tsz *TarSz) Unarchive(source, destination string) error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (tsz *TarSz) Walk(archive string, walkFn WalkFunc) error {
+func (tsz *TarSz) Walk(archive string, walkFn common.WalkFunc) error {
 	tsz.wrapReader()
 	return tsz.Tar.Walk(archive, walkFn)
 }

@@ -1,4 +1,4 @@
-package archiver
+package common
 
 import (
 	"fmt"

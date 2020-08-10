@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/mholt/archiver/v3/common"
 )
 
 // TarZstd facilitates Zstandard compression
@@ -45,7 +46,7 @@ func (tzst *TarZstd) Unarchive(source, destination string) error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (tzst *TarZstd) Walk(archive string, walkFn WalkFunc) error {
+func (tzst *TarZstd) Walk(archive string, walkFn common.WalkFunc) error {
 	tzst.wrapReader()
 	return tzst.Tar.Walk(archive, walkFn)
 }

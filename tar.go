@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/mholt/archiver/v3/common"
 )
 
 // Tar provides facilities for operating TAR archives.
@@ -71,7 +73,7 @@ func (*Tar) CheckPath(to, filename string) error {
 	dest := filepath.Join(to, filename)
 	//prevent path traversal attacks
 	if !strings.HasPrefix(dest, to) {
-		return &IllegalPathError{AbsolutePath: dest, Filename: filename}
+		return &common.IllegalPathError{AbsolutePath: dest, Filename: filename}
 	}
 	return nil
 }
@@ -85,15 +87,15 @@ func (t *Tar) Archive(sources []string, destination string) error {
 	if t.writerWrapFn == nil && err != nil {
 		return fmt.Errorf("checking extension: %v", err)
 	}
-	if !t.OverwriteExisting && fileExists(destination) {
+	if !t.OverwriteExisting && common.FileExists(destination) {
 		return fmt.Errorf("file already exists: %s", destination)
 	}
 
 	// make the folder to contain the resulting archive
 	// if it does not already exist
 	destDir := filepath.Dir(destination)
-	if t.MkdirAll && !fileExists(destDir) {
-		err := mkdir(destDir, 0755)
+	if t.MkdirAll && !common.FileExists(destDir) {
+		err := common.Mkdir(destDir, 0755)
 		if err != nil {
 			return fmt.Errorf("making folder for destination: %v", err)
 		}
@@ -112,8 +114,8 @@ func (t *Tar) Archive(sources []string, destination string) error {
 	defer t.Close()
 
 	var topLevelFolder string
-	if t.ImplicitTopLevelFolder && multipleTopLevels(sources) {
-		topLevelFolder = folderNameFromFileName(destination)
+	if t.ImplicitTopLevelFolder && common.MultipleTopLevels(sources) {
+		topLevelFolder = common.FolderNameFromFileName(destination)
 	}
 
 	for _, source := range sources {
@@ -129,8 +131,8 @@ func (t *Tar) Archive(sources []string, destination string) error {
 // Unarchive unpacks the .tar file at source to destination.
 // Destination will be treated as a folder name.
 func (t *Tar) Unarchive(source, destination string) error {
-	if !fileExists(destination) && t.MkdirAll {
-		err := mkdir(destination, 0755)
+	if !common.FileExists(destination) && t.MkdirAll {
+		err := common.Mkdir(destination, 0755)
 		if err != nil {
 			return fmt.Errorf("preparing destination: %v", err)
 		}
@@ -165,7 +167,7 @@ func (t *Tar) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if t.ContinueOnError || IsIllegalPathError(err) {
+			if t.ContinueOnError || common.IsIllegalPathError(err) {
 				log.Printf("[ERROR] Reading file in tar archive: %v", err)
 				continue
 			}
@@ -214,8 +216,8 @@ func (t *Tar) addTopLevelFolder(sourceArchive, destination string) (string, erro
 		files = append(files, hdr.Name)
 	}
 
-	if multipleTopLevels(files) {
-		destination = filepath.Join(destination, folderNameFromFileName(sourceArchive))
+	if common.MultipleTopLevels(files) {
+		destination = filepath.Join(destination, common.FolderNameFromFileName(sourceArchive))
 	}
 
 	return destination, nil
@@ -251,21 +253,21 @@ func (t *Tar) untarNext(destination string) error {
 	return t.untarFile(f, destination, header)
 }
 
-func (t *Tar) untarFile(f File, destination string, hdr *tar.Header) error {
+func (t *Tar) untarFile(f common.File, destination string, hdr *tar.Header) error {
 	to := filepath.Join(destination, hdr.Name)
 
 	// do not overwrite existing files, if configured
-	if !f.IsDir() && !t.OverwriteExisting && fileExists(to) {
+	if !f.IsDir() && !t.OverwriteExisting && common.FileExists(to) {
 		return fmt.Errorf("file already exists: %s", to)
 	}
 
 	switch hdr.Typeflag {
 	case tar.TypeDir:
-		return mkdir(to, f.Mode())
+		return common.Mkdir(to, f.Mode())
 	case tar.TypeReg, tar.TypeRegA, tar.TypeChar, tar.TypeBlock, tar.TypeFifo, tar.TypeGNUSparse:
-		return writeNewFile(to, f, f.Mode())
+		return common.WriteNewFile(to, f, f.Mode())
 	case tar.TypeSymlink:
-		return writeNewSymbolicLink(to, hdr.Linkname)
+		return common.WriteNewSymbolicLink(to, hdr.Linkname)
 	case tar.TypeLink:
 		return writeNewHardLink(to, filepath.Join(destination, hdr.Linkname))
 	case tar.TypeXGlobalHeader:
@@ -305,12 +307,12 @@ func (t *Tar) writeWalk(source, topLevelFolder, destination string) error {
 		if err != nil {
 			return handleErr(fmt.Errorf("%s: getting absolute path: %v", fpath, err))
 		}
-		if within(fpathAbs, destAbs) {
+		if common.Within(fpathAbs, destAbs) {
 			return nil
 		}
 
 		// build the name to be used within the archive
-		nameInArchive, err := makeNameInArchive(sourceInfo, source, topLevelFolder, fpath)
+		nameInArchive, err := common.MakeNameInArchive(sourceInfo, source, topLevelFolder, fpath)
 		if err != nil {
 			return handleErr(err)
 		}
@@ -323,8 +325,8 @@ func (t *Tar) writeWalk(source, topLevelFolder, destination string) error {
 			}
 			defer file.Close()
 		}
-		err = t.Write(File{
-			FileInfo: FileInfo{
+		err = t.Write(common.File{
+			FileInfo: common.FileInfo{
 				FileInfo:   info,
 				CustomName: nameInArchive,
 			},
@@ -359,7 +361,7 @@ func (t *Tar) Create(out io.Writer) error {
 }
 
 // Write writes f to t, which must have been opened for writing first.
-func (t *Tar) Write(f File) error {
+func (t *Tar) Write(f common.File) error {
 	if t.tw == nil {
 		return fmt.Errorf("tar archive was not created for writing first")
 	}
@@ -371,7 +373,7 @@ func (t *Tar) Write(f File) error {
 	}
 
 	var linkTarget string
-	if isSymlink(f) {
+	if common.IsSymlink(f) {
 		var err error
 		linkTarget, err = os.Readlink(f.Name())
 		if err != nil {
@@ -428,17 +430,17 @@ func (t *Tar) Open(in io.Reader, size int64) error {
 // already been opened for reading. If there are no
 // more files, the error is io.EOF. The File must
 // be closed when finished reading from it.
-func (t *Tar) Read() (File, error) {
+func (t *Tar) Read() (common.File, error) {
 	if t.tr == nil {
-		return File{}, fmt.Errorf("tar archive is not open")
+		return common.File{}, fmt.Errorf("tar archive is not open")
 	}
 
 	hdr, err := t.tr.Next()
 	if err != nil {
-		return File{}, err // don't wrap error; preserve io.EOF
+		return common.File{}, err // don't wrap error; preserve io.EOF
 	}
 
-	file := File{
+	file := common.File{
 		FileInfo:   hdr.FileInfo(),
 		Header:     hdr,
 		ReadCloser: ReadFakeCloser{t.tr},
@@ -468,7 +470,7 @@ func (t *Tar) Close() error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (t *Tar) Walk(archive string, walkFn WalkFunc) error {
+func (t *Tar) Walk(archive string, walkFn common.WalkFunc) error {
 	file, err := os.Open(archive)
 	if err != nil {
 		return fmt.Errorf("opening archive file: %v", err)
@@ -521,7 +523,7 @@ func (t *Tar) Extract(source, target, destination string) error {
 	// until we are no longer within that directory
 	var targetDirPath string
 
-	return t.Walk(source, func(f File) error {
+	return t.Walk(source, func(f common.File) error {
 		th, ok := f.Header.(*tar.Header)
 		if !ok {
 			return fmt.Errorf("expected header to be *tar.Header but was %T", f.Header)
@@ -534,7 +536,7 @@ func (t *Tar) Extract(source, target, destination string) error {
 			targetDirPath = path.Dir(name)
 		}
 
-		if within(target, th.Name) {
+		if common.Within(target, th.Name) {
 			// either this is the exact file we want, or is
 			// in the directory we want to extract
 
