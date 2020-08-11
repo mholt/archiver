@@ -6,7 +6,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/mholt/archiver/v3"
+	"github.com/go-vela/archiver"
 )
 
 func requireRegularFile(t *testing.T, path string) os.FileInfo {
