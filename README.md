@@ -55,7 +55,7 @@ Tar files can optionally be compressed using any of the above compression format
 To install the runnable binary to your $GOPATH/bin:
 
 ```bash
-$ go install github.com/mholt/archiver/cmd/arc
+$ go get github.com/mholt/archiver/cmd/arc
 ```
 
 Or download binaries from the [releases](https://github.com/mholt/archiver/releases) page.
