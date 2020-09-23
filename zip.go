@@ -76,11 +76,11 @@ type Zip struct {
 	ContinueOnError bool
 
 	// Compression algorithm
-	FileMethod     ZipCompressionMethod
-	zw             *zip.Writer
-	zr             *zip.Reader
-	ridx           int
-	decinitialized bool
+	FileMethod ZipCompressionMethod
+	zw         *zip.Writer
+	zr         *zip.Reader
+	ridx       int
+	//decinitialized bool
 }
 
 // CheckExt ensures the file extension matches the format.
@@ -596,7 +596,9 @@ func (*Zip) Match(file io.ReadSeeker) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer file.Seek(currentPos, io.SeekStart)
+	defer func() {
+		_, _ = file.Seek(currentPos, io.SeekStart)
+	}()
 
 	buf := make([]byte, 4)
 	if n, err := file.Read(buf); err != nil || n < 4 {

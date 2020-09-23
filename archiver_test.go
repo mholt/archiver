@@ -3,7 +3,6 @@ package archiver
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -323,7 +322,7 @@ func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
 
 	// Test extracting archive
 	dest := filepath.Join(tmp, "extraction_test_"+auStr)
-	os.Mkdir(dest, 0755)
+	_ = os.Mkdir(dest, 0755)
 	err = au.Unarchive(outfile, dest)
 	if err != nil {
 		t.Fatalf("[%s] extracting archive [%s -> %s]: didn't expect an error, but got: %v", auStr, outfile, dest, err)
@@ -333,6 +332,7 @@ func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
 	symmetricTest(t, auStr, dest, true, true)
 }
 
+/*
 // testMatching tests that au can match the format of archiveFile.
 func testMatching(t *testing.T, au archiverUnarchiver, archiveFile string) {
 	m, ok := au.(Matcher)
@@ -358,12 +358,13 @@ func testMatching(t *testing.T, au archiverUnarchiver, archiveFile string) {
 		t.Fatalf("%s (%T): format should have matched, but didn't", m, m)
 	}
 }
+*/
 
 // symmetricTest compares the contents of a destination directory to the contents
 // of the test corpus and tests that they are equal.
 func symmetricTest(t *testing.T, formatName, dest string, testSymlinks, testModes bool) {
 	var expectedFileCount int
-	filepath.Walk("testdata/corpus", func(fpath string, info os.FileInfo, err error) error {
+	_ = filepath.Walk("testdata/corpus", func(fpath string, info os.FileInfo, err error) error {
 		if testSymlinks || (info.Mode()&os.ModeSymlink) == 0 {
 			expectedFileCount++
 		}
@@ -373,7 +374,7 @@ func symmetricTest(t *testing.T, formatName, dest string, testSymlinks, testMode
 	// If outputs equals inputs, we're good; traverse output files
 	// and compare file names, file contents, and file count.
 	var actualFileCount int
-	filepath.Walk(dest, func(fpath string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(dest, func(fpath string, info os.FileInfo, _ error) error {
 		if fpath == dest {
 			return nil
 		}

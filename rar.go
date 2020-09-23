@@ -363,7 +363,9 @@ func (*Rar) Match(file io.ReadSeeker) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer file.Seek(currentPos, io.SeekStart)
+	defer func() {
+		_, _ = file.Seek(currentPos, io.SeekStart)
+	}()
 
 	buf := make([]byte, 8)
 	if n, err := file.Read(buf); err != nil || n < 8 {

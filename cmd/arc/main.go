@@ -219,7 +219,7 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.ContinueOnError = continueOnError
 		v.Password = os.Getenv("ARCHIVE_PASSWORD")
 	case *archiver.Tar:
-		v = mytar
+		f = mytar
 	case *archiver.TarBrotli:
 		v.Tar = mytar
 		v.Quality = compressionLevel

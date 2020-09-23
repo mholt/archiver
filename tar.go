@@ -546,7 +546,9 @@ func (*Tar) Match(file io.ReadSeeker) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer file.Seek(currentPos, io.SeekStart)
+	defer func() {
+		_, _ = file.Seek(currentPos, io.SeekStart)
+	}()
 
 	buf := make([]byte, tarBlockSize)
 	if _, err = io.ReadFull(file, buf); err != nil {
