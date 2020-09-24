@@ -1,5 +1,4 @@
-archiver [![archiver GoDoc](https://img.shields.io/badge/reference-godoc-blue.svg?style=flat-square)](https://pkg.go.dev/github.com/mholt/archiver?tab=doc) <a href="https://dev.azure.com/mholt-dev/Archiver/_build"><img src="https://img.shields.io/azure-devops/build/mholt-dev/1e14e7f7-f929-4fec-a1db-fa5a3c0d4ca9/2/master.svg?label=cross-platform%20tests&style=flat-square"></a>
-========
+# archiver [![archiver GoDoc](https://img.shields.io/badge/reference-godoc-blue.svg?style=flat-square)](https://pkg.go.dev/github.com/mholt/archiver?tab=doc) <a href="https://dev.azure.com/mholt-dev/Archiver/_build"><img src="https://img.shields.io/azure-devops/build/mholt-dev/1e14e7f7-f929-4fec-a1db-fa5a3c0d4ca9/2/master.svg?label=cross-platform%20tests&style=flat-square"></a>
 
 Introducing **Archiver 3.1** - a cross-platform, multi-format archive utility and Go library. A powerful and flexible library meets an elegant CLI in this generic replacement for several platform-specific or format-specific archive utilities.
 
@@ -49,10 +48,9 @@ Files are put into the root of the archive; directories are recursively added, p
 
 Tar files can optionally be compressed using any of the above compression formats.
 
-
 ## Install
 
-To install the runnable binary to your $GOPATH/bin:
+To install the runnable binary to your \$GOPATH/bin:
 
 ```bash
 $ go install github.com/mholt/archiver/cmd/arc
@@ -66,7 +64,6 @@ To use as a dependency in your project:
 $ go get github.com/mholt/archiver/v3
 ```
 
-
 ## Command Use
 
 ### Make new archive
@@ -79,7 +76,6 @@ $ arc archive test.tar.gz file1.txt images/file2.jpg folder/subfolder
 
 (At least one input file is required.)
 
-
 ### Extract entire archive
 
 ```bash
@@ -91,7 +87,6 @@ $ arc unarchive test.tar.gz
 (The destination path is optional; default is current directory.)
 
 The archive name must end with a supported file extension&mdash;this is how it knows what kind of archive to make. Run `arc help` for more help.
-
 
 ### List archive contents
 
@@ -109,7 +104,6 @@ drwxr-xr-x  matt    staff   0       2018-09-19 15:47:18 -0600 MDT   dist/
 ...
 ```
 
-
 ### Extract a specific file or folder from an archive
 
 ```bash
@@ -117,7 +111,6 @@ drwxr-xr-x  matt    staff   0       2018-09-19 15:47:18 -0600 MDT   dist/
 
 $ arc extract test.tar.gz foo/hello.txt extracted/hello.txt
 ```
-
 
 ### Compress a single file
 
@@ -141,12 +134,9 @@ $ arc decompress test.txt.gz
 
 For convenience, the output file (second argument) may be omitted. In that case, the output filename will have the same name as the input filename, but with the compression extension stripped from the end; and the input file will be deleted if successful.
 
-
 ### Flags
 
 Flags are specified before the subcommand. Use `arc help` or `arc -h` to get usage help and a description of flags with their default values.
-
-
 
 ## Library Use
 
@@ -209,7 +199,7 @@ for _, fname := range filenames {
 	if err != nil {
 		return err
 	}
-	
+
 	// get file's name for the inside of the archive
 	internalName, err := archiver.NameInArchive(info, fname, fname)
 	if err != nil {
@@ -242,7 +232,6 @@ The `archiver.File` type allows you to use actual files with archives, or to mim
 There's a lot more that can be done, too. [See the GoDoc](https://pkg.go.dev/github.com/mholt/archiver?tab=doc) for full API documentation.
 
 **Security note: This package does NOT attempt to mitigate zip-slip attacks.** It is [extremely difficult](https://github.com/rubyzip/rubyzip/pull/376) [to do properly](https://github.com/mholt/archiver/pull/65#issuecomment-395988244) and [seemingly impossible to mitigate effectively across platforms](https://github.com/golang/go/issues/20126). [Attempted fixes have broken processing of legitimate files in production](https://github.com/mholt/archiver/pull/70#issuecomment-423267320), rendering the program unusable. Our recommendation instead is to inspect the contents of an untrusted archive before extracting it (this package provides `Walkers`) and decide if you want to proceed with extraction.
-
 
 ## Project Values
 
