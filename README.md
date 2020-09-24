@@ -48,20 +48,75 @@ Files are put into the root of the archive; directories are recursively added, p
 
 Tar files can optionally be compressed using any of the above compression formats.
 
+## GoDoc
+
+See <https://pkg.go.dev/github.com/mholt/archiver/v3>
+
 ## Install
+
+### With webi
+
+[`webi`](https://webinstall.dev/arc) will install `webi` and `arc` to `~/.local/bin/` and update your `PATH`.
+
+#### Mac, Linux, Raspberry Pi
+
+```bash
+curl -fsS https://webinstall.dev/arc | bash
+```
+
+#### Windows 10
+
+```pwsh
+curl.exe -fsS -A MS https://webinstall.dev/arc | powershell
+```
+
+### With Go
 
 To install the runnable binary to your \$GOPATH/bin:
 
 ```bash
-$ go install github.com/mholt/archiver/cmd/arc
+go get github.com/mholt/archiver/cmd/arc
 ```
 
-Or download binaries from the [releases](https://github.com/mholt/archiver/releases) page.
+### Manually
 
-To use as a dependency in your project:
+To install manually
 
+1. Download the binary for your platform from the [Github Releases](https://github.com/mholt/archiver/releases) page.
+2. Move the binary to a location in your path, for example:
+   - without `sudo`:
+     ```bash
+     chmod a+x ~/Downloads/arc_*
+     mkdir -p ~/.local/bin
+     mv ~/Downloads/arc_* ~/.local/bin/arc
+     ```
+   - as `root`:
+     ```bash
+     chmod a+x ~/Downloads/arc_*
+     sudo mkdir -p /usr/local/bin
+     sudo mv ~/Downloads/arc_* /usr/local/bin/arc
+     ```
+3. If needed, update `~/.bashrc` or `~/.profile` to include add `arc` in your `PATH`, for example:
+   ```
+   echo 'PATH="$HOME:/.local/bin:$PATH"' >> ~/.bashrc
+   ```
+
+## Build from Source
+
+You can successfully build `arc` with just the go tooling, or with `goreleaser`.
+
+### With `go`
+
+```bash
+go build cmd/arc/*.go
 ```
-$ go get github.com/mholt/archiver/v3
+
+### Multi-platform with `goreleaser`
+
+Builds with `goreleaser` will also include version info.
+
+```bash
+goreleaser --snapshot --skip-publish --rm-dist
 ```
 
 ## Command Use
@@ -71,7 +126,7 @@ $ go get github.com/mholt/archiver/v3
 ```bash
 # Syntax: arc archive [archive name] [input files...]
 
-$ arc archive test.tar.gz file1.txt images/file2.jpg folder/subfolder
+arc archive test.tar.gz file1.txt images/file2.jpg folder/subfolder
 ```
 
 (At least one input file is required.)
@@ -81,7 +136,7 @@ $ arc archive test.tar.gz file1.txt images/file2.jpg folder/subfolder
 ```bash
 # Syntax: arc unarchive [archive name] [destination]
 
-$ arc unarchive test.tar.gz
+arc unarchive test.tar.gz
 ```
 
 (The destination path is optional; default is current directory.)
@@ -93,7 +148,10 @@ The archive name must end with a supported file extension&mdash;this is how it k
 ```bash
 # Syntax: arc ls [archive name]
 
-$ arc ls caddy_dist.tar.gz
+arc ls caddy_dist.tar.gz
+```
+
+```txt
 drwxr-xr-x  matt    staff   0       2018-09-19 15:47:18 -0600 MDT   dist/
 -rw-r--r--  matt    staff   6148    2017-08-07 18:34:22 -0600 MDT   dist/.DS_Store
 -rw-r--r--  matt    staff   22481   2018-09-19 15:47:18 -0600 MDT   dist/CHANGES.txt
@@ -109,7 +167,7 @@ drwxr-xr-x  matt    staff   0       2018-09-19 15:47:18 -0600 MDT   dist/
 ```bash
 # Syntax: arc extract [archive name] [path in archive] [destination on disk]
 
-$ arc extract test.tar.gz foo/hello.txt extracted/hello.txt
+arc extract test.tar.gz foo/hello.txt extracted/hello.txt
 ```
 
 ### Compress a single file
@@ -117,8 +175,8 @@ $ arc extract test.tar.gz foo/hello.txt extracted/hello.txt
 ```bash
 # Syntax: arc compress [input file] [output file]
 
-$ arc compress test.txt compressed_test.txt.gz
-$ arc compress test.txt gz
+arc compress test.txt compressed_test.txt.gz
+arc compress test.txt gz
 ```
 
 For convenience, the output file (second argument) may simply be a compression format (without leading dot), in which case the output filename will be the same as the input filename but with the format extension appended, and the input file will be deleted if successful.
@@ -128,8 +186,8 @@ For convenience, the output file (second argument) may simply be a compression f
 ```bash
 # Syntax: arc decompress [input file] [output file]
 
-$ arc decompress test.txt.gz original_test.txt
-$ arc decompress test.txt.gz
+arc decompress test.txt.gz original_test.txt
+arc decompress test.txt.gz
 ```
 
 For convenience, the output file (second argument) may be omitted. In that case, the output filename will have the same name as the input filename, but with the compression extension stripped from the end; and the input file will be deleted if successful.
@@ -141,6 +199,12 @@ Flags are specified before the subcommand. Use `arc help` or `arc -h` to get usa
 ## Library Use
 
 The archiver package allows you to easily create and open archives, walk their contents, extract specific files, compress and decompress files, and even stream archives in and out using pure io.Reader and io.Writer interfaces, without ever needing to touch the disk.
+
+To use as a dependency in your project:
+
+```bash
+go get github.com/mholt/archiver/v3
+```
 
 ```go
 import "github.com/mholt/archiver/v3"

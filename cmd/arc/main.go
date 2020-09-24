@@ -24,6 +24,12 @@ var (
 	continueOnError        bool
 )
 
+var (
+	version string
+	commit  string
+	date    string
+)
+
 func init() {
 	flag.IntVar(&compressionLevel, "level", flate.DefaultCompression, "Compression level")
 	flag.BoolVar(&overwriteExisting, "overwrite", false, "Overwrite existing files")
@@ -37,6 +43,11 @@ func main() {
 	if len(os.Args) >= 2 &&
 		(os.Args[1] == "-h" || os.Args[1] == "--help" || os.Args[1] == "help") {
 		fmt.Println(usageString())
+		os.Exit(0)
+	}
+	if len(os.Args) >= 2 &&
+		(os.Args[1] == "-V" || os.Args[1] == "--version" || os.Args[1] == "version") {
+		fmt.Printf("arc v%s %s (%s)", version, commit, date)
 		os.Exit(0)
 	}
 	if len(os.Args) < 3 {
