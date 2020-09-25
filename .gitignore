@@ -2,6 +2,7 @@
 /cmd/arc/arc
 /dist/
 /vendor/
+.env
 
 .DS_Store
 _gitignore
