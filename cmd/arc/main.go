@@ -27,9 +27,9 @@ var (
 )
 
 var (
-	version string
-	commit  string
-	date    string
+	version = "0.0.0"
+	commit  = "0000000000"
+	date    = "0001-01-01T00:00:00Z"
 )
 
 func init() {
@@ -51,7 +51,7 @@ func main() {
 	}
 	if len(os.Args) >= 2 &&
 		(os.Args[1] == "-V" || os.Args[1] == "--version" || os.Args[1] == "version") {
-		fmt.Printf("arc v%s %s (%s)", version, commit, date)
+		fmt.Printf("arc v%s %s (%s)\n", version, commit[:7], date)
 		os.Exit(0)
 	}
 	if len(os.Args) < 3 {
