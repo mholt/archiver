@@ -21,6 +21,7 @@ var (
 	mkdirAll               bool
 	selectiveCompression   bool
 	implicitTopLevelFolder bool
+	stripComponents        int
 	continueOnError        bool
 )
 
@@ -36,6 +37,7 @@ func init() {
 	flag.BoolVar(&mkdirAll, "mkdirs", false, "Make all necessary directories")
 	flag.BoolVar(&selectiveCompression, "smart", true, "Only compress files which are not already compressed (zip only)")
 	flag.BoolVar(&implicitTopLevelFolder, "folder-safe", true, "If an archive does not have a single top-level folder, create one implicitly")
+	flag.IntVar(&stripComponents, "strip-components", 0, "Strip number of leading paths")
 	flag.BoolVar(&continueOnError, "allow-errors", true, "Log errors and continue processing")
 }
 
@@ -218,6 +220,7 @@ func getFormat(subcommand string) (interface{}, error) {
 		OverwriteExisting:      overwriteExisting,
 		MkdirAll:               mkdirAll,
 		ImplicitTopLevelFolder: implicitTopLevelFolder,
+		StripComponents:        stripComponents,
 		ContinueOnError:        continueOnError,
 	}
 
