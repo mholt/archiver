@@ -235,6 +235,7 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.OverwriteExisting = overwriteExisting
 		v.MkdirAll = mkdirAll
 		v.ImplicitTopLevelFolder = implicitTopLevelFolder
+		v.StripComponents = stripComponents
 		v.ContinueOnError = continueOnError
 		v.Password = os.Getenv("ARCHIVE_PASSWORD")
 	case *archiver.Tar:

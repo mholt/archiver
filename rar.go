@@ -40,6 +40,10 @@ type Rar struct {
 	// especially on extraction.
 	ImplicitTopLevelFolder bool
 
+	// Strip number of leading paths. This feature is available
+	// only during unpacking of the entire archive.
+	StripComponents int
+
 	// If true, errors encountered during reading
 	// or writing a single file will be logged and
 	// the operation will continue on remaining files.
@@ -166,6 +170,17 @@ func (r *Rar) unrarNext(to string) error {
 	errPath := r.CheckPath(to, header.Name)
 	if errPath != nil {
 		return fmt.Errorf("checking path traversal attempt: %v", errPath)
+	}
+
+	if r.StripComponents > 0 {
+		if strings.Count(header.Name, "/") < r.StripComponents {
+			return nil // skip path with fewer components
+		}
+
+		for i := 0; i < r.StripComponents; i++ {
+			slash := strings.Index(header.Name, "/")
+			header.Name = header.Name[slash+1:]
+		}
 	}
 
 	return r.unrarFile(f, filepath.Join(to, header.Name))
