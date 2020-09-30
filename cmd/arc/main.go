@@ -258,6 +258,7 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.MkdirAll = mkdirAll
 		v.SelectiveCompression = selectiveCompression
 		v.ImplicitTopLevelFolder = implicitTopLevelFolder
+		v.StripComponents = stripComponents
 		v.ContinueOnError = continueOnError
 	case *archiver.Gz:
 		v.CompressionLevel = compressionLevel
