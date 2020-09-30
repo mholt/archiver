@@ -452,6 +452,60 @@ func symmetricTest(t *testing.T, formatName, dest string, testSymlinks, testMode
 	}
 }
 
+func TestUnarchiveWithStripComponents(t *testing.T) {
+	testArchives := []string{
+		"testdata/sample.rar",
+		"testdata/testarchives/evilarchives/evil.zip",
+		"testdata/testarchives/evilarchives/evil.tar",
+		"testdata/testarchives/evilarchives/evil.tar.gz",
+		"testdata/testarchives/evilarchives/evil.tar.bz2",
+	}
+
+	to := "testdata/testarchives/destarchives/"
+
+	for _, archiveName := range testArchives {
+		f, err := ByExtension(archiveName)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		var target string
+
+		switch v := f.(type) {
+		case *Rar:
+			v.OverwriteExisting = false
+			v.ImplicitTopLevelFolder = false
+			v.StripComponents = 1
+			target = "quote1.txt"
+		case *Zip:
+		case *Tar:
+			v.OverwriteExisting = false
+			v.ImplicitTopLevelFolder = false
+			v.StripComponents = 1
+			target = "safefile"
+		case *TarGz:
+		case *TarBz2:
+			v.Tar.OverwriteExisting = false
+			v.Tar.ImplicitTopLevelFolder = false
+			v.Tar.StripComponents = 1
+			target = "safefile"
+		}
+
+		u := f.(Unarchiver)
+
+		if err := u.Unarchive(archiveName, to); err != nil {
+			fmt.Println(err)
+		}
+
+		if _, err := os.Stat(filepath.Join(to, target)); os.IsNotExist(err) {
+			t.Errorf("file is incorrectly extracted: %s", target)
+		}
+
+		os.RemoveAll(to)
+	}
+}
+
 // test at runtime if the CheckFilename function is behaving properly for the archive formats
 func TestSafeExtraction(t *testing.T) {
 
