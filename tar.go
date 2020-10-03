@@ -67,7 +67,7 @@ func (*Tar) CheckPath(to, filename string) error {
 	dest := filepath.Join(to, filename)
 	//prevent path traversal attacks
 	if !strings.HasPrefix(dest, to) {
-		return fmt.Errorf("illegal file path: %s", filename)
+		return &IllegalPathError{AbsolutePath: dest, Filename: filename}
 	}
 	return nil
 }
@@ -161,7 +161,7 @@ func (t *Tar) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if t.ContinueOnError || strings.Contains(err.Error(), "illegal file path") {
+			if t.ContinueOnError || IsIllegalPathError(err) {
 				log.Printf("[ERROR] Reading file in tar archive: %v", err)
 				continue
 			}
