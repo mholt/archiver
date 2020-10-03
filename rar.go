@@ -66,7 +66,7 @@ func (*Rar) CheckPath(to, filename string) error {
 	dest := filepath.Join(to, filename)
 	//prevent path traversal attacks
 	if !strings.HasPrefix(dest, to) {
-		return fmt.Errorf("illegal file path: %s", filename)
+		return &IllegalPathError{AbsolutePath: dest, Filename: filename}
 	}
 	return nil
 }
@@ -105,7 +105,7 @@ func (r *Rar) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if r.ContinueOnError || strings.Contains(err.Error(), "illegal file path") {
+			if r.ContinueOnError || IsIllegalPathError(err) {
 				log.Printf("[ERROR] Reading file in rar archive: %v", err)
 				continue
 			}

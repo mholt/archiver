@@ -123,7 +123,7 @@ func (*Zip) CheckPath(to, filename string) error {
 	dest := filepath.Join(to, filename)
 	//prevent path traversal attacks
 	if !strings.HasPrefix(dest, to) {
-		return fmt.Errorf("illegal file path: %s", filename)
+		return &IllegalPathError{AbsolutePath: dest, Filename: filename}
 	}
 	return nil
 }
@@ -225,7 +225,7 @@ func (z *Zip) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if z.ContinueOnError || strings.Contains(err.Error(), "illegal file path") {
+			if z.ContinueOnError || IsIllegalPathError(err) {
 				log.Printf("[ERROR] Reading file in zip archive: %v", err)
 				continue
 			}
