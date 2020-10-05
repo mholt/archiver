@@ -22,6 +22,7 @@ var (
 	selectiveCompression   bool
 	implicitTopLevelFolder bool
 	continueOnError        bool
+	unsafe				   bool
 )
 
 var (
@@ -37,6 +38,7 @@ func init() {
 	flag.BoolVar(&selectiveCompression, "smart", true, "Only compress files which are not already compressed (zip only)")
 	flag.BoolVar(&implicitTopLevelFolder, "folder-safe", true, "If an archive does not have a single top-level folder, create one implicitly")
 	flag.BoolVar(&continueOnError, "allow-errors", true, "Log errors and continue processing")
+	flag.BoolVar(&unsafe, "unsafe", false, "Turns off symlink check")
 }
 
 func main() {
@@ -170,9 +172,12 @@ func main() {
 	case "decompress":
 		c, ok := iface.(archiver.Decompressor)
 		if !ok {
-			fatalf("the compress command does not support the %s format", iface)
+			fatalf("the decompress command does not support the %s format", iface)
 		}
-		fc := archiver.FileCompressor{Decompressor: c}
+		fc := archiver.FileCompressor{Decompressor: c, OverwriteExisting: false}
+		if unsafe {
+			fc.OverwriteExisting = true
+		}
 
 		in := flag.Arg(1)
 		out := flag.Arg(2)
