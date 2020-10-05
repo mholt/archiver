@@ -128,6 +128,32 @@ func (*Zip) CheckPath(to, filename string) error {
 	return nil
 }
 
+// Compress compresses to out what it reads from in.
+// It also ensures a compatible or matching file extension.
+func (z *Zip) Compress(in io.Reader, out io.Writer) error {
+	conf := bzip2.WriterConfig{Level: z.CompressionLevel}
+	w, err := bzip2.NewWriter(out, &conf)
+	if err != nil {
+		return err
+	}
+	defer w.Close()
+	_, err = io.Copy(w, in)
+	return err
+}
+
+
+// Decompress decompresses to out what it reads from in.
+func (z *Zip) Decompress(in io.Reader, out io.Writer) error {
+	conf := bzip2.ReaderConfig{}
+	r, err := bzip2.NewReader(in, &conf)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, r)
+	return err
+}
+
+
 // Archive creates a .zip file at destination containing
 // the files listed in sources. The destination must end
 // with ".zip". File paths can be those of regular files
@@ -646,6 +672,8 @@ var (
 	_ = Matcher(new(Zip))
 	_ = ExtensionChecker(new(Zip))
 	_ = FilenameChecker(new(Zip))
+	_ = Compressor(new(Zip))
+	_ = Decompressor(new(Zip))
 )
 
 // compressedFormats is a (non-exhaustive) set of lowercased
