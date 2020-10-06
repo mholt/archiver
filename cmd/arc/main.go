@@ -23,6 +23,7 @@ var (
 	implicitTopLevelFolder bool
 	continueOnError        bool
 	unsafe				   bool
+	specifyFileType		   string
 )
 
 var (
@@ -39,6 +40,7 @@ func init() {
 	flag.BoolVar(&implicitTopLevelFolder, "folder-safe", true, "If an archive does not have a single top-level folder, create one implicitly")
 	flag.BoolVar(&continueOnError, "allow-errors", true, "Log errors and continue processing")
 	flag.BoolVar(&unsafe, "unsafe", false, "Turns off symlink check")
+	flag.StringVar(&specifyFileType, "ext", "", "specify file type")
 }
 
 func main() {
@@ -213,6 +215,9 @@ func getFormat(subcommand string) (interface{}, error) {
 	}
 
 	// get the format by filename extension
+	if specifyFileType != "" {
+		filename = "." + specifyFileType
+	}
 	f, err := archiver.ByExtension(filename)
 	if err != nil {
 		return nil, err
@@ -323,7 +328,7 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help
 
   SPECIFYING THE ARCHIVE FORMAT
     The format of the archive is determined by its
-    file extension. Supported extensions:
+    file extension*. Supported extensions:
       .zip
       .tar
       .tar.br
@@ -345,7 +350,9 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help
       .gz
       .lz4
       .sz
-      .xz
+	  .xz
+	*use flag --ext to manually set filetype.
+	 example: --ext=tar.gz
 
   (DE)COMPRESSING SINGLE FILES
     Some formats are compression-only, and can be used
