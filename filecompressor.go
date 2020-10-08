@@ -51,8 +51,8 @@ func (fc FileCompressor) DecompressFile(source, destination string) error {
 	if !fc.OverwriteExisting && fileExists(destination) {
 		return fmt.Errorf("file exists: %s", destination)
 	}
-	
-	fd, err := os.Lstat(destination) 
+
+	fd, err := os.Lstat(destination)
 	//fd.Name() is only a valid function call if there is a path to fd.
 	//Lstat only returns os.PathErrors.
 	//ok checks if there is a path before checking if symlink is attached to destination.
@@ -61,7 +61,6 @@ func (fc FileCompressor) DecompressFile(source, destination string) error {
 			return fmt.Errorf("destination is symlink: %s", destination)
 		}
 	}
-	
 
 	in, err := os.Open(source)
 	if err != nil {

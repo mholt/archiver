@@ -141,7 +141,6 @@ func (z *Zip) Compress(in io.Reader, out io.Writer) error {
 	return err
 }
 
-
 // Decompress decompresses to out what it reads from in.
 func (z *Zip) Decompress(in io.Reader, out io.Writer) error {
 	conf := bzip2.ReaderConfig{}
@@ -152,7 +151,6 @@ func (z *Zip) Decompress(in io.Reader, out io.Writer) error {
 	_, err = io.Copy(out, r)
 	return err
 }
-
 
 // Archive creates a .zip file at destination containing
 // the files listed in sources. The destination must end
