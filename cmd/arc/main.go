@@ -22,8 +22,8 @@ var (
 	selectiveCompression   bool
 	implicitTopLevelFolder bool
 	continueOnError        bool
-	unsafe				   bool
-	specifyFileType		   string
+	unsafe                 bool
+	specifyFileType        string
 )
 
 var (
