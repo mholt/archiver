@@ -52,14 +52,11 @@ func (fc FileCompressor) DecompressFile(source, destination string) error {
 		return fmt.Errorf("file exists: %s", destination)
 	}
 
-	fd, err := os.Lstat(destination)
-	//fd.Name() is only a valid function call if there is a path to fd.
-	//Lstat only returns os.PathErrors.
-	//ok checks if there is a path before checking if symlink is attached to destination.
-	if _, ok := err.(*os.PathError); !ok {
-		if fd.Name() == destination {
-			return fmt.Errorf("destination is symlink: %s", destination)
-		}
+	// os.Readlink returns the destination of the named symbolic link. 
+	// If there is an error, it will be of type *PathError.
+	sym, err := os.Readlink(destination)
+	if sym == destination && err == nil {
+		return fmt.Errorf("destination is symlink: %s", destination)
 	}
 
 	in, err := os.Open(source)
