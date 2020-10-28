@@ -16,6 +16,8 @@ type Lz4 struct {
 // Compress reads in, compresses it, and writes it to out.
 func (lz *Lz4) Compress(in io.Reader, out io.Writer) error {
 	w := lz4.NewWriter(out)
+	// TODO archiver v4: use proper lz4.Fast
+	// bitshifting for backwards compatibility with lz4/v3
 	options := []lz4.Option{
 		lz4.CompressionLevelOption(lz4.CompressionLevel(1 << (8 + lz.CompressionLevel))),
 	}

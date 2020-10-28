@@ -84,6 +84,8 @@ func (tlz4 *TarLz4) wrapWriter() {
 	var lz4w *lz4.Writer
 	tlz4.Tar.writerWrapFn = func(w io.Writer) (io.Writer, error) {
 		lz4w = lz4.NewWriter(w)
+		// TODO archiver v4: use proper lz4.Fast
+		// bitshifting for backwards compatibility with lz4/v3
 		options := []lz4.Option{
 			lz4.CompressionLevelOption(lz4.CompressionLevel(1 << (8 + tlz4.CompressionLevel))),
 		}
