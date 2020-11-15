@@ -24,6 +24,8 @@ var (
 	stripComponents        int
 	continueOnError        bool
 	specifyFileType        string
+	showHelp bool
+	showVersion bool
 )
 
 var (
@@ -41,30 +43,31 @@ func init() {
 	flag.IntVar(&stripComponents, "strip-components", 0, "Strip number of leading paths")
 	flag.BoolVar(&continueOnError, "allow-errors", true, "Log errors and continue processing")
 	flag.StringVar(&specifyFileType, "ext", "", "specify file type")
+	flag.BoolVar(&showHelp, "help", false, "Display this help text")
+	flag.BoolVar(&showVersion, "version", false, "Display version text")
 }
 
 func main() {
-	if len(os.Args) >= 2 &&
-		(os.Args[1] == "-h" || os.Args[1] == "--help" || os.Args[1] == "help") {
-		fmt.Println(usageString())
+	flag.Parse()
+
+	if showHelp {
+		fmt.Print(usageString())
 		os.Exit(0)
 	}
-	if len(os.Args) >= 2 &&
-		(os.Args[1] == "-V" || os.Args[1] == "--version" || os.Args[1] == "version") {
+	if showVersion {
 		fmt.Printf("arc v%s %s (%s)", version, commit, date)
 		os.Exit(0)
 	}
-	if len(os.Args) < 3 {
+	if flag.NArg() < 2 {
 		fatal(usageString())
 	}
-	flag.Parse()
 
 	subcommand := flag.Arg(0)
 
 	// get the format we're working with
 	iface, err := getFormat(subcommand)
 	if err != nil {
-		fatal(err)
+		fatalLn(err)
 	}
 
 	// run the desired command
@@ -72,14 +75,14 @@ func main() {
 	case "archive":
 		a, ok := iface.(archiver.Archiver)
 		if !ok {
-			fatalf("the archive command does not support the %s format", iface)
+			fatalF("the archive command does not support the %s format", iface)
 		}
 
 		var sources []string
 		for _, src := range flag.Args()[2:] {
 			srcs, err := filepath.Glob(src)
 			if err != nil {
-				fatalf(err.Error())
+				fatalF(err.Error())
 			}
 			sources = append(sources, srcs...)
 		}
@@ -89,21 +92,21 @@ func main() {
 	case "unarchive":
 		u, ok := iface.(archiver.Unarchiver)
 		if !ok {
-			fatalf("the unarchive command does not support the %s format", iface)
+			fatalF("the unarchive command does not support the %s format", iface)
 		}
 		err = u.Unarchive(flag.Arg(1), flag.Arg(2))
 
 	case "extract":
 		e, ok := iface.(archiver.Extractor)
 		if !ok {
-			fatalf("the extract command does not support the %s format", iface)
+			fatalF("the extract command does not support the %s format", iface)
 		}
 		err = e.Extract(flag.Arg(1), flag.Arg(2), flag.Arg(3))
 
 	case "ls":
 		w, ok := iface.(archiver.Walker)
 		if !ok {
-			fatalf("the ls command does not support the %s format", iface)
+			fatalF("the ls command does not support the %s format", iface)
 		}
 
 		var count int
@@ -153,7 +156,7 @@ func main() {
 	case "compress":
 		c, ok := iface.(archiver.Compressor)
 		if !ok {
-			fatalf("the compress command does not support the %s format", iface)
+			fatalF("the compress command does not support the %s format", iface)
 		}
 		fc := archiver.FileCompressor{Compressor: c}
 
@@ -174,7 +177,7 @@ func main() {
 	case "decompress":
 		c, ok := iface.(archiver.Decompressor)
 		if !ok {
-			fatalf("the compress command does not support the %s format", iface)
+			fatalF("the compress command does not support the %s format", iface)
 		}
 		fc := archiver.FileCompressor{Decompressor: c}
 
@@ -193,10 +196,10 @@ func main() {
 		}
 
 	default:
-		fatalf("unrecognized command: %s", flag.Arg(0))
+		fatalF("unrecognized command: %s", flag.Arg(0))
 	}
 	if err != nil {
-		fatal(err)
+		fatalLn(err)
 	}
 }
 
@@ -288,11 +291,16 @@ func getFormat(subcommand string) (interface{}, error) {
 }
 
 func fatal(v ...interface{}) {
+	fmt.Fprint(os.Stderr, v...)
+	os.Exit(1)
+}
+
+func fatalLn(v ...interface{}) {
 	fmt.Fprintln(os.Stderr, v...)
 	os.Exit(1)
 }
 
-func fatalf(s string, v ...interface{}) {
+func fatalF(s string, v ...interface{}) {
 	fmt.Fprintf(os.Stderr, s+"\n", v...)
 	os.Exit(1)
 }
@@ -305,72 +313,69 @@ func usageString() string {
 	return buf.String()
 }
 
-const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help} [arguments...]
-  archive
-    Create a new archive file. List the files/folders
-    to include in the archive; at least one required.
-  unarchive
-    Extract an archive file. Provide the archive to
-    open and the destination folder to extract into.
-  extract
-    Extract a single file or folder (recursively) from
-    an archive. First argument is the source archive,
-    second is the file to extract (exact path within the
-    archive is required), and third is destination.
-  ls
-    List the contents of the archive.
-  compress
-    Compresses a file, destination optional.
-  decompress
-    Decompresses a file, destination optional.
-  help
-    Display this help text. Also -h or --help.
+const usage = `USAGE
+   arc <command> [arguments...]
 
-  SPECIFYING THE ARCHIVE FORMAT
-    The format of the archive is determined by its
-    file extension*. Supported extensions:
-      .zip
-      .tar
-      .tar.br
-      .tbr
-      .tar.gz
-      .tgz
-      .tar.bz2
-      .tbz2
-      .tar.xz
-      .txz
-      .tar.lz4
-      .tlz4
-      .tar.sz
-      .tsz
-      .zst
-      .tar.zst
-      .rar (open only)
-      .bz2
-      .gz
-      .lz4
-      .sz
-      .xz
+COMMANDS
+   archive
+      Create a new archive file. List the files/folders to include in the
+      archive; at least one required.
+   compress
+      Compresses a file, destination optional.
+   decompress
+      Decompresses a file, destination optional.
+   extract
+      Extract a single file or folder (recursively) from an archive. First
+      argument is the source archive, second is the file to extract (exact path
+      within the archive is required), and third is destination.
+   ls
+      List the contents of the archive.
+   unarchive
+      Extract an archive file. Provide the archive to open and the destination
+      folder to extract into.
 
-    *use flag --ext to manually set filetype. example: --ext=tar.gz
+(DE)COMPRESSING SINGLE FILES
+   Some formats are compression-only, and can be used with the compress and
+   decompress commands on a single file; they do not bundle multiple files.
 
-  (DE)COMPRESSING SINGLE FILES
-    Some formats are compression-only, and can be used
-    with the compress and decompress commands on a
-    single file; they do not bundle multiple files.
+   To replace a file when compressing, specify the source file name for the
+   first argument, and the compression format (without leading dot) for the
+   second argument. To replace a file when decompressing, specify only the
+   source file and no destination.
 
-    To replace a file when compressing, specify the
-    source file name for the first argument, and the
-    compression format (without leading dot) for the
-    second argument. To replace a file when decompressing,
-    specify only the source file and no destination.
+PASSWORD-PROTECTED RAR FILES
+   Export the ARCHIVE_PASSWORD environment variable to be able to open
+   password-protected rar archives.
 
-  PASSWORD-PROTECTED RAR FILES
-    Export the ARCHIVE_PASSWORD environment variable
-    to be able to open password-protected rar archives.
+SPECIFYING THE ARCHIVE FORMAT
+   The format of the archive is determined by its file extension. Supported
+   extensions:
 
-  GLOBAL FLAG REFERENCE
-    The following global flags may be used before the
-    sub-command (some flags are format-specific):
+   .bz2
+   .gz
+   .lz4
+   .rar (open only)
+   .sz
+   .tar
+   .tar.br
+   .tar.bz2
+   .tar.gz
+   .tar.lz4
+   .tar.sz
+   .tar.xz
+   .tar.zst
+   .tbr
+   .tbz2
+   .tgz
+   .tlz4
+   .tsz
+   .txz
+   .xz
+   .zip
+   .zst
+
+GLOBAL FLAG REFERENCE
+   The following global flags may be used before the sub-command (some flags
+   are format-specific):
 
 `
