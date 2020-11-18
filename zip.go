@@ -273,28 +273,33 @@ func (z *Zip) extractNext(to string) error {
 func (z *Zip) extractFile(f File, to string, header *zip.FileHeader) error {
 	to = filepath.Join(to, header.Name)
 
-	// if a directory, no content; simply make the directory and return
-	if f.IsDir() {
-		return mkdir(to, f.Mode())
-	}
-
 	// do not overwrite existing files, if configured
-	if !z.OverwriteExisting && fileExists(to) {
+	if !f.IsDir() && !z.OverwriteExisting && fileExists(to) {
 		return fmt.Errorf("file already exists: %s", to)
 	}
 
-	// extract symbolic links as symbolic links
-	if isSymlink(header.FileInfo()) {
-		// symlink target is the contents of the file
+	var err error
+
+	switch {
+	case f.IsDir():
+		err = mkdir(to, f.Mode())
+	case isSymlink(header.FileInfo()):
 		buf := new(bytes.Buffer)
-		_, err := io.Copy(buf, f)
-		if err != nil {
+
+		if _, err := io.Copy(buf, f); err != nil {
 			return fmt.Errorf("%s: reading symlink target: %v", header.Name, err)
 		}
-		return writeNewSymbolicLink(to, strings.TrimSpace(buf.String()))
+
+		err = writeNewSymbolicLink(to, strings.TrimSpace(buf.String()))
+	default:
+		err = writeNewFile(to, f, f.Mode())
 	}
 
-	return writeNewFile(to, f, f.Mode())
+	if err != nil {
+		return err
+	}
+
+	return os.Chtimes(to, header.Modified, header.Modified)
 }
 
 func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
