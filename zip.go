@@ -290,7 +290,7 @@ func (z *Zip) extractFile(f File, to string, header *zip.FileHeader) error {
 			return fmt.Errorf("%s: reading symlink target: %v", header.Name, err)
 		}
 
-		err = writeNewSymbolicLink(to, strings.TrimSpace(buf.String()))
+		return writeNewSymbolicLink(to, strings.TrimSpace(buf.String()))
 	default:
 		err = writeNewFile(to, f, f.Mode())
 	}
