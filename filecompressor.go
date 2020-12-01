@@ -3,6 +3,7 @@ package archiver
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // FileCompressor can compress and decompress single files.
@@ -47,8 +48,23 @@ func (fc FileCompressor) DecompressFile(source, destination string) error {
 	if fc.Decompressor == nil {
 		return fmt.Errorf("no decompressor specified")
 	}
-	if !fc.OverwriteExisting && fileExists(destination) {
-		return fmt.Errorf("file exists: %s", destination)
+
+	if fileExists(destination) {
+		if !fc.OverwriteExisting {
+			return fmt.Errorf("file exists: %s", destination)
+		}
+		// Disallow symbolic link targets outside of the destination directory.
+		info, err := os.Lstat(destination)
+		if err != nil {
+			return fmt.Errorf("failed to lstat destination file %s: %s", destination, err)
+		} else if info.Mode()&os.ModeSymlink != 0 {
+			linkDest, err := os.Readlink(destination)
+			if err != nil {
+				return fmt.Errorf("failed to read symbolic link %s: %s", destination, err)
+			} else if !within(filepath.Dir(destination), linkDest) {
+				return fmt.Errorf("symbolic link %s has a target outside of the destination directory: %s", destination, linkDest)
+			}
+		}
 	}
 
 	in, err := os.Open(source)
