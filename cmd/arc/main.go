@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bytes"
 	"compress/flate"
 	"flag"
@@ -11,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/klauspost/compress/zip"
 	"github.com/mholt/archiver/v3"
 	"github.com/nwaples/rardecode"
 )
