@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/andybalholm/brotli v1.0.1
 	github.com/dsnet/compress v0.0.1
-	github.com/golang/snappy v0.0.1
+	github.com/golang/snappy v0.0.2
 	github.com/klauspost/compress v1.10.10
 	github.com/klauspost/pgzip v1.2.4
 	github.com/nwaples/rardecode v1.1.0
