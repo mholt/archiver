@@ -1,10 +1,11 @@
 package main
 
 import (
-	"archive/zip"
 	"log"
 	"os"
 	"time"
+
+	"github.com/klauspost/compress/zip"
 )
 
 func main() {
