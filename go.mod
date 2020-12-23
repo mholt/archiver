@@ -9,7 +9,7 @@ require (
 	github.com/klauspost/compress v1.11.4
 	github.com/klauspost/pgzip v1.2.5
 	github.com/nwaples/rardecode v1.1.0
-	github.com/pierrec/lz4/v4 v4.0.3
+	github.com/pierrec/lz4/v4 v4.1.2
 	github.com/ulikunitz/xz v0.5.7
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 )
