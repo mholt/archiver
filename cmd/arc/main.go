@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/tar"
-	"archive/zip"
 	"bytes"
 	"compress/flate"
 	"flag"
@@ -11,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/klauspost/compress/zip"
 	"github.com/mholt/archiver/v3"
 	"github.com/nwaples/rardecode"
 )
@@ -21,7 +21,15 @@ var (
 	mkdirAll               bool
 	selectiveCompression   bool
 	implicitTopLevelFolder bool
+	stripComponents        int
 	continueOnError        bool
+	specifyFileType        string
+)
+
+var (
+	version string
+	commit  string
+	date    string
 )
 
 func init() {
@@ -30,13 +38,20 @@ func init() {
 	flag.BoolVar(&mkdirAll, "mkdirs", false, "Make all necessary directories")
 	flag.BoolVar(&selectiveCompression, "smart", true, "Only compress files which are not already compressed (zip only)")
 	flag.BoolVar(&implicitTopLevelFolder, "folder-safe", true, "If an archive does not have a single top-level folder, create one implicitly")
+	flag.IntVar(&stripComponents, "strip-components", 0, "Strip number of leading paths")
 	flag.BoolVar(&continueOnError, "allow-errors", true, "Log errors and continue processing")
+	flag.StringVar(&specifyFileType, "ext", "", "specify file type")
 }
 
 func main() {
 	if len(os.Args) >= 2 &&
 		(os.Args[1] == "-h" || os.Args[1] == "--help" || os.Args[1] == "help") {
 		fmt.Println(usageString())
+		os.Exit(0)
+	}
+	if len(os.Args) >= 2 &&
+		(os.Args[1] == "-V" || os.Args[1] == "--version" || os.Args[1] == "version") {
+		fmt.Printf("arc v%s %s (%s)", version, commit, date)
 		os.Exit(0)
 	}
 	if len(os.Args) < 3 {
@@ -197,6 +212,9 @@ func getFormat(subcommand string) (interface{}, error) {
 	}
 
 	// get the format by filename extension
+	if specifyFileType != "" {
+		filename = "." + specifyFileType
+	}
 	f, err := archiver.ByExtension(filename)
 	if err != nil {
 		return nil, err
@@ -207,6 +225,7 @@ func getFormat(subcommand string) (interface{}, error) {
 		OverwriteExisting:      overwriteExisting,
 		MkdirAll:               mkdirAll,
 		ImplicitTopLevelFolder: implicitTopLevelFolder,
+		StripComponents:        stripComponents,
 		ContinueOnError:        continueOnError,
 	}
 
@@ -216,10 +235,11 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.OverwriteExisting = overwriteExisting
 		v.MkdirAll = mkdirAll
 		v.ImplicitTopLevelFolder = implicitTopLevelFolder
+		v.StripComponents = stripComponents
 		v.ContinueOnError = continueOnError
 		v.Password = os.Getenv("ARCHIVE_PASSWORD")
 	case *archiver.Tar:
-		v = mytar
+		f = mytar
 	case *archiver.TarBrotli:
 		v.Tar = mytar
 		v.Quality = compressionLevel
@@ -244,6 +264,7 @@ func getFormat(subcommand string) (interface{}, error) {
 		v.MkdirAll = mkdirAll
 		v.SelectiveCompression = selectiveCompression
 		v.ImplicitTopLevelFolder = implicitTopLevelFolder
+		v.StripComponents = stripComponents
 		v.ContinueOnError = continueOnError
 	case *archiver.Gz:
 		v.CompressionLevel = compressionLevel
@@ -307,7 +328,7 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help
 
   SPECIFYING THE ARCHIVE FORMAT
     The format of the archive is determined by its
-    file extension. Supported extensions:
+    file extension*. Supported extensions:
       .zip
       .tar
       .tar.br
@@ -330,6 +351,8 @@ const usage = `Usage: arc {archive|unarchive|extract|ls|compress|decompress|help
       .lz4
       .sz
       .xz
+
+    *use flag --ext to manually set filetype. example: --ext=tar.gz
 
   (DE)COMPRESSING SINGLE FILES
     Some formats are compression-only, and can be used
