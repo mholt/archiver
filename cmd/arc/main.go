@@ -220,71 +220,20 @@ func getFormat(subcommand string) (interface{}, error) {
 		return nil, err
 	}
 
-	// prepare a single Tar, in case it's needed
-	mytar := &archiver.Tar{
-		OverwriteExisting:      overwriteExisting,
-		MkdirAll:               mkdirAll,
-		ImplicitTopLevelFolder: implicitTopLevelFolder,
-		StripComponents:        stripComponents,
-		ContinueOnError:        continueOnError,
+	params := archiver.CustomizeParams{
+		Tar: &archiver.Tar{
+			OverwriteExisting:      overwriteExisting,
+			MkdirAll:               mkdirAll,
+			ImplicitTopLevelFolder: implicitTopLevelFolder,
+			StripComponents:        stripComponents,
+			ContinueOnError:        continueOnError,
+		},
+		CompressionLevel:     compressionLevel,
+		Password:             os.Getenv("ARCHIVE_PASSWORD"),
+		SelectiveCompression: selectiveCompression,
 	}
 
-	// fully configure the new value
-	switch v := f.(type) {
-	case *archiver.Rar:
-		v.OverwriteExisting = overwriteExisting
-		v.MkdirAll = mkdirAll
-		v.ImplicitTopLevelFolder = implicitTopLevelFolder
-		v.StripComponents = stripComponents
-		v.ContinueOnError = continueOnError
-		v.Password = os.Getenv("ARCHIVE_PASSWORD")
-	case *archiver.Tar:
-		f = mytar
-	case *archiver.TarBrotli:
-		v.Tar = mytar
-		v.Quality = compressionLevel
-	case *archiver.TarBz2:
-		v.Tar = mytar
-		v.CompressionLevel = compressionLevel
-	case *archiver.TarGz:
-		v.Tar = mytar
-		v.CompressionLevel = compressionLevel
-	case *archiver.TarLz4:
-		v.Tar = mytar
-		v.CompressionLevel = compressionLevel
-	case *archiver.TarSz:
-		v.Tar = mytar
-	case *archiver.TarXz:
-		v.Tar = mytar
-	case *archiver.TarZstd:
-		v.Tar = mytar
-	case *archiver.Zip:
-		v.CompressionLevel = compressionLevel
-		v.OverwriteExisting = overwriteExisting
-		v.MkdirAll = mkdirAll
-		v.SelectiveCompression = selectiveCompression
-		v.ImplicitTopLevelFolder = implicitTopLevelFolder
-		v.StripComponents = stripComponents
-		v.ContinueOnError = continueOnError
-	case *archiver.Gz:
-		v.CompressionLevel = compressionLevel
-	case *archiver.Brotli:
-		v.Quality = compressionLevel
-	case *archiver.Bz2:
-		v.CompressionLevel = compressionLevel
-	case *archiver.Lz4:
-		v.CompressionLevel = compressionLevel
-	case *archiver.Snappy:
-		// nothing to customize
-	case *archiver.Xz:
-		// nothing to customize
-	case *archiver.Zstd:
-		// nothing to customize
-	default:
-		return nil, fmt.Errorf("format does not support customization: %s", f)
-	}
-
-	return f, nil
+	return archiver.Customize(f, params)
 }
 
 func fatal(v ...interface{}) {
