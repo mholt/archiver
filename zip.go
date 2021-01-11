@@ -448,7 +448,7 @@ func (z *Zip) writeFile(f File, writer io.Writer) error {
 	}
 	_, err := io.Copy(writer, f)
 	if err != nil {
-		return fmt.Errorf("%s: copying contents: %v", f.Name(), err)
+		return fmt.Errorf("%s: copying contents: %w", f.Name(), err)
 	}
 
 	return nil
