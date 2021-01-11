@@ -399,7 +399,7 @@ func (t *Tar) Write(f File) error {
 		}
 		_, err := io.Copy(t.tw, f)
 		if err != nil {
-			return fmt.Errorf("%s: copying contents: %v", f.Name(), err)
+			return fmt.Errorf("%s: copying contents: %w", f.Name(), err)
 		}
 	}
 
