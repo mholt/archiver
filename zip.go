@@ -420,7 +420,7 @@ func (z *Zip) Write(f File) error {
 
 	writer, err := z.zw.CreateHeader(header)
 	if err != nil {
-		return fmt.Errorf("%s: making header: %v", f.Name(), err)
+		return fmt.Errorf("%s: making header: %w", f.Name(), err)
 	}
 
 	return z.writeFile(f, writer)

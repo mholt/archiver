@@ -386,7 +386,7 @@ func (t *Tar) Write(f File) error {
 
 	err = t.tw.WriteHeader(hdr)
 	if err != nil {
-		return fmt.Errorf("%s: writing header: %v", hdr.Name, err)
+		return fmt.Errorf("%s: writing header: %w", hdr.Name, err)
 	}
 
 	if f.IsDir() {
