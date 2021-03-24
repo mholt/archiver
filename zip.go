@@ -79,6 +79,9 @@ type Zip struct {
 	// the operation will continue on remaining files.
 	ContinueOnError bool
 
+	// If given will only compress files which return true from the Filter function
+	Filter func(info os.FileInfo) bool
+
 	// Compression algorithm
 	FileMethod ZipCompressionMethod
 	zw         *zip.Writer
@@ -320,6 +323,10 @@ func (z *Zip) writeWalk(source, topLevelFolder, destination string) error {
 		}
 		if info == nil {
 			return handleErr(fmt.Errorf("%s: no file info", fpath))
+		}
+
+		if z.Filter != nil && !z.Filter(info) {
+			return nil
 		}
 
 		// make sure we do not copy the output file into the output
