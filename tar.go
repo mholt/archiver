@@ -49,6 +49,14 @@ type Tar struct {
 	// the operation will continue on remaining files.
 	ContinueOnError bool
 
+	// IncludeFunc is called for every file and directory that may
+	// be included in the archive. If it returns true, that file/dir
+	// is included in the archive. Otherwise, it -- and in the case of
+	// directories, all of its children -- is left out of the archive.
+	//
+	// If not set, everything is included.
+	IncludeFunc func(string, os.FileInfo) (bool, error)
+
 	tw *tar.Writer
 	tr *tar.Reader
 
@@ -313,6 +321,20 @@ func (t *Tar) writeWalk(source, topLevelFolder, destination string) error {
 		nameInArchive, err := makeNameInArchive(sourceInfo, source, topLevelFolder, fpath)
 		if err != nil {
 			return handleErr(err)
+		}
+
+		if t.IncludeFunc != nil {
+			ok, err := t.IncludeFunc(fpathAbs, info)
+			if err != nil {
+				return handleErr(err)
+			}
+			if !ok {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+
+				return nil
+			}
 		}
 
 		var file io.ReadCloser
