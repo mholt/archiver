@@ -3,6 +3,8 @@ package archiver
 import (
 	"fmt"
 	"os"
+
+	"github.com/mholt/archiver/v3/common"
 )
 
 // FileCompressor can compress and decompress single files.
@@ -23,7 +25,7 @@ func (fc FileCompressor) CompressFile(source, destination string) error {
 	if fc.Compressor == nil {
 		return fmt.Errorf("no compressor specified")
 	}
-	if !fc.OverwriteExisting && fileExists(destination) {
+	if !fc.OverwriteExisting && common.FileExists(destination) {
 		return fmt.Errorf("file exists: %s", destination)
 	}
 
@@ -47,7 +49,7 @@ func (fc FileCompressor) DecompressFile(source, destination string) error {
 	if fc.Decompressor == nil {
 		return fmt.Errorf("no decompressor specified")
 	}
-	if !fc.OverwriteExisting && fileExists(destination) {
+	if !fc.OverwriteExisting && common.FileExists(destination) {
 		return fmt.Errorf("file exists: %s", destination)
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/pgzip"
+	"github.com/mholt/archiver/v3/common"
 )
 
 // TarGz facilitates gzip compression
@@ -54,7 +55,7 @@ func (tgz *TarGz) Unarchive(source, destination string) error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (tgz *TarGz) Walk(archive string, walkFn WalkFunc) error {
+func (tgz *TarGz) Walk(archive string, walkFn common.WalkFunc) error {
 	tgz.wrapReader()
 	return tgz.Tar.Walk(archive, walkFn)
 }

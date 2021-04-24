@@ -1,4 +1,4 @@
-package archiver_test
+package common_test
 
 import (
 	"errors"
@@ -6,16 +6,16 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mholt/archiver/v3"
+	"github.com/mholt/archiver/v3/common"
 )
 
 func TestIllegalPathErrorString(t *testing.T) {
 	tests := []struct {
-		instance *archiver.IllegalPathError
+		instance *common.IllegalPathError
 		expected string
 	}{
-		{instance: &archiver.IllegalPathError{Filename: "foo.txt"}, expected: "illegal file path: foo.txt"},
-		{instance: &archiver.IllegalPathError{AbsolutePath: "/tmp/bar.txt", Filename: "bar.txt"}, expected: "illegal file path: bar.txt"},
+		{instance: &common.IllegalPathError{Filename: "foo.txt"}, expected: "illegal file path: foo.txt"},
+		{instance: &common.IllegalPathError{AbsolutePath: "/tmp/bar.txt", Filename: "bar.txt"}, expected: "illegal file path: bar.txt"},
 	}
 
 	for i, test := range tests {
@@ -38,14 +38,14 @@ func TestIsIllegalPathError(t *testing.T) {
 		{instance: os.ErrNotExist, expected: false},
 		{instance: fmt.Errorf("some error"), expected: false},
 		{instance: errors.New("another error"), expected: false},
-		{instance: &archiver.IllegalPathError{Filename: "foo.txt"}, expected: true},
+		{instance: &common.IllegalPathError{Filename: "foo.txt"}, expected: true},
 	}
 
 	for i, test := range tests {
 		test := test
 
 		t.Run(fmt.Sprintf("Case %d", i), func(t *testing.T) {
-			actual := archiver.IsIllegalPathError(test.instance)
+			actual := common.IsIllegalPathError(test.instance)
 			if actual != test.expected {
 				t.Fatalf("Excepected '%v', but got '%v'", test.expected, actual)
 			}

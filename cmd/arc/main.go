@@ -12,6 +12,7 @@ import (
 
 	"github.com/klauspost/compress/zip"
 	"github.com/mholt/archiver/v3"
+	"github.com/mholt/archiver/v3/common"
 	"github.com/nwaples/rardecode"
 )
 
@@ -107,7 +108,7 @@ func main() {
 		}
 
 		var count int
-		err = w.Walk(flag.Arg(1), func(f archiver.File) error {
+		err = w.Walk(flag.Arg(1), func(f common.File) error {
 			count++
 			switch h := f.Header.(type) {
 			case zip.FileHeader:

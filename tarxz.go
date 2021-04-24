@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mholt/archiver/v3/common"
 	"github.com/ulikunitz/xz"
 	fastxz "github.com/xi2/xz"
 )
@@ -48,7 +49,7 @@ func (txz *TarXz) Unarchive(source, destination string) error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (txz *TarXz) Walk(archive string, walkFn WalkFunc) error {
+func (txz *TarXz) Walk(archive string, walkFn common.WalkFunc) error {
 	txz.wrapReader()
 	return txz.Tar.Walk(archive, walkFn)
 }

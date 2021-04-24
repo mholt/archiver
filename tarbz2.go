@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dsnet/compress/bzip2"
+	"github.com/mholt/archiver/v3/common"
 )
 
 // TarBz2 facilitates bzip2 compression
@@ -49,7 +50,7 @@ func (tbz2 *TarBz2) Unarchive(source, destination string) error {
 }
 
 // Walk calls walkFn for each visited item in archive.
-func (tbz2 *TarBz2) Walk(archive string, walkFn WalkFunc) error {
+func (tbz2 *TarBz2) Walk(archive string, walkFn common.WalkFunc) error {
 	tbz2.wrapReader()
 	return tbz2.Tar.Walk(archive, walkFn)
 }
