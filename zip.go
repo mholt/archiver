@@ -186,13 +186,6 @@ func (z *Zip) Archive(sources []string, destination string) error {
 // Unarchive unpacks the .zip file at source to destination.
 // Destination will be treated as a folder name.
 func (z *Zip) Unarchive(source, destination string) error {
-	if !fileExists(destination) && z.MkdirAll {
-		err := mkdir(destination, 0755)
-		if err != nil {
-			return fmt.Errorf("preparing destination: %v", err)
-		}
-	}
-
 	file, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("opening source file: %v", err)
@@ -204,7 +197,22 @@ func (z *Zip) Unarchive(source, destination string) error {
 		return fmt.Errorf("statting source file: %v", err)
 	}
 
-	err = z.Open(file, fileInfo.Size())
+	return z.doUnarchive(file, fileInfo.Size(), destination, folderNameFromFileName(source))
+}
+
+func (z *Zip) ReaderUnarchive(source io.Reader, size int64, destination string) error {
+	return z.doUnarchive(source, size, destination, "archive")
+}
+
+func (z *Zip) doUnarchive(source io.Reader, size int64, destination, folderNameIfMultipleTopLevels string) error {
+	if !fileExists(destination) && z.MkdirAll {
+		err := mkdir(destination, 0755)
+		if err != nil {
+			return fmt.Errorf("preparing destination: %v", err)
+		}
+	}
+
+	err := z.Open(source, size)
 	if err != nil {
 		return fmt.Errorf("opening zip archive for reading: %v", err)
 	}
@@ -219,7 +227,7 @@ func (z *Zip) Unarchive(source, destination string) error {
 			files[i] = z.zr.File[i].Name
 		}
 		if multipleTopLevels(files) {
-			destination = filepath.Join(destination, folderNameFromFileName(source))
+			destination = filepath.Join(destination, folderNameIfMultipleTopLevels)
 		}
 	}
 
@@ -656,6 +664,7 @@ var (
 	_ = Writer(new(Zip))
 	_ = Archiver(new(Zip))
 	_ = Unarchiver(new(Zip))
+	_ = ReaderUnarchiver(new(Rar))
 	_ = Walker(new(Zip))
 	_ = Extractor(new(Zip))
 	_ = Matcher(new(Zip))

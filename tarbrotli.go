@@ -45,6 +45,14 @@ func (tbr *TarBrotli) Unarchive(source, destination string) error {
 	return tbr.Tar.Unarchive(source, destination)
 }
 
+// ReaderUnarchive unpacks the compressed tarball
+// provided by source to destination. Destination
+// will be treated as a folder name.
+func (tbr *TarBrotli) ReaderUnarchive(source io.Reader, _ int64, destination string) error {
+	tbr.wrapReader()
+	return tbr.Tar.ReaderUnarchive(source, 0, destination)
+}
+
 // Walk calls walkFn for each visited item in archive.
 func (tbr *TarBrotli) Walk(archive string, walkFn WalkFunc) error {
 	tbr.wrapReader()
@@ -106,6 +114,7 @@ var (
 	_ = Writer(new(TarBrotli))
 	_ = Archiver(new(TarBrotli))
 	_ = Unarchiver(new(TarBrotli))
+	_ = ReaderUnarchiver(new(Rar))
 	_ = Walker(new(TarBrotli))
 	_ = Extractor(new(TarBrotli))
 )

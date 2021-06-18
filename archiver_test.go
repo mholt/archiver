@@ -330,6 +330,22 @@ func testArchiveUnarchive(t *testing.T, au archiverUnarchiver) {
 
 	// Check that what was extracted is what was compressed
 	symmetricTest(t, auStr, dest, true, true)
+
+	// Read outfile bytes and create a reader
+	inMemoryBytes, err := ioutil.ReadFile(outfile)
+	if err != nil {
+		t.Fatalf("failed to read in outfile bytes")
+	}
+	reader := bytes.NewReader(inMemoryBytes)
+
+	readerDest := filepath.Join(tmp, "extraction_test_reader"+auStr)
+	os.Mkdir(readerDest, 0755)
+	err = au.ReaderUnarchive(reader, int64(len(inMemoryBytes)), readerDest)
+	if err != nil {
+		t.Fatalf("[%s] extracting archive [reader -> %s]: didn't expect an error, but got: %v", auStr, readerDest, err)
+	}
+	// Check that what was extracted from reader is what was compressed
+	symmetricTest(t, auStr, readerDest, true, true)
 }
 
 /*
@@ -572,6 +588,7 @@ var archiveFormats = []interface{}{
 type archiverUnarchiver interface {
 	Archiver
 	Unarchiver
+	ReaderUnarchiver
 }
 
 type fakeFileInfo struct {

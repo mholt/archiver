@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -91,7 +92,7 @@ func (r *Rar) Unarchive(source, destination string) error {
 	// rather than potentially littering the destination...
 	if r.ImplicitTopLevelFolder {
 		var err error
-		destination, err = r.addTopLevelFolder(source, destination)
+		destination, err = r.addTopLevelFolderForFile(source, destination)
 		if err != nil {
 			return fmt.Errorf("scanning source archive: %v", err)
 		}
@@ -103,6 +104,54 @@ func (r *Rar) Unarchive(source, destination string) error {
 	}
 	defer r.Close()
 
+	return r.doUnarchive(destination)
+}
+
+// ReaderUnarchive unpacks the .rar file provided by the
+// io.Reader to destination. Destination will be treated as
+// a folder name. The size parameter is not used. If
+// r.ImplicitTopLevelFolder is true, this operation will
+// fully read the source reader into memory before processing,
+// and the implicit top-level folder will be named "archive".
+func (r *Rar) ReaderUnarchive(source io.Reader, _ int64, destination string) error {
+	if !fileExists(destination) && r.MkdirAll {
+		err := mkdir(destination, 0755)
+		if err != nil {
+			return fmt.Errorf("preparing destination: %v", err)
+		}
+	}
+
+	// if the files in the archive do not all share a common
+	// root, then make sure we extract to a single subfolder
+	// rather than potentially littering the destination...
+	if r.ImplicitTopLevelFolder {
+		// addTopLevelFolder must read entire source: fully read source store bytes in-memory
+		readerBytes, err := ioutil.ReadAll(source)
+		if err != nil {
+			return fmt.Errorf("reading from source reader: %v", err)
+		}
+		// source has been fully read: update it to be a bytes.Reader that reads the bytes
+		source = bytes.NewReader(readerBytes)
+
+		// run addTopLevelFolder using a separate bytes.Reader that reads from the same bytes
+		destination, err = r.addTopLevelFolder(bytes.NewReader(readerBytes), destination, "archive")
+		if err != nil {
+			return fmt.Errorf("scanning source archive: %v", err)
+		}
+	}
+
+	err := r.Open(source, 0)
+	if err != nil {
+		return fmt.Errorf("opening rar archive for reading: %v", err)
+	}
+	defer r.Close()
+
+	return r.doUnarchive(destination)
+}
+
+// doUnarchive performs the unarchive operation. Assumes that checks for destination and handling of implicit top-level
+// folder has already been done and r.Open or r.OpenFile has already been called.
+func (r *Rar) doUnarchive(destination string) error {
 	for {
 		err := r.unrarNext(destination)
 		if err == io.EOF {
@@ -116,22 +165,28 @@ func (r *Rar) Unarchive(source, destination string) error {
 			return fmt.Errorf("reading file in rar archive: %v", err)
 		}
 	}
-
 	return nil
 }
 
-// addTopLevelFolder scans the files contained inside
-// the tarball named sourceArchive and returns a modified
+// addTopLevelFolderForFile scans the files contained inside
+// the rar named sourceArchive and returns a modified
 // destination if all the files do not share the same
 // top-level folder.
-func (r *Rar) addTopLevelFolder(sourceArchive, destination string) (string, error) {
+func (r *Rar) addTopLevelFolderForFile(sourceArchive, destination string) (string, error) {
 	file, err := os.Open(sourceArchive)
 	if err != nil {
 		return "", fmt.Errorf("opening source archive: %v", err)
 	}
 	defer file.Close()
+	return r.addTopLevelFolder(file, destination, folderNameFromFileName(sourceArchive))
+}
 
-	rc, err := rardecode.NewReader(file, r.Password)
+// addTopLevelFolder scans the files contained inside
+// the provided reader (which provides a rar) and returns
+// a modified destination if all the files do not share the
+// same top-level folder.
+func (r *Rar) addTopLevelFolder(sourceArchiveReader io.Reader, destination, folderNameIfMultipleTopLevels string) (string, error) {
+	rc, err := rardecode.NewReader(sourceArchiveReader, r.Password)
 	if err != nil {
 		return "", fmt.Errorf("creating archive reader: %v", err)
 	}
@@ -149,7 +204,7 @@ func (r *Rar) addTopLevelFolder(sourceArchive, destination string) (string, erro
 	}
 
 	if multipleTopLevels(files) {
-		destination = filepath.Join(destination, folderNameFromFileName(sourceArchive))
+		destination = filepath.Join(destination, folderNameIfMultipleTopLevels)
 	}
 
 	return destination, nil
@@ -434,6 +489,7 @@ func (rfi rarFileInfo) Sys() interface{}   { return nil }
 var (
 	_ = Reader(new(Rar))
 	_ = Unarchiver(new(Rar))
+	_ = ReaderUnarchiver(new(Rar))
 	_ = Walker(new(Rar))
 	_ = Extractor(new(Rar))
 	_ = Matcher(new(Rar))

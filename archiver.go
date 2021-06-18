@@ -83,6 +83,12 @@ type Unarchiver interface {
 	Unarchive(source, destination string) error
 }
 
+// ReaderUnarchiver is a type that can extract archive files
+// from an io.Reader into a folder.
+type ReaderUnarchiver interface {
+	ReaderUnarchive(source io.Reader, size int64, destination string) error
+}
+
 // Writer can write discrete byte streams of files to
 // an output stream.
 type Writer interface {
