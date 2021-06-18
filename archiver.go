@@ -480,6 +480,66 @@ func ByExtension(filename string) (interface{}, error) {
 	return nil, fmt.Errorf("format unrecognized by filename: %s", filename)
 }
 
+// Customize customize an archiver and unarchiver, or compressor
+// and decompressor, based on CustomizeParams struct.
+func Customize(f interface{}, params CustomizeParams) (interface{}, error) {
+	switch v := f.(type) {
+	case *Rar:
+		v.OverwriteExisting = params.OverwriteExisting
+		v.MkdirAll = params.MkdirAll
+		v.ImplicitTopLevelFolder = params.ImplicitTopLevelFolder
+		v.StripComponents = params.StripComponents
+		v.ContinueOnError = params.ContinueOnError
+		v.Password = params.Password
+	case *Tar:
+		f = params.Tar
+	case *TarBrotli:
+		v.Tar = params.Tar
+		v.Quality = params.CompressionLevel
+	case *TarBz2:
+		v.Tar = params.Tar
+		v.CompressionLevel = params.CompressionLevel
+	case *TarGz:
+		v.Tar = params.Tar
+		v.CompressionLevel = params.CompressionLevel
+	case *TarLz4:
+		v.Tar = params.Tar
+		v.CompressionLevel = params.CompressionLevel
+	case *TarSz:
+		v.Tar = params.Tar
+	case *TarXz:
+		v.Tar = params.Tar
+	case *TarZstd:
+		v.Tar = params.Tar
+	case *Zip:
+		v.CompressionLevel = params.CompressionLevel
+		v.OverwriteExisting = params.OverwriteExisting
+		v.MkdirAll = params.MkdirAll
+		v.SelectiveCompression = params.SelectiveCompression
+		v.ImplicitTopLevelFolder = params.ImplicitTopLevelFolder
+		v.StripComponents = params.StripComponents
+		v.ContinueOnError = params.ContinueOnError
+	case *Gz:
+		v.CompressionLevel = params.CompressionLevel
+	case *Brotli:
+		v.Quality = params.CompressionLevel
+	case *Bz2:
+		v.CompressionLevel = params.CompressionLevel
+	case *Lz4:
+		v.CompressionLevel = params.CompressionLevel
+	case *Snappy:
+		// nothing to customize
+	case *Xz:
+		// nothing to customize
+	case *Zstd:
+		// nothing to customize
+	default:
+		return nil, fmt.Errorf("format does not support customization: %s", f)
+	}
+
+	return f, nil
+}
+
 // ByHeader returns the unarchiver value that matches the input's
 // file header. It does not affect the current read position.
 // If the file's header is not a recognized archive format, then
@@ -534,4 +594,11 @@ var matchers = []Matcher{
 	&Rar{},
 	&Tar{},
 	&Zip{},
+}
+
+type CustomizeParams struct {
+	*Tar
+	SelectiveCompression bool
+	Password             string
+	CompressionLevel     int
 }
