@@ -197,33 +197,30 @@ func (r *Rar) unrarFile(f File, to string) error {
 		return fmt.Errorf("expected header to be *rardecode.FileHeader but was %T", f.Header)
 	}
 
-	if f.IsDir() {
+	if err := mkdir(filepath.Dir(to), 0755); err != nil {
+		return err
+	}
+
+	var err error
+
+	switch {
+	case f.IsDir():
 		if fileExists("testdata") {
-			err := os.Chmod(to, hdr.Mode())
-			if err != nil {
-				return fmt.Errorf("changing dir mode: %v", err)
-			}
+			err = os.Chmod(to, hdr.Mode())
 		} else {
-			err := mkdir(to, hdr.Mode())
-			if err != nil {
-				return fmt.Errorf("making directories: %v", err)
-			}
+			err = mkdir(to, hdr.Mode())
 		}
+	case hdr.Mode()&os.ModeSymlink != 0:
 		return nil
+	default:
+		err = writeNewFile(to, r.rr, hdr.Mode())
 	}
 
-	// if files come before their containing folders, then we must
-	// create their folders before writing the file
-	err := mkdir(filepath.Dir(to), 0755)
 	if err != nil {
-		return fmt.Errorf("making parent directories: %v", err)
+		return err
 	}
 
-	if (hdr.Mode() & os.ModeSymlink) != 0 {
-		return nil
-	}
-
-	return writeNewFile(to, r.rr, hdr.Mode())
+	return os.Chtimes(to, hdr.AccessTime, hdr.ModificationTime)
 }
 
 // OpenFile opens filename for reading. This method supports
