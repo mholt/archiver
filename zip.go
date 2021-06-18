@@ -542,6 +542,7 @@ func (z *Zip) Walk(archive string, walkFn WalkFunc) error {
 		}
 
 		err = walkFn(File{
+			FullPath:   zf.Name,
 			FileInfo:   zf.FileInfo(),
 			Header:     zf.FileHeader,
 			ReadCloser: zfrc,
