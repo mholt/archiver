@@ -45,6 +45,15 @@ func (tgz *TarGz) Archive(sources []string, destination string) error {
 	return tgz.Tar.Archive(sources, destination)
 }
 
+// WriterArchive writes a compressed tar file to the destination
+// io.Writer containing the files listed in sources. File paths
+// can be those of regular files or directories; directories will
+// be recursively added.
+func (tgz *TarGz) WriterArchive(sources []string, destination io.Writer) error {
+	tgz.wrapWriter()
+	return tgz.Tar.WriterArchive(sources, destination)
+}
+
 // Unarchive unpacks the compressed tarball at
 // source to destination. Destination will be
 // treated as a folder name.
@@ -128,6 +137,7 @@ var (
 	_ = Reader(new(TarGz))
 	_ = Writer(new(TarGz))
 	_ = Archiver(new(TarGz))
+	_ = WriterArchiver(new(TarGz))
 	_ = Unarchiver(new(TarGz))
 	_ = Walker(new(TarGz))
 	_ = Extractor(new(TarGz))

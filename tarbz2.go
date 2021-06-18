@@ -40,6 +40,15 @@ func (tbz2 *TarBz2) Archive(sources []string, destination string) error {
 	return tbz2.Tar.Archive(sources, destination)
 }
 
+// WriterArchive writes a compressed tar file to the destination
+// io.Writer containing the files listed in sources. File paths
+// can be those of regular files or directories; directories will
+// be recursively added.
+func (tbz2 *TarBz2) WriterArchive(sources []string, destination io.Writer) error {
+	tbz2.wrapWriter()
+	return tbz2.Tar.WriterArchive(sources, destination)
+}
+
 // Unarchive unpacks the compressed tarball at
 // source to destination. Destination will be
 // treated as a folder name.

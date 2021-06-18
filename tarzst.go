@@ -36,6 +36,15 @@ func (tzst *TarZstd) Archive(sources []string, destination string) error {
 	return tzst.Tar.Archive(sources, destination)
 }
 
+// WriterArchive writes a compressed tar file to the destination
+// io.Writer containing the files listed in sources. File paths
+// can be those of regular files or directories; directories will
+// be recursively added.
+func (tzst *TarZstd) WriterArchive(sources []string, destination io.Writer) error {
+	tzst.wrapWriter()
+	return tzst.Tar.WriterArchive(sources, destination)
+}
+
 // Unarchive unpacks the compressed tarball at
 // source to destination. Destination will be
 // treated as a folder name.
@@ -110,6 +119,7 @@ var (
 	_ = Reader(new(TarZstd))
 	_ = Writer(new(TarZstd))
 	_ = Archiver(new(TarZstd))
+	_ = WriterArchiver(new(TarZstd))
 	_ = Unarchiver(new(TarZstd))
 	_ = Walker(new(TarZstd))
 	_ = ExtensionChecker(new(TarZstd))
