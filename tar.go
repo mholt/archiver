@@ -40,6 +40,10 @@ type Tar struct {
 	// especially on extraction.
 	ImplicitTopLevelFolder bool
 
+	// Strip number of leading paths. This feature is available
+	// only during unpacking of the entire archive.
+	StripComponents int
+
 	// If true, errors encountered during reading
 	// or writing a single file will be logged and
 	// the operation will continue on remaining files.
@@ -57,6 +61,17 @@ type Tar struct {
 func (*Tar) CheckExt(filename string) error {
 	if !strings.HasSuffix(filename, ".tar") {
 		return fmt.Errorf("filename must have a .tar extension")
+	}
+	return nil
+}
+
+// CheckPath ensures that the filename has not been crafted to perform path traversal attacks
+func (*Tar) CheckPath(to, filename string) error {
+	to, _ = filepath.Abs(to) //explicit the destination folder to prevent that 'string.HasPrefix' check can be 'bypassed' when no destination folder is supplied in input
+	dest := filepath.Join(to, filename)
+	//prevent path traversal attacks
+	if !strings.HasPrefix(dest, to) {
+		return &IllegalPathError{AbsolutePath: dest, Filename: filename}
 	}
 	return nil
 }
@@ -150,7 +165,7 @@ func (t *Tar) Unarchive(source, destination string) error {
 			break
 		}
 		if err != nil {
-			if t.ContinueOnError {
+			if t.ContinueOnError || IsIllegalPathError(err) {
 				log.Printf("[ERROR] Reading file in tar archive: %v", err)
 				continue
 			}
@@ -211,9 +226,27 @@ func (t *Tar) untarNext(destination string) error {
 	if err != nil {
 		return err // don't wrap error; calling loop must break on io.EOF
 	}
+	defer f.Close()
+
 	header, ok := f.Header.(*tar.Header)
 	if !ok {
 		return fmt.Errorf("expected header to be *tar.Header but was %T", f.Header)
+	}
+
+	errPath := t.CheckPath(destination, header.Name)
+	if errPath != nil {
+		return fmt.Errorf("checking path traversal attempt: %v", errPath)
+	}
+
+	if t.StripComponents > 0 {
+		if strings.Count(header.Name, "/") < t.StripComponents {
+			return nil // skip path with fewer components
+		}
+
+		for i := 0; i < t.StripComponents; i++ {
+			slash := strings.Index(header.Name, "/")
+			header.Name = header.Name[slash+1:]
+		}
 	}
 	return t.untarFile(f, destination, header)
 }
@@ -354,7 +387,7 @@ func (t *Tar) Write(f File) error {
 
 	err = t.tw.WriteHeader(hdr)
 	if err != nil {
-		return fmt.Errorf("%s: writing header: %v", hdr.Name, err)
+		return fmt.Errorf("%s: writing header: %w", hdr.Name, err)
 	}
 
 	if f.IsDir() {
@@ -367,7 +400,7 @@ func (t *Tar) Write(f File) error {
 		}
 		_, err := io.Copy(t.tw, f)
 		if err != nil {
-			return fmt.Errorf("%s: copying contents: %v", f.Name(), err)
+			return fmt.Errorf("%s: copying contents: %w", f.Name(), err)
 		}
 	}
 
@@ -547,7 +580,9 @@ func (*Tar) Match(file io.ReadSeeker) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer file.Seek(currentPos, io.SeekStart)
+	defer func() {
+		_, _ = file.Seek(currentPos, io.SeekStart)
+	}()
 
 	buf := make([]byte, tarBlockSize)
 	if _, err = io.ReadFull(file, buf); err != nil {
@@ -613,6 +648,7 @@ var (
 	_ = Extractor(new(Tar))
 	_ = Matcher(new(Tar))
 	_ = ExtensionChecker(new(Tar))
+	_ = FilenameChecker(new(Tar))
 )
 
 // DefaultTar is a default instance that is conveniently ready to use.
