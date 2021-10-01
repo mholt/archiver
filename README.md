@@ -75,7 +75,7 @@ curl.exe -fsS -A MS https://webinstall.dev/arc | powershell
 To install the runnable binary to your \$GOPATH/bin:
 
 ```bash
-go get github.com/mholt/archiver/cmd/arc
+go install github.com/mholt/archiver/v3/cmd/arc@latest
 ```
 
 ### Manually
