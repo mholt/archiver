@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
+	fastxz "github.com/therootcompany/xz"
 	"github.com/ulikunitz/xz"
-	fastxz "github.com/xi2/xz"
 )
 
 func init() {

@@ -8,8 +8,8 @@ require (
 	github.com/klauspost/compress v1.13.6
 	github.com/klauspost/pgzip v1.2.5
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2
+	github.com/therootcompany/xz v1.0.1
 	github.com/ulikunitz/xz v0.5.10
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 )
 
 require (
