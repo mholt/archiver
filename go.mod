@@ -15,4 +15,5 @@ require (
 require (
 	github.com/golang/snappy v0.0.4
 	github.com/pierrec/lz4/v4 v4.1.12
+	golang.org/x/text v0.3.7
 )

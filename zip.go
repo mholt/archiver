@@ -14,6 +14,13 @@ import (
 	"github.com/dsnet/compress/bzip2"
 	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/encoding/korean"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/encoding/traditionalchinese"
+	"golang.org/x/text/encoding/unicode"
 )
 
 func init() {
@@ -66,6 +73,11 @@ type Zip struct {
 	// a file within an archive will be logged and the
 	// operation will continue on remaining files.
 	ContinueOnError bool
+
+	// For files in zip archives that do not have UTF-8
+	// encoded filenames and comments, specify the character
+	// encoding here.
+	TextEncoding string
 }
 
 func (z Zip) Name() string { return ".zip" }
@@ -164,13 +176,15 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 		if err := ctx.Err(); err != nil {
 			return err // honor context cancellation
 		}
-
 		if !fileIsIncluded(pathsInArchive, f.Name) {
 			continue
 		}
 		if fileIsIncluded(skipDirs, f.Name) {
 			continue
 		}
+
+		// ensure filename and comment are UTF-8 encoded (issue #147)
+		z.decodeText(&f.FileHeader)
 
 		file := File{
 			FileInfo:      f.FileInfo(),
@@ -193,6 +207,24 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 	}
 
 	return nil
+}
+
+// decodeText decodes the name and comment fields from hdr into UTF-8.
+// It is a no-op if the text is already UTF-8 encoded or if z.TextEncoding
+// is not specified.
+func (z Zip) decodeText(hdr *zip.FileHeader) {
+	if hdr.NonUTF8 && z.TextEncoding != "" {
+		filename, err := decodeText(hdr.Name, z.TextEncoding)
+		if err == nil {
+			hdr.Name = filename
+		}
+		if hdr.Comment != "" {
+			comment, err := decodeText(hdr.Comment, z.TextEncoding)
+			if err == nil {
+				hdr.Comment = comment
+			}
+		}
+	}
 }
 
 type seekReaderAt interface {
@@ -263,6 +295,55 @@ var compressedFormats = map[string]struct{}{
 	".xz":   {},
 	".zip":  {},
 	".zipx": {},
+}
+
+var encodings = map[string]encoding.Encoding{
+	"ibm866":            charmap.CodePage866,
+	"iso8859_2":         charmap.ISO8859_2,
+	"iso8859_3":         charmap.ISO8859_3,
+	"iso8859_4":         charmap.ISO8859_4,
+	"iso8859_5":         charmap.ISO8859_5,
+	"iso8859_6":         charmap.ISO8859_6,
+	"iso8859_7":         charmap.ISO8859_7,
+	"iso8859_8":         charmap.ISO8859_8,
+	"iso8859_8I":        charmap.ISO8859_8I,
+	"iso8859_10":        charmap.ISO8859_10,
+	"iso8859_13":        charmap.ISO8859_13,
+	"iso8859_14":        charmap.ISO8859_14,
+	"iso8859_15":        charmap.ISO8859_15,
+	"iso8859_16":        charmap.ISO8859_16,
+	"koi8r":             charmap.KOI8R,
+	"koi8u":             charmap.KOI8U,
+	"macintosh":         charmap.Macintosh,
+	"windows874":        charmap.Windows874,
+	"windows1250":       charmap.Windows1250,
+	"windows1251":       charmap.Windows1251,
+	"windows1252":       charmap.Windows1252,
+	"windows1253":       charmap.Windows1253,
+	"windows1254":       charmap.Windows1254,
+	"windows1255":       charmap.Windows1255,
+	"windows1256":       charmap.Windows1256,
+	"windows1257":       charmap.Windows1257,
+	"windows1258":       charmap.Windows1258,
+	"macintoshcyrillic": charmap.MacintoshCyrillic,
+	"gbk":               simplifiedchinese.GBK,
+	"gb18030":           simplifiedchinese.GB18030,
+	"big5":              traditionalchinese.Big5,
+	"eucjp":             japanese.EUCJP,
+	"iso2022jp":         japanese.ISO2022JP,
+	"shiftjis":          japanese.ShiftJIS,
+	"euckr":             korean.EUCKR,
+	"utf16be":           unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM),
+	"utf16le":           unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM),
+}
+
+// decodeText returns UTF-8 encoded text from the given charset.
+// Thanks to @zxdvd for contributing non-UTF-8 encoding logic in #149.
+func decodeText(input, charset string) (string, error) {
+	if enc, ok := encodings[charset]; ok {
+		return enc.NewDecoder().String(input)
+	}
+	return "", fmt.Errorf("unrecognized charset %s", charset)
 }
 
 var zipHeader = []byte("PK\x03\x04") // TODO: headers of empty zip files might end with 0x05,0x06 or 0x06,0x06 instead of 0x03,0x04
