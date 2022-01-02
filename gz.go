@@ -1,76 +1,79 @@
 package archiver
 
 import (
-	"fmt"
+	"bytes"
 	"io"
-	"path/filepath"
+	"strings"
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/pgzip"
 )
 
+func init() {
+	RegisterFormat(Gz{})
+}
+
 // Gz facilitates gzip compression.
 type Gz struct {
+	// Gzip compression level. See https://pkg.go.dev/compress/flate#pkg-constants
+	// for some predefined constants. If 0, DefaultCompression is assumed rather
+	// than no compression.
 	CompressionLevel int
-	SingleThreaded   bool
+
+	// Use a fast parallel Gzip implementation. This is only
+	// effective for large streams (about 1 MB or greater).
+	Multithreaded bool
 }
 
-// Compress reads in, compresses it, and writes it to out.
-func (gz *Gz) Compress(in io.Reader, out io.Writer) error {
-	var w io.WriteCloser
+func (Gz) Name() string { return ".gz" }
+
+func (gz Gz) Match(filename string, stream io.Reader) (MatchResult, error) {
+	var mr MatchResult
+
+	// match filename
+	if strings.Contains(strings.ToLower(filename), gz.Name()) {
+		mr.ByName = true
+	}
+
+	// match file header
+	buf := make([]byte, len(gzHeader))
+	if _, err := io.ReadFull(stream, buf); err != nil {
+		return mr, err
+	}
+	mr.ByStream = bytes.Equal(buf, gzHeader)
+
+	return mr, nil
+}
+
+func (gz Gz) OpenWriter(w io.Writer) (io.WriteCloser, error) {
+	// assume default compression level if 0, rather than no
+	// compression, since no compression on a gzipped file
+	// doesn't make any sense in our use cases
+	level := gz.CompressionLevel
+	if level == 0 {
+		level = gzip.DefaultCompression
+	}
+
+	var wc io.WriteCloser
 	var err error
-	if gz.SingleThreaded {
-		w, err = gzip.NewWriterLevel(out, gz.CompressionLevel)
+	if gz.Multithreaded {
+		wc, err = pgzip.NewWriterLevel(w, level)
 	} else {
-		w, err = pgzip.NewWriterLevel(out, gz.CompressionLevel)
+		wc, err = gzip.NewWriterLevel(w, level)
 	}
-	if err != nil {
-		return err
-	}
-	defer w.Close()
-	_, err = io.Copy(w, in)
-	return err
+	return wc, err
 }
 
-// Decompress reads in, decompresses it, and writes it to out.
-func (gz *Gz) Decompress(in io.Reader, out io.Writer) error {
-	var r io.ReadCloser
+func (gz Gz) OpenReader(r io.Reader) (io.ReadCloser, error) {
+	var rc io.ReadCloser
 	var err error
-	if gz.SingleThreaded {
-		r, err = gzip.NewReader(in)
+	if gz.Multithreaded {
+		rc, err = pgzip.NewReader(r)
 	} else {
-		r, err = pgzip.NewReader(in)
+		rc, err = gzip.NewReader(r)
 	}
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-	_, err = io.Copy(out, r)
-	return err
+	return rc, err
 }
 
-// CheckExt ensures the file extension matches the format.
-func (gz *Gz) CheckExt(filename string) error {
-	if filepath.Ext(filename) != ".gz" {
-		return fmt.Errorf("filename must have a .gz extension")
-	}
-	return nil
-}
-
-func (gz *Gz) String() string { return "gz" }
-
-// NewGz returns a new, default instance ready to be customized and used.
-func NewGz() *Gz {
-	return &Gz{
-		CompressionLevel: gzip.DefaultCompression,
-	}
-}
-
-// Compile-time checks to ensure type implements desired interfaces.
-var (
-	_ = Compressor(new(Gz))
-	_ = Decompressor(new(Gz))
-)
-
-// DefaultGz is a default instance that is conveniently ready to use.
-var DefaultGz = NewGz()
+// magic number at the beginning of gzip files
+var gzHeader = []byte{0x1f, 0x8b}

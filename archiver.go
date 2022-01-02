@@ -1,540 +1,180 @@
-// Package archiver facilitates convenient, cross-platform, high-level archival
-// and compression operations for a variety of formats and compression algorithms.
-//
-// This package and its dependencies are written in pure Go (not cgo) and
-// have no external dependencies, so they should run on all major platforms.
-// (It also comes with a command for CLI use in the cmd/arc folder.)
-//
-// Each supported format or algorithm has a unique type definition that
-// implements the interfaces corresponding to the tasks they perform. For
-// example, the Tar type implements Reader, Writer, Archiver, Unarchiver,
-// Walker, and several other interfaces.
-//
-// The most common functions are implemented at the package level for
-// convenience: Archive, Unarchive, Walk, Extract, CompressFile, and
-// DecompressFile. With these, the format type is chosen implicitly,
-// and a sane default configuration is used.
-//
-// To customize a format's configuration, create an instance of its struct
-// with its fields set to the desired values. You can also use and customize
-// the handy Default* (replace the wildcard with the format's type name)
-// for a quick, one-off instance of the format's type.
-//
-// To obtain a new instance of a format's struct with the default config, use
-// the provided New*() functions. This is not required, however. An empty
-// struct of any type, for example &Zip{} is perfectly valid, so you may
-// create the structs manually, too. The examples on this page show how
-// either may be done.
-//
-// See the examples in this package for an idea of how to wield this package
-// for common tasks. Most of the examples which are specific to a certain
-// format type, for example Zip, can be applied to other types that implement
-// the same interfaces. For example, using Zip is very similar to using Tar
-// or TarGz (etc), and using Gz is very similar to using Sz or Xz (etc).
-//
-// When creating archives or compressing files using a specific instance of
-// the format's type, the name of the output file MUST match that of the
-// format, to prevent confusion later on. If you absolutely need a different
-// file extension, you may rename the file afterward.
-//
-// Values in this package are NOT safe for concurrent use. There is no
-// performance benefit of reusing them, and since they may contain important
-// state (especially while walking, reading, or writing), it is NOT
-// recommended to reuse values from this package or change their configuration
-// after they are in use.
 package archiver
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
-// Archiver is a type that can create an archive file
-// from a list of source file names.
-type Archiver interface {
-	ExtensionChecker
-
-	// Archive adds all the files or folders in sources
-	// to an archive to be created at destination. Files
-	// are added to the root of the archive, and directories
-	// are walked and recursively added, preserving folder
-	// structure.
-	Archive(sources []string, destination string) error
-}
-
-// ExtensionChecker validates file extensions
-type ExtensionChecker interface {
-	CheckExt(name string) error
-}
-
-// FilenameChecker validates filenames to prevent path traversal attacks
-type FilenameChecker interface {
-	CheckPath(to, filename string) error
-}
-
-// Unarchiver is a type that can extract archive files
-// into a folder.
-type Unarchiver interface {
-	Unarchive(source, destination string) error
-}
-
-// Writer can write discrete byte streams of files to
-// an output stream.
-type Writer interface {
-	Create(out io.Writer) error
-	Write(f File) error
-	Close() error
-}
-
-// Reader can read discrete byte streams of files from
-// an input stream.
-type Reader interface {
-	Open(in io.Reader, size int64) error
-	Read() (File, error)
-	Close() error
-}
-
-// Extractor can extract a specific file from a source
-// archive to a specific destination folder on disk.
-type Extractor interface {
-	Extract(source, target, destination string) error
-}
-
-// File provides methods for accessing information about
-// or contents of a file within an archive.
+// File is a virtualized, generalized file abstraction for interacting with archives.
+// It implements the fs.File interface.
 type File struct {
-	os.FileInfo
+	fs.FileInfo
 
-	// The original header info; depends on
-	// type of archive -- could be nil, too.
+	// The file header as used/provided by the archive format.
+	// Typically, you do not need to set this field when creating
+	// an archive.
 	Header interface{}
 
-	// Allow the file contents to be read (and closed)
-	io.ReadCloser
+	// The path of the file as it appears in the archive.
+	// This is equivalent to Header.Name (for most Header
+	// types). We require it to be specified here because
+	// it is such a common field and we want to preserve
+	// format-agnosticism (no type assertions) for basic
+	// operations.
+	NameInArchive string
+
+	// For symbolic and hard links, the target of the link.
+	LinkTarget string
+
+	// A callback function that opens the file to read its
+	// contents. The file must be closed when reading is
+	// complete. Nil for files that don't have content
+	// (such as directories and links).
+	Open func() (io.ReadCloser, error)
 }
 
-// FileInfo is an os.FileInfo but optionally with
-// a custom name, useful if dealing with files that
-// are not actual files on disk, or which have a
-// different name in an archive than on disk.
-type FileInfo struct {
-	os.FileInfo
-	CustomName string
-	// Stores path to the source.
-	// Used when reading a symlink.
-	SourcePath string
-}
+func (f File) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
 
-// Name returns fi.CustomName if not empty;
-// otherwise it returns fi.FileInfo.Name().
-func (fi FileInfo) Name() string {
-	if fi.CustomName != "" {
-		return fi.CustomName
-	}
-	return fi.FileInfo.Name()
-}
-
-// ReadFakeCloser is an io.Reader that has
-// a no-op close method to satisfy the
-// io.ReadCloser interface.
-type ReadFakeCloser struct {
-	io.Reader
-}
-
-// Close implements io.Closer.
-func (rfc ReadFakeCloser) Close() error { return nil }
-
-// Walker can walk an archive file and return information
-// about each item in the archive.
-type Walker interface {
-	Walk(archive string, walkFn WalkFunc) error
-}
-
-// WalkFunc is called at each item visited by Walk.
-// If an error is returned, the walk may continue
-// if the Walker is configured to continue on error.
-// The sole exception is the error value ErrStopWalk,
-// which stops the walk without an actual error.
-type WalkFunc func(f File) error
-
-// ErrStopWalk signals Walk to break without error.
-var ErrStopWalk = fmt.Errorf("walk stopped")
-
-// ErrFormatNotRecognized is an error that will be
-// returned if the file is not a valid archive format.
-var ErrFormatNotRecognized = fmt.Errorf("format not recognized")
-
-// Compressor compresses to out what it reads from in.
-// It also ensures a compatible or matching file extension.
-type Compressor interface {
-	ExtensionChecker
-	Compress(in io.Reader, out io.Writer) error
-}
-
-// Decompressor decompresses to out what it reads from in.
-type Decompressor interface {
-	Decompress(in io.Reader, out io.Writer) error
-}
-
-// Matcher is a type that can return whether the given
-// file appears to match the implementation's format.
-// Implementations should return the file's read position
-// to where it was when the method was called.
-type Matcher interface {
-	Match(io.ReadSeeker) (bool, error)
-}
-
-// Archive creates an archive of the source files to a new file at destination.
-// The archive format is chosen implicitly by file extension.
-func Archive(sources []string, destination string) error {
-	aIface, err := ByExtension(destination)
-	if err != nil {
-		return err
-	}
-	a, ok := aIface.(Archiver)
-	if !ok {
-		return fmt.Errorf("format specified by destination filename is not an archive format: %s (%T)", destination, aIface)
-	}
-	return a.Archive(sources, destination)
-}
-
-// Unarchive unarchives the given archive file into the destination folder.
-// The archive format is selected implicitly.
-func Unarchive(source, destination string) error {
-	uaIface, err := ByExtension(source)
-	if err != nil {
-		return err
-	}
-	u, ok := uaIface.(Unarchiver)
-	if !ok {
-		return fmt.Errorf("format specified by source filename is not an archive format: %s (%T)", source, uaIface)
-	}
-	return u.Unarchive(source, destination)
-}
-
-// Walk calls walkFn for each file within the given archive file.
-// The archive format is chosen implicitly.
-func Walk(archive string, walkFn WalkFunc) error {
-	wIface, err := ByExtension(archive)
-	if err != nil {
-		return err
-	}
-	w, ok := wIface.(Walker)
-	if !ok {
-		return fmt.Errorf("format specified by archive filename is not a walker format: %s (%T)", archive, wIface)
-	}
-	return w.Walk(archive, walkFn)
-}
-
-// Extract extracts a single file from the given source archive. If the target
-// is a directory, the entire folder will be extracted into destination. The
-// archive format is chosen implicitly.
-func Extract(source, target, destination string) error {
-	eIface, err := ByExtension(source)
-	if err != nil {
-		return err
-	}
-	e, ok := eIface.(Extractor)
-	if !ok {
-		return fmt.Errorf("format specified by source filename is not an extractor format: %s (%T)", source, eIface)
-	}
-	return e.Extract(source, target, destination)
-}
-
-// CompressFile is a convenience function to simply compress a file.
-// The compression algorithm is selected implicitly based on the
-// destination's extension.
-func CompressFile(source, destination string) error {
-	cIface, err := ByExtension(destination)
-	if err != nil {
-		return err
-	}
-	c, ok := cIface.(Compressor)
-	if !ok {
-		return fmt.Errorf("format specified by destination filename is not a recognized compression algorithm: %s", destination)
-	}
-	return FileCompressor{Compressor: c}.CompressFile(source, destination)
-}
-
-// DecompressFile is a convenience function to simply decompress a file.
-// The decompression algorithm is selected implicitly based on the
-// source's extension.
-func DecompressFile(source, destination string) error {
-	cIface, err := ByExtension(source)
-	if err != nil {
-		return err
-	}
-	c, ok := cIface.(Decompressor)
-	if !ok {
-		return fmt.Errorf("format specified by source filename is not a recognized compression algorithm: %s", source)
-	}
-	return FileCompressor{Decompressor: c}.DecompressFile(source, destination)
-}
-
-func fileExists(name string) bool {
-	_, err := os.Stat(name)
-	return !os.IsNotExist(err)
-}
-
-func mkdir(dirPath string, dirMode os.FileMode) error {
-	err := os.MkdirAll(dirPath, dirMode)
-	if err != nil {
-		return fmt.Errorf("%s: making directory: %v", dirPath, err)
-	}
-	return nil
-}
-
-func writeNewFile(fpath string, in io.Reader, fm os.FileMode) error {
-	err := os.MkdirAll(filepath.Dir(fpath), 0755)
-	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
-	}
-
-	out, err := os.Create(fpath)
-	if err != nil {
-		return fmt.Errorf("%s: creating new file: %v", fpath, err)
-	}
-	defer out.Close()
-
-	err = out.Chmod(fm)
-	if err != nil && runtime.GOOS != "windows" {
-		return fmt.Errorf("%s: changing file mode: %v", fpath, err)
-	}
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return fmt.Errorf("%s: writing file: %v", fpath, err)
-	}
-	return nil
-}
-
-func writeNewSymbolicLink(fpath string, target string) error {
-	err := os.MkdirAll(filepath.Dir(fpath), 0755)
-	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
-	}
-
-	_, err = os.Lstat(fpath)
-	if err == nil {
-		err = os.Remove(fpath)
-		if err != nil {
-			return fmt.Errorf("%s: failed to unlink: %+v", fpath, err)
+// FilesFromDisk returns a list of files by walking the directories in the
+// given filenames map. The keys are the names on disk, and the values are
+// their associated names in the archive. For convenience, empty values are
+// interpreted as the base name of the file (sans path) in the root of the
+// archive. Keys that specify directories on disk will be walked and added
+// to the archive recursively, rooted at the named directory. Symbolic links
+// will be preserved.
+//
+// This function is primarily used when preparing a list of files to add to
+// an archive.
+func FilesFromDisk(filenames map[string]string) ([]File, error) {
+	var files []File
+	for rootOnDisk, rootInArchive := range filenames {
+		if rootInArchive == "" {
+			rootInArchive = filepath.Base(rootInArchive)
 		}
-	}
 
-	err = os.Symlink(target, fpath)
-	if err != nil {
-		return fmt.Errorf("%s: making symbolic link for: %v", fpath, err)
-	}
-	return nil
-}
-
-func writeNewHardLink(fpath string, target string) error {
-	err := os.MkdirAll(filepath.Dir(fpath), 0755)
-	if err != nil {
-		return fmt.Errorf("%s: making directory for file: %v", fpath, err)
-	}
-
-	_, err = os.Lstat(fpath)
-	if err == nil {
-		err = os.Remove(fpath)
-		if err != nil {
-			return fmt.Errorf("%s: failed to unlink: %+v", fpath, err)
-		}
-	}
-
-	err = os.Link(target, fpath)
-	if err != nil {
-		return fmt.Errorf("%s: making hard link for: %v", fpath, err)
-	}
-	return nil
-}
-
-func isSymlink(fi os.FileInfo) bool {
-	return fi.Mode()&os.ModeSymlink != 0
-}
-
-// within returns true if sub is within or equal to parent.
-func within(parent, sub string) bool {
-	rel, err := filepath.Rel(parent, sub)
-	if err != nil {
-		return false
-	}
-	return !strings.Contains(rel, "..")
-}
-
-// multipleTopLevels returns true if the paths do not
-// share a common top-level folder.
-func multipleTopLevels(paths []string) bool {
-	if len(paths) < 2 {
-		return false
-	}
-	var lastTop string
-	for _, p := range paths {
-		p = strings.TrimPrefix(strings.Replace(p, `\`, "/", -1), "/")
-		for {
-			next := path.Dir(p)
-			if next == "." {
-				break
+		filepath.WalkDir(rootOnDisk, func(filename string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
 			}
-			p = next
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+
+			nameInArchive := path.Join(rootInArchive, strings.TrimPrefix(filename, rootOnDisk))
+
+			file := File{
+				FileInfo:      info,
+				NameInArchive: nameInArchive,
+				Open: func() (io.ReadCloser, error) {
+					return os.Open(filename)
+				},
+			}
+
+			// preserve symlinks
+			if isSymlink(info) {
+				file.LinkTarget, err = os.Readlink(filename)
+				if err != nil {
+					return fmt.Errorf("%s: readlink: %w", filename, err)
+				}
+			}
+
+			files = append(files, file)
+			return nil
+		})
+	}
+	return files, nil
+}
+
+// FileHandler is a callback function that is used to handle files as they are read
+// from an archive; it is kind of like fs.WalkDirFunc. Handler functions that open
+// their files must not overlap or run concurrently, as files may be read from the
+// same sequential stream; always close the file before returning.
+//
+// If the special error value fs.SkipDir is returned, the directory of the file
+// (or the file itself if it is a directory) will not be walked. Note that because
+// archive contents are not necessarily ordered, skipping directories requires
+// memory, and skipping lots of directories may run up your memory bill.
+//
+// Any other returned error will terminate a walk.
+type FileHandler func(ctx context.Context, f File) error
+
+// openAndCopyFile opens file for reading, copies its
+// contents to w, then closes file.
+func openAndCopyFile(file File, w io.Writer) error {
+	fileReader, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer fileReader.Close()
+	_, err = io.Copy(w, fileReader)
+	return err
+}
+
+// fileIsIncluded returns true if filename is included according to
+// filenameList; meaning it is in the list, its parent folder/path
+// is in the list, or the list is nil.
+func fileIsIncluded(filenameList []string, filename string) bool {
+	// include all files if there is no specific list
+	if filenameList == nil {
+		return true
+	}
+	trimmedFilename := strings.TrimSuffix(filename, "/")
+	for _, fn := range filenameList {
+		trimmedFn := strings.TrimSuffix(fn, "/")
+
+		// exact matches are of course included
+		if trimmedFn == trimmedFilename {
+			return true
 		}
-		if lastTop == "" {
-			lastTop = p
-		}
-		if p != lastTop {
+
+		// also consider the file included if its parent
+		// folder/path is in the list
+		if strings.HasPrefix(trimmedFilename, trimmedFn+"/") {
 			return true
 		}
 	}
 	return false
 }
 
-// folderNameFromFileName returns a name for a folder
-// that is suitable based on the filename, which will
-// be stripped of its extensions.
-func folderNameFromFileName(filename string) string {
-	base := filepath.Base(filename)
-	firstDot := strings.Index(base, ".")
-	if firstDot > -1 {
-		return base[:firstDot]
-	}
-	return base
+func isSymlink(info fs.FileInfo) bool {
+	return info.Mode()&os.ModeSymlink != 0
 }
 
-// makeNameInArchive returns the filename for the file given by fpath to be used within
-// the archive. sourceInfo is the FileInfo obtained by calling os.Stat on source, and baseDir
-// is an optional base directory that becomes the root of the archive. fpath should be the
-// unaltered file path of the file given to a filepath.WalkFunc.
-func makeNameInArchive(sourceInfo os.FileInfo, source, baseDir, fpath string) (string, error) {
-	name := filepath.Base(fpath) // start with the file or dir name
-	if sourceInfo.IsDir() {
-		// preserve internal directory structure; that's the path components
-		// between the source directory's leaf and this file's leaf
-		dir, err := filepath.Rel(filepath.Dir(source), filepath.Dir(fpath))
-		if err != nil {
-			return "", err
+// skipList keeps a list of non-intersecting paths
+// as long as its add method is used. Identical
+// elements are rejected, more specific paths are
+// replaced with broader ones, and more specific
+// paths won't be added when a broader one already
+// exists in the list. Trailing slashes are ignored.
+type skipList []string
+
+func (s *skipList) add(dir string) {
+	trimmedDir := strings.TrimSuffix(dir, "/")
+	var dontAdd bool
+	for i := 0; i < len(*s); i++ {
+		trimmedElem := strings.TrimSuffix((*s)[i], "/")
+		if trimmedDir == trimmedElem {
+			return
 		}
-		// prepend the internal directory structure to the leaf name,
-		// and convert path separators to forward slashes as per spec
-		name = path.Join(filepath.ToSlash(dir), name)
-	}
-	return path.Join(baseDir, name), nil // prepend the base directory
-}
-
-// NameInArchive returns a name for the file at fpath suitable for
-// the inside of an archive. The source and its associated sourceInfo
-// is the path where walking a directory started, and if no directory
-// was walked, source may == fpath. The returned name is essentially
-// the components of the path between source and fpath, preserving
-// the internal directory structure.
-func NameInArchive(sourceInfo os.FileInfo, source, fpath string) (string, error) {
-	return makeNameInArchive(sourceInfo, source, "", fpath)
-}
-
-// ByExtension returns an archiver and unarchiver, or compressor
-// and decompressor, based on the extension of the filename.
-func ByExtension(filename string) (interface{}, error) {
-	var ec interface{}
-	for _, c := range extCheckers {
-		if err := c.CheckExt(filename); err == nil {
-			ec = c
-			break
+		// don't add dir if a broader path already exists in the list
+		if strings.HasPrefix(trimmedDir, trimmedElem+"/") {
+			dontAdd = true
+			continue
+		}
+		// if dir is broader than a path in the list, remove more specific path in list
+		if strings.HasPrefix(trimmedElem, trimmedDir+"/") {
+			*s = append((*s)[:i], (*s)[i+1:]...)
+			i--
 		}
 	}
-	switch ec.(type) {
-	case *Rar:
-		return NewRar(), nil
-	case *Tar:
-		return NewTar(), nil
-	case *TarBrotli:
-		return NewTarBrotli(), nil
-	case *TarBz2:
-		return NewTarBz2(), nil
-	case *TarGz:
-		return NewTarGz(), nil
-	case *TarLz4:
-		return NewTarLz4(), nil
-	case *TarSz:
-		return NewTarSz(), nil
-	case *TarXz:
-		return NewTarXz(), nil
-	case *TarZstd:
-		return NewTarZstd(), nil
-	case *Zip:
-		return NewZip(), nil
-	case *Gz:
-		return NewGz(), nil
-	case *Bz2:
-		return NewBz2(), nil
-	case *Lz4:
-		return NewLz4(), nil
-	case *Snappy:
-		return NewSnappy(), nil
-	case *Xz:
-		return NewXz(), nil
-	case *Zstd:
-		return NewZstd(), nil
+	if !dontAdd {
+		*s = append(*s, dir)
 	}
-	return nil, fmt.Errorf("format unrecognized by filename: %s", filename)
-}
-
-// ByHeader returns the unarchiver value that matches the input's
-// file header. It does not affect the current read position.
-// If the file's header is not a recognized archive format, then
-// ErrFormatNotRecognized will be returned.
-func ByHeader(input io.ReadSeeker) (Unarchiver, error) {
-	var matcher Matcher
-	for _, m := range matchers {
-		ok, err := m.Match(input)
-		if err != nil {
-			return nil, fmt.Errorf("matching on format %s: %v", m, err)
-		}
-		if ok {
-			matcher = m
-			break
-		}
-	}
-	switch matcher.(type) {
-	case *Zip:
-		return NewZip(), nil
-	case *Tar:
-		return NewTar(), nil
-	case *Rar:
-		return NewRar(), nil
-	}
-	return nil, ErrFormatNotRecognized
-}
-
-// extCheckers is a list of the format implementations
-// that can check extensions. Only to be used for
-// checking extensions - not any archival operations.
-var extCheckers = []ExtensionChecker{
-	&TarBrotli{},
-	&TarBz2{},
-	&TarGz{},
-	&TarLz4{},
-	&TarSz{},
-	&TarXz{},
-	&TarZstd{},
-	&Rar{},
-	&Tar{},
-	&Zip{},
-	&Brotli{},
-	&Gz{},
-	&Bz2{},
-	&Lz4{},
-	&Snappy{},
-	&Xz{},
-	&Zstd{},
-}
-
-var matchers = []Matcher{
-	&Rar{},
-	&Tar{},
-	&Zip{},
 }

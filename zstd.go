@@ -1,12 +1,16 @@
 package archiver
 
 import (
-	"fmt"
+	"bytes"
 	"io"
-	"path/filepath"
+	"strings"
 
 	"github.com/klauspost/compress/zstd"
 )
+
+func init() {
+	RegisterFormat(Zstd{})
+}
 
 // Zstd facilitates Zstandard compression.
 type Zstd struct {
@@ -14,48 +18,47 @@ type Zstd struct {
 	DecoderOptions []zstd.DOption
 }
 
-// Compress reads in, compresses it, and writes it to out.
-func (zs *Zstd) Compress(in io.Reader, out io.Writer) error {
-	w, err := zstd.NewWriter(out, zs.EncoderOptions...)
-	if err != nil {
-		return err
+func (Zstd) Name() string { return ".zst" }
+
+func (zs Zstd) Match(filename string, stream io.Reader) (MatchResult, error) {
+	var mr MatchResult
+
+	// match filename
+	if strings.Contains(strings.ToLower(filename), zs.Name()) {
+		mr.ByName = true
 	}
-	defer w.Close()
-	_, err = io.Copy(w, in)
-	return err
+
+	// match file header
+	buf := make([]byte, len(zstdHeader))
+	if _, err := io.ReadFull(stream, buf); err != nil {
+		return mr, err
+	}
+	mr.ByStream = bytes.Equal(buf, zstdHeader)
+
+	return mr, nil
 }
 
-// Decompress reads in, decompresses it, and writes it to out.
-func (zs *Zstd) Decompress(in io.Reader, out io.Writer) error {
-	r, err := zstd.NewReader(in, zs.DecoderOptions...)
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-	_, err = io.Copy(out, r)
-	return err
+func (zs Zstd) OpenWriter(w io.Writer) (io.WriteCloser, error) {
+	return zstd.NewWriter(w, zs.EncoderOptions...)
 }
 
-// CheckExt ensures the file extension matches the format.
-func (zs *Zstd) CheckExt(filename string) error {
-	if filepath.Ext(filename) != ".zst" {
-		return fmt.Errorf("filename must have a .zst extension")
+func (zs Zstd) OpenReader(r io.Reader) (io.ReadCloser, error) {
+	zr, err := zstd.NewReader(r, zs.DecoderOptions...)
+	if err != nil {
+		return nil, err
 	}
+	return errorCloser{zr}, nil
+}
+
+type errorCloser struct {
+	*zstd.Decoder
+}
+
+func (ec errorCloser) Close() error {
+	ec.Decoder.Close()
 	return nil
 }
 
-func (zs *Zstd) String() string { return "zstd" }
-
-// NewZstd returns a new, default instance ready to be customized and used.
-func NewZstd() *Zstd {
-	return new(Zstd)
-}
-
-// Compile-time checks to ensure type implements desired interfaces.
-var (
-	_ = Compressor(new(Zstd))
-	_ = Decompressor(new(Zstd))
-)
-
-// DefaultZstd is a default instance that is conveniently ready to use.
-var DefaultZstd = NewZstd()
+// magic number at the beginning of Zstandard files
+// https://github.com/facebook/zstd/blob/6211bfee5ec24dc825c11751c33aa31d618b5f10/doc/zstd_compression_format.md
+var zstdHeader = []byte{0x28, 0xb5, 0x2f, 0xfd}
