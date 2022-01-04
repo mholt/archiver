@@ -30,6 +30,7 @@ type File struct {
 	NameInArchive string
 
 	// For symbolic and hard links, the target of the link.
+	// Not supported by all archive formats.
 	LinkTarget string
 
 	// A callback function that opens the file to read its
@@ -62,6 +63,7 @@ func FilesFromDisk(filenames map[string]string) ([]File, error) {
 			if err != nil {
 				return err
 			}
+
 			info, err := d.Info()
 			if err != nil {
 				return err

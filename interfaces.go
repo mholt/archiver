@@ -7,7 +7,7 @@ import (
 
 // Format represents either an archive or compression format.
 type Format interface {
-	// Name returns the name of the format. TODO: what about 'extension' instead?
+	// Name returns the name of the format.
 	Name() string
 
 	// Match returns true if the given name/stream is recognized.
