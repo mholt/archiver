@@ -1,33 +1,32 @@
-# archiver [![archiver GoDoc](https://img.shields.io/badge/reference-godoc-blue.svg?style=flat-square)](https://pkg.go.dev/github.com/mholt/archiver?tab=doc) [![Ubuntu-latest](https://github.com/mholt/archiver/actions/workflows/ubuntu-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/ubuntu-latest.yml) [![Macos-latest](https://github.com/mholt/archiver/actions/workflows/macos-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/macos-latest.yml) [![Windows-latest](https://github.com/mholt/archiver/actions/workflows/windows-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/windows-latest.yml)
+# archiver [![Go Reference](https://pkg.go.dev/badge/github.com/mholt/archiver/v4.svg)](https://pkg.go.dev/github.com/mholt/archiver/v4) [![Ubuntu-latest](https://github.com/mholt/archiver/actions/workflows/ubuntu-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/ubuntu-latest.yml) [![Macos-latest](https://github.com/mholt/archiver/actions/workflows/macos-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/macos-latest.yml) [![Windows-latest](https://github.com/mholt/archiver/actions/workflows/windows-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/windows-latest.yml)
 
-Introducing **Archiver 3.1** - a cross-platform, multi-format archive utility and Go library. A powerful and flexible library meets an elegant CLI in this generic replacement for several platform-specific or format-specific archive utilities.
+Introducing **Archiver 4.0** - a cross-platform, multi-format archive utility and Go library. A powerful and flexible library meets an elegant CLI in this generic replacement for several platform-specific or format-specific archive utilities.
+
+**:warning: v4 is in ALPHA. The core library APIs work pretty well but the command has not been implemented yet, nor have most automated tests. If you need the `arc` command, stick with v3 for now.**
 
 ## Features
 
-Package archiver makes it trivially easy to make and extract common archive formats such as tarball (and its compressed variants) and zip. Simply name the input and output file(s). The `arc` command runs the same on all platforms and has no external dependencies (not even libc). It is powered by the Go standard library and several third-party, pure-Go libraries.
-
-Files are put into the root of the archive; directories are recursively added, preserving structure.
-
-- Make whole archives from a list of files
-- Open whole archives to a folder
-- Extract specific files/folders from archives
-- Stream files in and out of archives without needing actual files on disk
-- Traverse archive contents without loading them
-- Compress files
-- Decompress files
-- Streaming compression and decompression
-- Several archive and compression formats supported
-
-### Format-dependent features
-
-- Gzip is multithreaded
-- Optionally create a top-level folder to avoid littering a directory or archive root with files
-- Toggle overwrite existing files
-- Adjust compression level
-- Zip: store (not compress) already-compressed files
-- Make all necessary directories
+- Stream-oriented APIs
+- Automatically identify archive and compression formats:
+	- By file name
+	- By header
+- Traverse directories, archive files, and any other file uniformly as [`io/fs`](https://pkg.go.dev/io/fs) file systems:
+	- [`DirFS`](https://pkg.go.dev/github.com/mholt/archiver/v4#DirFS)
+	- [`FileFS`](https://pkg.go.dev/github.com/mholt/archiver/v4#FileFS)
+	- [`ArchiveFS`](https://pkg.go.dev/github.com/mholt/archiver/v4#ArchiveFS)
+- Compress and decompress files
+- Create and extract archive files
+- Walk or traverse into archive files
+- Extract only specific files from archives
+- Insert (append) into .tar files
+- Numerous archive and compression formats supported
+- Extensible (add more formats just by registering them)
+- Cross-platform, static binary
+- Pure Go (no cgo)
+- Multithreaded Gzip
+- Adjust compression levels
+- Automatically add compressed files to zip archives without re-compressing
 - Open password-protected RAR archives
-- Optionally continue with other files after an error
 
 ### Supported compression formats
 
@@ -38,7 +37,7 @@ Files are put into the root of the archive; directories are recursively added, p
 - lz4
 - snappy (sz)
 - xz
-- zstandard (zstd)
+- zstandard (zst)
 
 ### Supported archive formats
 
@@ -46,279 +45,247 @@ Files are put into the root of the archive; directories are recursively added, p
 - .tar (including any compressed variants like .tar.gz)
 - .rar (read-only)
 
-Tar files can optionally be compressed using any of the above compression formats.
+Tar files can optionally be compressed using any compression format.
 
-## GoDoc
+## Command use
 
-See <https://pkg.go.dev/github.com/mholt/archiver/v3>
+Coming soon for v4. See [the last v3 docs](https://github.com/mholt/archiver/tree/v3.5.1).
 
-## Install
 
-### With webi
-
-[`webi`](https://webinstall.dev/arc) will install `webi` and `arc` to `~/.local/bin/` and update your `PATH`.
-
-#### Mac, Linux, Raspberry Pi
+## Library use
 
 ```bash
-curl -fsS https://webinstall.dev/arc | bash
+$ go get github.com/mholt/archiver/v4
 ```
 
-#### Windows 10
 
-```pwsh
-curl.exe -fsS -A MS https://webinstall.dev/arc | powershell
-```
+### Create archive
 
-### With Go
+Creating archives can be done entirely without needing a real disk or storage device since all you need is a list of [`File` structs](https://pkg.go.dev/github.com/mholt/archiver/v4#File) to pass in.
 
-To install the runnable binary to your \$GOPATH/bin:
+However, creating archives from files on disk is very common, so you can use the `FilesFromDisk()` function to help you map filenames on disk to their paths in the archive. Then create and customize the format type.
 
-```bash
-go install github.com/mholt/archiver/v3/cmd/arc@latest
-```
-
-### Manually
-
-To install manually
-
-1. Download the binary for your platform from the [Github Releases](https://github.com/mholt/archiver/releases) page.
-2. Move the binary to a location in your path, for example:
-   - without `sudo`:
-     ```bash
-     chmod a+x ~/Downloads/arc_*
-     mkdir -p ~/.local/bin
-     mv ~/Downloads/arc_* ~/.local/bin/arc
-     ```
-   - as `root`:
-     ```bash
-     chmod a+x ~/Downloads/arc_*
-     sudo mkdir -p /usr/local/bin
-     sudo mv ~/Downloads/arc_* /usr/local/bin/arc
-     ```
-3. If needed, update `~/.bashrc` or `~/.profile` to include add `arc` in your `PATH`, for example:
-   ```
-   echo 'PATH="$HOME:/.local/bin:$PATH"' >> ~/.bashrc
-   ```
-
-## Build from Source
-
-You can successfully build `arc` with just the go tooling, or with `goreleaser`.
-
-### With `go`
-
-```bash
-go build cmd/arc/*.go
-```
-
-### Multi-platform with `goreleaser`
-
-Builds with `goreleaser` will also include version info.
-
-```bash
-goreleaser --snapshot --skip-publish --rm-dist
-```
-
-## Command Use
-
-### Make new archive
-
-```bash
-# Syntax: arc archive [archive name] [input files...]
-
-arc archive test.tar.gz file1.txt images/file2.jpg folder/subfolder
-```
-
-(At least one input file is required.)
-
-### Extract entire archive
-
-```bash
-# Syntax: arc unarchive [archive name] [destination]
-
-arc unarchive test.tar.gz
-```
-
-(The destination path is optional; default is current directory.)
-
-The archive name must end with a supported file extension&mdash;this is how it knows what kind of archive to make. Run `arc help` for more help.
-
-### List archive contents
-
-```bash
-# Syntax: arc ls [archive name]
-
-arc ls caddy_dist.tar.gz
-```
-
-```txt
-drwxr-xr-x  matt    staff   0       2018-09-19 15:47:18 -0600 MDT   dist/
--rw-r--r--  matt    staff   6148    2017-08-07 18:34:22 -0600 MDT   dist/.DS_Store
--rw-r--r--  matt    staff   22481   2018-09-19 15:47:18 -0600 MDT   dist/CHANGES.txt
--rw-r--r--  matt    staff   17189   2018-09-19 15:47:18 -0600 MDT   dist/EULA.txt
--rw-r--r--  matt    staff   25261   2016-03-07 16:32:00 -0700 MST   dist/LICENSES.txt
--rw-r--r--  matt    staff   1017    2018-09-19 15:47:18 -0600 MDT   dist/README.txt
--rw-r--r--  matt    staff   288     2016-03-21 11:52:38 -0600 MDT   dist/gitcookie.sh.enc
-...
-```
-
-### Extract a specific file or folder from an archive
-
-```bash
-# Syntax: arc extract [archive name] [path in archive] [destination on disk]
-
-arc extract test.tar.gz foo/hello.txt extracted/hello.txt
-```
-
-### Compress a single file
-
-```bash
-# Syntax: arc compress [input file] [output file]
-
-arc compress test.txt compressed_test.txt.gz
-arc compress test.txt gz
-```
-
-For convenience, the output file (second argument) may simply be a compression format (without leading dot), in which case the output filename will be the same as the input filename but with the format extension appended, and the input file will be deleted if successful.
-
-### Decompress a single file
-
-```bash
-# Syntax: arc decompress [input file] [output file]
-
-arc decompress test.txt.gz original_test.txt
-arc decompress test.txt.gz
-```
-
-For convenience, the output file (second argument) may be omitted. In that case, the output filename will have the same name as the input filename, but with the compression extension stripped from the end; and the input file will be deleted if successful.
-
-### Flags
-
-Flags are specified before the subcommand. Use `arc help` or `arc -h` to get usage help and a description of flags with their default values.
-
-## Library Use
-
-The archiver package allows you to easily create and open archives, walk their contents, extract specific files, compress and decompress files, and even stream archives in and out using pure io.Reader and io.Writer interfaces, without ever needing to touch the disk.
-
-To use as a dependency in your project:
-
-```bash
-go get github.com/mholt/archiver/v3
-```
+In this example, we add 2 files and a directory (which includes its contents recursively) to a .tar.gz file:
 
 ```go
-import "github.com/mholt/archiver/v3"
-```
-
-[See the package's GoDoc](https://pkg.go.dev/github.com/mholt/archiver?tab=doc) for full API documentation.
-
-For example, creating or unpacking an archive file:
-
-```go
-err := archiver.Archive([]string{"testdata", "other/file.txt"}, "test.zip")
-// ...
-err = archiver.Unarchive("test.tar.gz", "test")
-```
-
-The archive format is determined by file extension. (There are [several functions in this package](https://pkg.go.dev/github.com/mholt/archiver?tab=doc) which perform a task by inferring the format from file extension or file header, including `Archive()`, `Unarchive()`, `CompressFile()`, and `DecompressFile()`.)
-
-To configure the archiver used or perform, create an instance of the format's type:
-
-```go
-z := archiver.Zip{
-	CompressionLevel:       flate.DefaultCompression,
-	MkdirAll:               true,
-	SelectiveCompression:   true,
-	ContinueOnError:        false,
-	OverwriteExisting:      false,
-	ImplicitTopLevelFolder: false,
-}
-
-err := z.Archive([]string{"testdata", "other/file.txt"}, "/Users/matt/Desktop/test.zip")
-```
-
-Inspecting an archive:
-
-```go
-err = z.Walk("/Users/matt/Desktop/test.zip", func(f archiver.File) error {
-	zfh, ok := f.Header.(zip.FileHeader)
-	if ok {
-		fmt.Println("Filename:", zfh.Name)
-	}
-	return nil
+// map files on disk to their paths in the archive
+files, err := archiver.FilesFromDisk(map[string]string{
+	"/path/on/disk/file1.txt": "file1.txt",
+	"/path/on/disk/file2.txt": "subfolder/file2.txt",
+	"/path/on/disk/folder":    "",
 })
-```
-
-Streaming files into an archive that is being written to the HTTP response:
-
-```go
-err = z.Create(responseWriter)
 if err != nil {
 	return err
 }
-defer z.Close()
 
-for _, fname := range filenames {
-	info, err := os.Stat(fname)
+// create the output file we'll write to
+out, err := os.Create("example.tar.gz")
+if err != nil {
+	return err
+}
+defer out.Close()
+
+// we can use the CompressedArchive type to gzip a tarball
+// (compression is not required; you could use Tar directly)
+format := archiver.CompressedArchive{
+	Compression: archiver.Gz{},
+	Archival:    archiver.Tar{},
+}
+
+// create the archive
+err = format.Archive(context.Background(), out, files)
+if err != nil {
+	return err
+}
+```
+
+### Extract archive
+
+Extracting an archive, extracting _from_ an archive, and walking an archive are all the same function.
+
+Simply use your format type (e.g. `Zip`) to call `Extract()`. You'll pass in a context (for cancellation), the input stream, the list of files you want out of the archive, and a callback function to handle each file. 
+
+If you want all the files, pass in a nil list of file paths.
+
+```go
+// the type that will be used to read the input stream
+format := archiver.Zip{}
+
+// the list of files we want out of the archive; any
+// directories will include all their contents unless
+// we return fs.SkipDir from our handler
+// (leave this nil to walk ALL files from the archive)
+fileList := []string{"file1.txt", "subfolder"}
+
+handler := func(ctx context.Context, f archiver.File) error {
+	// do something with the file
+	return nil
+}
+
+err := format.Extract(ctx, input, fileList, handler)
+if err != nil {
+	return err
+}
+```
+
+### Identifying formats
+
+Have an input stream with unknown contents? No problem, archiver can identify it for you. It will try matching based on filename and/or the header (which peeks at the stream):
+
+```go
+format, err := archiver.Identify("filename.tar.zst", input)
+if err != nil {
+	return err
+}
+// you can now type-assert format to whatever you need
+
+// want to extract something?
+if ex, ok := format.(archiver.Extractor); ok {
+	// ... proceed to extract
+}
+
+// or maybe it's compressed and you want to decompress it?
+if decom, ok := format.(archiver.Decompressor); ok {
+	rc, err := decom.OpenReader(unknownFile)
 	if err != nil {
 		return err
 	}
+	defer rc.Close()
 
-	// get file's name for the inside of the archive
-	internalName, err := archiver.NameInArchive(info, fname, fname)
+	// read from rc to get decompressed data
+}
+```
+
+### Virtual file systems
+
+This is my favorite feature.
+
+Let's say you have a file. It could be a real directory on disk, an archive, a compressed archive, or any other regular file. You don't really care; you just want to use it uniformly no matter what it is.
+
+Use archiver to simply create a file system:
+
+```go
+// filename could be:
+// - a folder ("/home/you/Desktop")
+// - an archive ("example.zip")
+// - a compressed archive ("example.tar.gz")
+// - a regular file ("example.txt")
+fsys, err := archiver.FileSystem(filename)
+if err != nil {
+	return err
+}
+```
+
+This is a fully-featured `fs.FS`, so you can open files and read directories, no matter what kind of file the input was.
+
+For example, to open a specific file:
+
+```go
+f, err := fsys.Open("file")
+if err != nil {
+	return err
+}
+defer f.Close()
+```
+
+If you opened a regular file, you can read from it.
+
+If you opened a directory, you can list its contents:
+
+```go
+if dir, ok := f.(fs.ReadDirFile); ok {
+	// 0 gets all entries, but you can pass > 0 to paginate
+	entries, err := dir.ReadDir(0)
 	if err != nil {
 		return err
 	}
-
-	// open the file
-	file, err := os.Open(f)
-	if err != nil {
-		return err
-	}
-
-	// write it to the archive
-	err = z.Write(archiver.File{
-		FileInfo: archiver.FileInfo{
-			FileInfo:   info,
-			CustomName: internalName,
-		},
-		ReadCloser: file,
-	})
-	file.Close()
-	if err != nil {
-		return err
+	for _, e := range entries {
+		fmt.Println(e.Name())
 	}
 }
 ```
 
-The `archiver.File` type allows you to use actual files with archives, or to mimic files when you only have streams.
+Or get a directory listing this way:
 
-There's a lot more that can be done, too. [See the GoDoc](https://pkg.go.dev/github.com/mholt/archiver?tab=doc) for full API documentation.
+```go
+entries, err := fsys.ReadDir("Playlists")
+if err != nil {
+	return err
+}
+for _, e := range entries {
+	fmt.Println(e.Name())
+}
+```
 
-**Security note: This package does NOT attempt to mitigate zip-slip attacks.** It is [extremely difficult](https://github.com/rubyzip/rubyzip/pull/376) [to do properly](https://github.com/mholt/archiver/pull/65#issuecomment-395988244) and [seemingly impossible to mitigate effectively across platforms](https://github.com/golang/go/issues/20126). [Attempted fixes have broken processing of legitimate files in production](https://github.com/mholt/archiver/pull/70#issuecomment-423267320), rendering the program unusable. Our recommendation instead is to inspect the contents of an untrusted archive before extracting it (this package provides `Walkers`) and decide if you want to proceed with extraction.
+Or maybe you want to walk all or part of the file system, but skip a folder named `.git`:
 
-## Project Values
+```go
+err := fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+	if err != nil {
+		return err
+	}
+	if path == ".git" {
+		return fs.SkipDir
+	}
+	fmt.Println("Walking:", path, "Dir?", d.IsDir())
+	return nil
+})
+if err != nil {
+	return err
+}
+```
 
-This project has a few principle-based goals that guide its development:
+### Compress data
 
-- **Do our thing really well.** Our thing is creating, opening, inspecting, compressing, and streaming archive files. It is not meant to be a replacement for specific archive format tools like tar, zip, etc. that have lots of features and customizability. (Some customizability is OK, but not to the extent that it becomes overly complicated or error-prone.)
+Compression formats let you open writers to compress data:
 
-- **Have good tests.** Changes should be covered by tests.
+```go
+// wrap underlying writer w
+compressor, err := archiver.Zstd{}.OpenWriter(w)
+if err != nil {
+	return err
+}
+defer compressor.Close()
 
-- **Limit dependencies.** Keep the package lightweight.
+// writes to compressor will be compressed
+```
 
-- **Pure Go.** This means no cgo or other external/system dependencies. This package should be able to stand on its own and cross-compile easily to any platform -- and that includes its library dependencies.
+### Decompress data
 
-- **Idiomatic Go.** Keep interfaces small, variable names semantic, vet shows no errors, the linter is generally quiet, etc.
+Similarly, compression formats let you open readers to decompress data:
 
-- **Be elegant.** This package should be elegant to use and its code should be elegant when reading and testing. If it doesn't feel good, fix it up.
+```go
+// wrap underlying reader r
+decompressor, err := archiver.Brotli{}.OpenReader(r)
+if err != nil {
+	return err
+}
+defer decompressor.Close()
 
-- **Well-documented.** Use comments prudently; explain why non-obvious code is necessary (and use tests to enforce it). Keep the docs updated, and have examples where helpful.
+// reads from decompressor will be decompressed
+```
 
-- **Keep it efficient.** This often means keep it simple. Fast code is valuable.
+### Append to tarball
 
-- **Consensus.** Contributions should ideally be approved by multiple reviewers before being merged. Generally, avoid merging multi-chunk changes that do not go through at least one or two iterations/reviews. Except for trivial changes, PRs are seldom ready to merge right away.
+Tar archives can be appended to without creating a whole new archive by calling `Insert()` on a tar stream. However, this requires that the tarball is not compressed (due to complexities with modifying compression dictionaries).
 
-- **Have fun contributing.** Coding is awesome!
+Here is an example that appends a file to a tarball on disk:
 
-We welcome contributions and appreciate your efforts! However, please open issues to discuss any changes before spending the time preparing a pull request. This will save time, reduce frustration, and help coordinate the work. Thank you!
+```go
+tarball, err := os.OpenFile("example.tar", os.O_RDWR, 0644)
+if err != nil {
+	return err
+}
+defer tarball.Close()
+
+// prepare a text file for the root of the archive
+files, err := archiver.FilesFromDisk(map[string]string{
+	"/home/you/lastminute.txt": "",
+})
+
+err := archiver.Tar{}.Insert(context.Background(), tarball, files)
+if err != nil {
+	return err
+}
+```
+

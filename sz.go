@@ -1,51 +1,47 @@
 package archiver
 
 import (
-	"fmt"
+	"bytes"
 	"io"
-	"path/filepath"
+	"strings"
 
 	"github.com/golang/snappy"
 )
 
-// Snappy facilitates Snappy compression.
-type Snappy struct{}
-
-// Compress reads in, compresses it, and writes it to out.
-func (s *Snappy) Compress(in io.Reader, out io.Writer) error {
-	w := snappy.NewBufferedWriter(out)
-	defer w.Close()
-	_, err := io.Copy(w, in)
-	return err
+func init() {
+	RegisterFormat(Sz{})
 }
 
-// Decompress reads in, decompresses it, and writes it to out.
-func (s *Snappy) Decompress(in io.Reader, out io.Writer) error {
-	r := snappy.NewReader(in)
-	_, err := io.Copy(out, r)
-	return err
-}
+// Sz facilitates Snappy compression.
+type Sz struct{}
 
-// CheckExt ensures the file extension matches the format.
-func (s *Snappy) CheckExt(filename string) error {
-	if filepath.Ext(filename) != ".sz" {
-		return fmt.Errorf("filename must have a .sz extension")
+func (sz Sz) Name() string { return ".sz" }
+
+func (sz Sz) Match(filename string, stream io.Reader) (MatchResult, error) {
+	var mr MatchResult
+
+	// match filename
+	if strings.Contains(strings.ToLower(filename), sz.Name()) {
+		mr.ByName = true
 	}
-	return nil
+
+	// match file header
+	buf := make([]byte, len(snappyHeader))
+	if _, err := io.ReadFull(stream, buf); err != nil {
+		return mr, err
+	}
+	mr.ByStream = bytes.Equal(buf, snappyHeader)
+
+	return mr, nil
 }
 
-func (s *Snappy) String() string { return "sz" }
-
-// NewSnappy returns a new, default instance ready to be customized and used.
-func NewSnappy() *Snappy {
-	return new(Snappy)
+func (Sz) OpenWriter(w io.Writer) (io.WriteCloser, error) {
+	return snappy.NewBufferedWriter(w), nil
 }
 
-// Compile-time checks to ensure type implements desired interfaces.
-var (
-	_ = Compressor(new(Snappy))
-	_ = Decompressor(new(Snappy))
-)
+func (Sz) OpenReader(r io.Reader) (io.ReadCloser, error) {
+	return io.NopCloser(snappy.NewReader(r)), nil
+}
 
-// DefaultSnappy is a default instance that is conveniently ready to use.
-var DefaultSnappy = NewSnappy()
+// https://github.com/google/snappy/blob/master/framing_format.txt
+var snappyHeader = []byte{0xff, 0x06, 0x00, 0x00, 0x73, 0x4e, 0x61, 0x50, 0x70, 0x59}

@@ -1,55 +1,42 @@
 package archiver
 
 import (
-	"fmt"
 	"io"
-	"path/filepath"
+	"strings"
 
 	"github.com/andybalholm/brotli"
 )
+
+func init() {
+	RegisterFormat(Brotli{})
+}
 
 // Brotli facilitates brotli compression.
 type Brotli struct {
 	Quality int
 }
 
-// Compress reads in, compresses it, and writes it to out.
-func (br *Brotli) Compress(in io.Reader, out io.Writer) error {
-	w := brotli.NewWriterLevel(out, br.Quality)
-	defer w.Close()
-	_, err := io.Copy(w, in)
-	return err
-}
+func (Brotli) Name() string { return ".br" }
 
-// Decompress reads in, decompresses it, and writes it to out.
-func (br *Brotli) Decompress(in io.Reader, out io.Writer) error {
-	r := brotli.NewReader(in)
-	_, err := io.Copy(out, r)
-	return err
-}
+func (br Brotli) Match(filename string, stream io.Reader) (MatchResult, error) {
+	var mr MatchResult
 
-// CheckExt ensures the file extension matches the format.
-func (br *Brotli) CheckExt(filename string) error {
-	if filepath.Ext(filename) != ".br" {
-		return fmt.Errorf("filename must have a .br extension")
+	// match filename
+	if strings.Contains(strings.ToLower(filename), br.Name()) {
+		mr.ByName = true
 	}
-	return nil
+
+	// brotli does not have well-defined file headers; the
+	// best way to match the stream would be to try decoding
+	// part of it, and this is not implemented for now
+
+	return mr, nil
 }
 
-func (br *Brotli) String() string { return "brotli" }
-
-// NewBrotli returns a new, default instance ready to be customized and used.
-func NewBrotli() *Brotli {
-	return &Brotli{
-		Quality: brotli.DefaultCompression,
-	}
+func (br Brotli) OpenWriter(w io.Writer) (io.WriteCloser, error) {
+	return brotli.NewWriterLevel(w, br.Quality), nil
 }
 
-// Compile-time checks to ensure type implements desired interfaces.
-var (
-	_ = Compressor(new(Brotli))
-	_ = Decompressor(new(Brotli))
-)
-
-// DefaultBrotli is a default instance that is conveniently ready to use.
-var DefaultBrotli = NewBrotli()
+func (Brotli) OpenReader(r io.Reader) (io.ReadCloser, error) {
+	return io.NopCloser(brotli.NewReader(r)), nil
+}

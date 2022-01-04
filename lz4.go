@@ -1,63 +1,55 @@
 package archiver
 
 import (
-	"fmt"
+	"bytes"
 	"io"
-	"path/filepath"
+	"strings"
 
 	"github.com/pierrec/lz4/v4"
 )
+
+func init() {
+	RegisterFormat(Lz4{})
+}
 
 // Lz4 facilitates LZ4 compression.
 type Lz4 struct {
 	CompressionLevel int
 }
 
-// Compress reads in, compresses it, and writes it to out.
-func (lz *Lz4) Compress(in io.Reader, out io.Writer) error {
-	w := lz4.NewWriter(out)
-	// TODO archiver v4: use proper lz4.Fast
-	// bitshifting for backwards compatibility with lz4/v3
+func (Lz4) Name() string { return ".lz4" }
+
+func (lz Lz4) Match(filename string, stream io.Reader) (MatchResult, error) {
+	var mr MatchResult
+
+	// match filename
+	if strings.Contains(strings.ToLower(filename), lz.Name()) {
+		mr.ByName = true
+	}
+
+	// match file header
+	buf := make([]byte, len(lz4Header))
+	if _, err := io.ReadFull(stream, buf); err != nil {
+		return mr, err
+	}
+	mr.ByStream = bytes.Equal(buf, lz4Header)
+
+	return mr, nil
+}
+
+func (lz Lz4) OpenWriter(w io.Writer) (io.WriteCloser, error) {
+	lzw := lz4.NewWriter(w)
 	options := []lz4.Option{
-		lz4.CompressionLevelOption(lz4.CompressionLevel(1 << (8 + lz.CompressionLevel))),
+		lz4.CompressionLevelOption(lz4.CompressionLevel(lz.CompressionLevel)),
 	}
-	if err := w.Apply(options...); err != nil {
-		return err
+	if err := lzw.Apply(options...); err != nil {
+		return nil, err
 	}
-	defer w.Close()
-	_, err := io.Copy(w, in)
-	return err
+	return lzw, nil
 }
 
-// Decompress reads in, decompresses it, and writes it to out.
-func (lz *Lz4) Decompress(in io.Reader, out io.Writer) error {
-	r := lz4.NewReader(in)
-	_, err := io.Copy(out, r)
-	return err
+func (Lz4) OpenReader(r io.Reader) (io.ReadCloser, error) {
+	return io.NopCloser(lz4.NewReader(r)), nil
 }
 
-// CheckExt ensures the file extension matches the format.
-func (lz *Lz4) CheckExt(filename string) error {
-	if filepath.Ext(filename) != ".lz4" {
-		return fmt.Errorf("filename must have a .lz4 extension")
-	}
-	return nil
-}
-
-func (lz *Lz4) String() string { return "lz4" }
-
-// NewLz4 returns a new, default instance ready to be customized and used.
-func NewLz4() *Lz4 {
-	return &Lz4{
-		CompressionLevel: 9, // https://github.com/lz4/lz4/blob/1b819bfd633ae285df2dfe1b0589e1ec064f2873/lib/lz4hc.h#L48
-	}
-}
-
-// Compile-time checks to ensure type implements desired interfaces.
-var (
-	_ = Compressor(new(Lz4))
-	_ = Decompressor(new(Lz4))
-)
-
-// DefaultLz4 is a default instance that is conveniently ready to use.
-var DefaultLz4 = NewLz4()
+var lz4Header = []byte{0x04, 0x22, 0x4d, 0x18}
