@@ -72,10 +72,10 @@ type Extractor interface {
 	Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error
 }
 
-// Inserter can insert files into an existing archive. Usually inserts are appends.
+// Inserter can insert files into an existing archive.
 type Inserter interface {
 	// Insert inserts the files into archive.
 	//
 	// Context is optional, but if given, cancellation must be honored.
-	Insert(ctx context.Context, files []File, archive io.ReadWriteSeeker) error
+	Insert(ctx context.Context, archive io.ReadWriteSeeker, files []File) error
 }

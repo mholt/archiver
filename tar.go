@@ -93,7 +93,7 @@ func (Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) er
 	return nil
 }
 
-func (t Tar) Insert(ctx context.Context, files []File, into io.ReadWriteSeeker) error {
+func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
