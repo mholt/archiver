@@ -304,7 +304,7 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	if result.FileInfo == nil {
 		return nil, fs.ErrNotExist
 	}
-	return result.FileInfo, err
+	return result.FileInfo, nil
 }
 
 // ReadDir reads the named directory from within the archive.
