@@ -25,7 +25,10 @@ import (
 // This method essentially offers uniform read access to various kinds of files:
 // directories, archives, compressed archives, and individual files are all treated
 // the same way.
-func FileSystem(root string) (fs.ReadDirFS, error) {
+//
+// The returned FS values are guaranteed to be fs.ReadDirFS and fs.StatFS types, and
+// may also be fs.SubFS.
+func FileSystem(root string) (fs.FS, error) {
 	info, err := os.Stat(root)
 	if err != nil {
 		return nil, err
@@ -62,6 +65,7 @@ func FileSystem(root string) (fs.ReadDirFS, error) {
 // and I have questions: https://twitter.com/mholt6/status/1476058551432876032
 type DirFS string
 
+// Open opens the named file.
 func (f DirFS) Open(name string) (fs.File, error) {
 	if err := f.checkName(name, "open"); err != nil {
 		return nil, err
@@ -69,6 +73,7 @@ func (f DirFS) Open(name string) (fs.File, error) {
 	return os.Open(filepath.Join(string(f), name))
 }
 
+// ReadDir returns a listing of all the files in the named directory.
 func (f DirFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	if err := f.checkName(name, "readdir"); err != nil {
 		return nil, err
@@ -76,11 +81,27 @@ func (f DirFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return os.ReadDir(filepath.Join(string(f), name))
 }
 
+// Stat returns info about the named file.
 func (f DirFS) Stat(name string) (fs.FileInfo, error) {
 	if err := f.checkName(name, "stat"); err != nil {
 		return nil, err
 	}
 	return os.Stat(filepath.Join(string(f), name))
+}
+
+// Sub returns an FS corresponding to the subtree rooted at dir.
+func (f DirFS) Sub(dir string) (fs.FS, error) {
+	if err := f.checkName(dir, "sub"); err != nil {
+		return nil, err
+	}
+	info, err := f.Stat(dir)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", dir)
+	}
+	return DirFS(filepath.Join(string(f), dir)), nil
 }
 
 // checkName returns an error if name is not a valid path according to the docs of
@@ -99,6 +120,7 @@ func (f DirFS) checkName(name, op string) error {
 // within the file system by the name of "." or the filename.
 type FileFS string
 
+// Open opens the named file, which must be the file used to create the file system.
 func (f FileFS) Open(name string) (fs.File, error) {
 	if err := f.checkName(name, "open"); err != nil {
 		return nil, err
@@ -106,6 +128,7 @@ func (f FileFS) Open(name string) (fs.File, error) {
 	return os.Open(string(f))
 }
 
+// ReadDir returns a directory listing with the file as the singular entry.
 func (f FileFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	if err := f.checkName(name, "stat"); err != nil {
 		return nil, err
@@ -117,6 +140,7 @@ func (f FileFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return []fs.DirEntry{fs.FileInfoToDirEntry(info)}, nil
 }
 
+// Stat stats the named file, which must be the file used to create the file system.
 func (f FileFS) Stat(name string) (fs.FileInfo, error) {
 	if err := f.checkName(name, "stat"); err != nil {
 		return nil, err
@@ -139,11 +163,14 @@ func (f FileFS) checkName(name, op string) error {
 // reading of archive contents the same way as any normal directory on disk.
 // The contents of compressed archives are transparently decompressed.
 type ArchiveFS struct {
-	Path    string
-	Format  Archival
+	Path    string          // path to the archive file on disk
+	Format  Archival        // the archive format
+	Prefix  string          // optional subdirectory in which to root the fs
 	Context context.Context // optional
 }
 
+// Open opens the named file from within the archive. If name is "." then
+// the archive file itself will be opened as a directory file.
 func (f ArchiveFS) Open(name string) (fs.File, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
@@ -161,6 +188,9 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 			archiveFile.Close()
 		}
 	}()
+
+	// apply prefix if fs is rooted in a subtree
+	name = path.Join(f.Prefix, name)
 
 	// handle special case of opening the archive root
 	if name == "." {
@@ -238,10 +268,15 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	return fsFile, nil
 }
 
+// Stat stats the named file from within the archive. If name is "." then
+// the archive file itself is statted and treated as a directory file.
 func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrInvalid}
 	}
+
+	// apply prefix if fs is rooted in a subtree
+	name = path.Join(f.Prefix, name)
 
 	if name == "." {
 		fileInfo, err := os.Stat(f.Path)
@@ -272,6 +307,7 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	return result.FileInfo, err
 }
 
+// ReadDir reads the named directory from within the archive.
 func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
@@ -282,6 +318,9 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		return nil, err
 	}
 	defer archiveFile.Close()
+
+	// apply prefix if fs is rooted in a subtree
+	name = path.Join(f.Prefix, name)
 
 	var entries []fs.DirEntry
 	handler := func(_ context.Context, file File) error {
@@ -311,6 +350,87 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 	err = f.Format.Extract(f.Context, archiveFile, filter, handler)
 	return entries, err
+}
+
+// Sub returns an FS corresponding to the subtree rooted at dir.
+func (f ArchiveFS) Sub(dir string) (fs.FS, error) {
+	if !fs.ValidPath(dir) {
+		return nil, &fs.PathError{Op: "sub", Path: dir, Err: fs.ErrInvalid}
+	}
+	info, err := f.Stat(dir)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", dir)
+	}
+	result := f
+	result.Prefix = dir
+	return result, nil
+}
+
+// TopDirOpen is a special Open() function that may be useful if
+// a file system root was created by extracting an archive.
+//
+// It first tries the file name as given, but if that returns an
+// error, it tries the name without the first element of the path.
+// In other words, if "a/b/c" returns an error, then "b/c" will
+// be tried instead.
+//
+// Consider an archive that contains a file "a/b/c". When the
+// archive is extracted, the contents may be created without a
+// new parent/root folder to contain them, and the path of the
+// same file outside the archive may be lacking an exclusive root
+// or parent container. Thus it is likely for a file system
+// created for the same files extracted to disk to be rooted at
+// one of the top-level files/folders from the archive instead of
+// a parent folder. For example, the file known as "a/b/c" when
+// rooted at the archive becomes "b/c" after extraction when rooted
+// at "a" on disk (because no new, exclusive top-level folder was
+// created). This difference in paths can make it difficult to use
+// archives and directories uniformly. Hence these TopDir* functions
+// which attempt to smooth over the difference.
+//
+// Some extraction utilities do create a container folder for
+// archive contents when extracting, in which case the user
+// may give that path as the root. In that case, these TopDir*
+// functions are not necessary (but aren't harmful either). They
+// are primarily useful if you are not sure whether the root is
+// an archive file or is an extracted archive file, as they will
+// work with the same filename/path inputs regardless of the
+// presence of a top-level directory.
+func TopDirOpen(fsys fs.FS, name string) (fs.File, error) {
+	file, err := fsys.Open(name)
+	if err == nil {
+		return file, nil
+	}
+	return fsys.Open(pathWithoutTopDir(name))
+}
+
+// TopDirStat is like TopDirOpen but for Stat.
+func TopDirStat(fsys fs.StatFS, name string) (fs.FileInfo, error) {
+	info, err := fsys.Stat(name)
+	if err == nil {
+		return info, nil
+	}
+	return fsys.Stat(pathWithoutTopDir(name))
+}
+
+// TopDirReadDir is like TopDirOpen but for ReadDir.
+func TopDirReadDir(fsys fs.ReadDirFS, name string) ([]fs.DirEntry, error) {
+	entries, err := fsys.ReadDir(name)
+	if err == nil {
+		return entries, nil
+	}
+	return fsys.ReadDir(pathWithoutTopDir(name))
+}
+
+func pathWithoutTopDir(fpath string) string {
+	slashIdx := strings.Index(fpath, "/")
+	if slashIdx < 0 {
+		return ""
+	}
+	return fpath[slashIdx+1:]
 }
 
 // errStopWalk is an arbitrary error value, since returning
@@ -401,3 +521,17 @@ func (ef extractedFile) Close() error {
 	}
 	return nil
 }
+
+// Interface guards
+var (
+	_ fs.ReadDirFS = (*DirFS)(nil)
+	_ fs.StatFS    = (*DirFS)(nil)
+	_ fs.SubFS     = (*DirFS)(nil)
+
+	_ fs.ReadDirFS = (*FileFS)(nil)
+	_ fs.StatFS    = (*FileFS)(nil)
+
+	_ fs.ReadDirFS = (*ArchiveFS)(nil)
+	_ fs.StatFS    = (*ArchiveFS)(nil)
+	_ fs.SubFS     = (*ArchiveFS)(nil)
+)

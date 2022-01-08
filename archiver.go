@@ -12,7 +12,6 @@ import (
 )
 
 // File is a virtualized, generalized file abstraction for interacting with archives.
-// It implements the fs.File interface.
 type File struct {
 	fs.FileInfo
 
