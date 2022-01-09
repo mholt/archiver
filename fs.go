@@ -308,6 +308,9 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	if fsFile == nil {
+		return nil, fs.ErrNotExist
+	}
 
 	return fsFile, nil
 }
@@ -472,7 +475,7 @@ func TopDirReadDir(fsys fs.ReadDirFS, name string) ([]fs.DirEntry, error) {
 func pathWithoutTopDir(fpath string) string {
 	slashIdx := strings.Index(fpath, "/")
 	if slashIdx < 0 {
-		return ""
+		return fpath
 	}
 	return fpath[slashIdx+1:]
 }
