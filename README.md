@@ -170,6 +170,7 @@ Use archiver to simply create a file system:
 // - an archive ("example.zip")
 // - a compressed archive ("example.tar.gz")
 // - a regular file ("example.txt")
+// - a compressed regular file ("example.txt.gz")
 fsys, err := archiver.FileSystem(filename)
 if err != nil {
 	return err
@@ -188,7 +189,7 @@ if err != nil {
 defer f.Close()
 ```
 
-If you opened a regular file, you can read from it.
+If you opened a regular file, you can read from it. If it's a compressed file, reads are automatically decompressed.
 
 If you opened a directory, you can list its contents:
 
