@@ -14,13 +14,14 @@ import (
 )
 
 // FileSystem opens the file at root as a read-only file system. The root may be a
-// path to a directory, archive file, compressed archive file or any other file on
-// disk.
+// path to a directory, archive file, compressed archive file, compressed file, or
+// any other file on disk.
 //
 // If root is a directory, its contents are accessed directly from the disk's file system.
 // If root is an archive file, its contents can be accessed like a normal directory;
 // compressed archive files are transparently decompressed as contents are accessed.
-// And if root is any other file, it is the only file in the returned file system.
+// And if root is any other file, it is the only file in the file system; if the file
+// is compressed, it is transparently decompressed when read from.
 //
 // This method essentially offers uniform read access to various kinds of files:
 // directories, archives, compressed archives, and individual files are all treated
@@ -50,13 +51,17 @@ func FileSystem(root string) (fs.FS, error) {
 		return nil, err
 	}
 	if format != nil {
+		// TODO: we only really need Extractor and Decompressor here, not the combined interfaces...
 		if af, ok := format.(Archival); ok {
 			return ArchiveFS{Path: root, Format: af}, nil
+		}
+		if cf, ok := format.(Compression); ok {
+			return FileFS{Path: root, Compression: cf}, nil
 		}
 	}
 
 	// otherwise consider it an ordinary file; make a file system with it as its only file
-	return FileFS(root), nil
+	return FileFS{Path: root}, nil
 }
 
 // DirFS allows accessing a directory on disk with a consistent file system interface.
@@ -118,14 +123,53 @@ func (f DirFS) checkName(name, op string) error {
 // The value should be the path to a regular file, not a directory. This file will
 // be the only entry in the file system and will be at its root. It can be accessed
 // within the file system by the name of "." or the filename.
-type FileFS string
+//
+// If the file is compressed, set the Compression field so that reads from the
+// file will be transparently decompressed.
+type FileFS struct {
+	// The path to the file on disk.
+	Path string
+
+	// If file is compressed, setting this field will
+	// transparently decompress reads.
+	Compression Decompressor
+}
 
 // Open opens the named file, which must be the file used to create the file system.
 func (f FileFS) Open(name string) (fs.File, error) {
 	if err := f.checkName(name, "open"); err != nil {
 		return nil, err
 	}
-	return os.Open(string(f))
+	file, err := os.Open(f.Path)
+	if err != nil {
+		return nil, err
+	}
+	if f.Compression == nil {
+		return file, nil
+	}
+	r, err := f.Compression.OpenReader(file)
+	if err != nil {
+		return nil, err
+	}
+	return compressedFile{file, r}, nil
+}
+
+// compressedFile is an fs.File that specially reads
+// from a decompression reader, and which closes both
+// that reader and the underlying file.
+type compressedFile struct {
+	*os.File
+	decomp io.ReadCloser
+}
+
+func (cf compressedFile) Read(p []byte) (int, error) { return cf.decomp.Read(p) }
+func (cf compressedFile) Close() error {
+	err := cf.File.Close()
+	err2 := cf.decomp.Close()
+	if err2 != nil && err == nil {
+		err = err2
+	}
+	return err
 }
 
 // ReadDir returns a directory listing with the file as the singular entry.
@@ -145,14 +189,14 @@ func (f FileFS) Stat(name string) (fs.FileInfo, error) {
 	if err := f.checkName(name, "stat"); err != nil {
 		return nil, err
 	}
-	return os.Stat(string(f))
+	return os.Stat(f.Path)
 }
 
 func (f FileFS) checkName(name, op string) error {
 	if !fs.ValidPath(name) {
 		return &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
-	if name != "." && name != path.Base(string(f)) {
+	if name != "." && name != path.Base(f.Path) {
 		return &fs.PathError{Op: op, Path: name, Err: fs.ErrNotExist}
 	}
 	return nil
