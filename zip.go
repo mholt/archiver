@@ -192,15 +192,14 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 		if err := ctx.Err(); err != nil {
 			return err // honor context cancellation
 		}
+		// ensure filename and comment are UTF-8 encoded (issue #147)
+		z.decodeText(&f.FileHeader)
 		if !fileIsIncluded(pathsInArchive, f.Name) {
 			continue
 		}
 		if fileIsIncluded(skipDirs, f.Name) {
 			continue
 		}
-
-		// ensure filename and comment are UTF-8 encoded (issue #147)
-		z.decodeText(&f.FileHeader)
 
 		file := File{
 			FileInfo:      f.FileInfo(),
