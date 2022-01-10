@@ -24,7 +24,7 @@ import (
 )
 
 func init() {
-	RegisterFormat(Zip{})
+	RegisterFormat(Zip{TextAutoEncoding: true})
 
 	// TODO: What about custom flate levels too
 	zip.RegisterCompressor(ZipMethodBzip2, func(out io.Writer) (io.WriteCloser, error) {
@@ -78,6 +78,22 @@ type Zip struct {
 	// encoded filenames and comments, specify the character
 	// encoding here.
 	TextEncoding string
+
+	/*You must set AutoEncodings to use it, this is fix to FileSystem decode error.
+	Example:
+
+	import (
+	    "github.com/mholt/archiver/v4"
+	    "golang.org/x/text/encoding"
+	    "golang.org/x/text/encoding/japanese"
+	    "golang.org/x/text/encoding/simplifiedchinese"
+	)
+	archiver.AutoEncodings = []encoding.Encoding{
+	    japanese.ShiftJIS,
+	    simplifiedchinese.GB18030, // set last at any time
+	}
+	*/
+	TextAutoEncoding bool
 }
 
 func (z Zip) Name() string { return ".zip" }
@@ -213,7 +229,7 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 // It is a no-op if the text is already UTF-8 encoded or if z.TextEncoding
 // is not specified.
 func (z Zip) decodeText(hdr *zip.FileHeader) {
-	if hdr.NonUTF8 && z.TextEncoding != "" {
+	if hdr.NonUTF8 && (z.TextEncoding != "" || z.TextAutoEncoding) {
 		filename, err := decodeText(hdr.Name, z.TextEncoding)
 		if err == nil {
 			hdr.Name = filename
@@ -337,13 +353,26 @@ var encodings = map[string]encoding.Encoding{
 	"utf16le":           unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM),
 }
 
+var AutoEncodings []encoding.Encoding
+
 // decodeText returns UTF-8 encoded text from the given charset.
 // Thanks to @zxdvd for contributing non-UTF-8 encoding logic in #149.
-func decodeText(input, charset string) (string, error) {
-	if enc, ok := encodings[charset]; ok {
-		return enc.NewDecoder().String(input)
+func decodeText(input, charset string) (str string, err error) {
+	if charset != "" {
+		if enc, ok := encodings[charset]; ok {
+			return enc.NewDecoder().String(input)
+		}
+		return "", fmt.Errorf("unrecognized charset %s", charset)
 	}
-	return "", fmt.Errorf("unrecognized charset %s", charset)
+	for _, enc := range AutoEncodings {
+		str, err = enc.NewDecoder().String(input)
+		if err != nil {
+			continue
+		} else {
+			break
+		}
+	}
+	return
 }
 
 var zipHeader = []byte("PK\x03\x04") // TODO: headers of empty zip files might end with 0x05,0x06 or 0x06,0x06 instead of 0x03,0x04
