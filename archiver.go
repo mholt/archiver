@@ -46,35 +46,13 @@ func (f File) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
 // their associated names in the archive. For convenience, empty values are
 // interpreted as the base name of the file (sans path) in the root of the
 // archive. Keys that specify directories on disk will be walked and added
-// to the archive recursively, rooted at the named directory. Symbolic links
-// will be preserved.
+// to the archive recursively, rooted at the named directory.
+//
+// File gathering will adhere to the settings specified in options.
 //
 // This function is primarily used when preparing a list of files to add to
 // an archive.
-
-func FilesFromDisk(filenames map[string]string) ([]File, error) {
-	files, err := filesFromDiskGeneric(filenames, false)
-	return files, err
-}
-
-// FilesFromDiskDerefSymlinks returns a list of files by walking the directories in the
-// given filenames map. The keys are the names on disk, and the values are
-// their associated names in the archive. For convenience, empty values are
-// interpreted as the base name of the file (sans path) in the root of the
-// archive. Keys that specify directories on disk will be walked and added
-// to the archive recursively, rooted at the named directory. Symbolic links
-// will be dereference.
-//
-// This function is primarily used when preparing a list of files to add to
-// an archive.
-
-func FilesFromDiskDerefSymlinks(filenames map[string]string) ([]File, error) {
-
-	files, err := filesFromDiskGeneric(filenames, true)
-	return files, err
-}
-
-func filesFromDiskGeneric(filenames map[string]string, derefSymlinks bool) ([]File, error) {
+func FilesFromDisk(options FromDiskOptions, filenames map[string]string) ([]File, error) {
 	var files []File
 	for rootOnDisk, rootInArchive := range filenames {
 		if rootInArchive == "" {
@@ -92,35 +70,35 @@ func filesFromDiskGeneric(filenames map[string]string, derefSymlinks bool) ([]Fi
 			}
 
 			nameInArchive := path.Join(rootInArchive, strings.TrimPrefix(filename, rootOnDisk))
+			var linkTarget string
 
-			if derefSymlinks && isSymlink(info) {
-				//Dereference symlink
-				filename, err = os.Readlink(filename)
-				if err != nil {
-					return fmt.Errorf("%s: readlink: %w", filename, err)
+			if isSymlink(info) {
+				if options.FollowSymlinks {
+					// dereference symlinks
+					filename, err = os.Readlink(filename)
+					if err != nil {
+						return fmt.Errorf("%s: readlink: %w", filename, err)
+					}
+					info, err = os.Stat(filename)
+					if err != nil {
+						return fmt.Errorf("%s: statting dereferenced symlink: %w", filename, err)
+					}
+				} else {
+					// preserve symlinks
+					linkTarget, err = os.Readlink(filename)
+					if err != nil {
+						return fmt.Errorf("%s: readlink: %w", filename, err)
+					}
 				}
-
-				info, err = os.Stat(filename)
-				if err != nil {
-					return fmt.Errorf("%s: could not get dereferenced file of symlink: %w", filename, err)
-				}
-
 			}
 
 			file := File{
 				FileInfo:      info,
 				NameInArchive: nameInArchive,
+				LinkTarget:    linkTarget,
 				Open: func() (io.ReadCloser, error) {
 					return os.Open(filename)
 				},
-			}
-
-			// preserve symlinks
-			if !derefSymlinks && isSymlink(info) {
-				file.LinkTarget, err = os.Readlink(filename)
-				if err != nil {
-					return fmt.Errorf("%s: readlink: %w", filename, err)
-				}
 			}
 
 			files = append(files, file)
@@ -128,6 +106,14 @@ func filesFromDiskGeneric(filenames map[string]string, derefSymlinks bool) ([]Fi
 		})
 	}
 	return files, nil
+}
+
+// FromDiskOptions specifies various options for gathering files from disk.
+type FromDiskOptions struct {
+	// If true, symbolic links will be dereferenced, meaning that
+	// the link will not be added as a link, but what the link
+	// points to will be added as a file.
+	FollowSymlinks bool
 }
 
 // FileHandler is a callback function that is used to handle files as they are read
