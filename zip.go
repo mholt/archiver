@@ -117,10 +117,13 @@ func (z Zip) Archive(ctx context.Context, output io.Writer, files []File) error 
 		if err != nil {
 			return fmt.Errorf("getting info for file %d: %s: %w", i, file.Name(), err)
 		}
+		hdr.Name = file.NameInArchive // complete path, since FileInfoHeader() only has base name
 
 		// customize header based on file properties
 		if file.IsDir() {
-			hdr.Name += "/" // required - strangely no mention of this in zip spec? but is in godoc...
+			if !strings.HasSuffix(hdr.Name, "/") {
+				hdr.Name += "/" // required
+			}
 			hdr.Method = zip.Store
 		} else if z.SelectiveCompression {
 			// only enable compression on compressable files
@@ -204,7 +207,7 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			// if a directory, skip this path; if a file, skip the folder path
 			dirPath := f.Name
 			if !file.IsDir() {
-				dirPath = path.Dir(f.Name)
+				dirPath = path.Dir(f.Name) + "/"
 			}
 			skipDirs.add(dirPath)
 		} else if err != nil {

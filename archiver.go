@@ -126,18 +126,13 @@ func fileIsIncluded(filenameList []string, filename string) bool {
 	if filenameList == nil {
 		return true
 	}
-	trimmedFilename := strings.TrimSuffix(filename, "/")
 	for _, fn := range filenameList {
-		trimmedFn := strings.TrimSuffix(fn, "/")
-
 		// exact matches are of course included
-		if trimmedFn == trimmedFilename {
+		if filename == fn {
 			return true
 		}
-
-		// also consider the file included if its parent
-		// folder/path is in the list
-		if strings.HasPrefix(trimmedFilename, trimmedFn+"/") {
+		// also consider the file included if its parent folder/path is in the list
+		if strings.HasPrefix(filename, strings.TrimSuffix(fn, "/")+"/") {
 			return true
 		}
 	}

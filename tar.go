@@ -71,10 +71,7 @@ func (Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) er
 	if err != nil {
 		return fmt.Errorf("file %s: creating header: %w", file.NameInArchive, err)
 	}
-
-	// reset the name; FileInfoHeader() only puts the
-	// base name of the file, not the whole path
-	hdr.Name = file.NameInArchive
+	hdr.Name = file.NameInArchive // complete path, since FileInfoHeader() only has base name
 
 	if err := tw.WriteHeader(hdr); err != nil {
 		return fmt.Errorf("file %s: writing header: %w", file.NameInArchive, err)
@@ -217,7 +214,7 @@ func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			// if a directory, skip this path; if a file, skip the folder path
 			dirPath := hdr.Name
 			if hdr.Typeflag != tar.TypeDir {
-				dirPath = path.Dir(hdr.Name)
+				dirPath = path.Dir(hdr.Name) + "/"
 			}
 			skipDirs.add(dirPath)
 		} else if err != nil {

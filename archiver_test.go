@@ -44,6 +44,11 @@ func TestFileIsIncluded(t *testing.T) {
 		{
 			included:  []string{"a/"},
 			candidate: "a",
+			expect:    false,
+		},
+		{
+			included:  []string{"a/"},
+			candidate: "a/",
 			expect:    true,
 		},
 		{
@@ -52,9 +57,9 @@ func TestFileIsIncluded(t *testing.T) {
 			expect:    true,
 		},
 		{
-			included:  []string{"a/"},
+			included:  []string{"a/b"},
 			candidate: "a/",
-			expect:    true,
+			expect:    false,
 		},
 	} {
 		actual := fileIsIncluded(tc.included, tc.candidate)

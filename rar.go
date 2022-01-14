@@ -108,7 +108,7 @@ func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			// if a directory, skip this path; if a file, skip the folder path
 			dirPath := hdr.Name
 			if !hdr.IsDir {
-				dirPath = path.Dir(hdr.Name)
+				dirPath = path.Dir(hdr.Name) + "/"
 			}
 			skipDirs.add(dirPath)
 		} else if err != nil {
