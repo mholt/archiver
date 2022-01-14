@@ -124,7 +124,7 @@ type rarFileInfo struct {
 	fh *rardecode.FileHeader
 }
 
-func (rfi rarFileInfo) Name() string       { return rfi.fh.Name }
+func (rfi rarFileInfo) Name() string       { return path.Base(rfi.fh.Name) }
 func (rfi rarFileInfo) Size() int64        { return rfi.fh.UnPackedSize }
 func (rfi rarFileInfo) Mode() os.FileMode  { return rfi.fh.Mode() }
 func (rfi rarFileInfo) ModTime() time.Time { return rfi.fh.ModificationTime }
