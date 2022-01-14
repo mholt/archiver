@@ -341,8 +341,16 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 
 	var result File
 	handler := func(_ context.Context, file File) error {
-		result = file
-		return errStopWalk
+		// in theory, the first file handled should be the one requested,
+		// unless... the file requested is a directory and the archive was
+		// created depth-first (i.e. directory contents added before the
+		// directory itself), in which case we have to iterate through the
+		// contents first; hence the check for exact filename match (issue #310)
+		if file.NameInArchive == name {
+			result = file
+			return errStopWalk
+		}
+		return nil
 	}
 	err = f.Format.Extract(f.Context, archiveFile, []string{name}, handler)
 	if err != nil && result.FileInfo == nil {
@@ -379,9 +387,18 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 			return nil
 		}
 
+		// items added to an archive depth-first results in the subfolder file being
+		// added to the archive after all the files within it, meaning we won't have
+		// the chance to return SkipDir before traversing into it, so we have to also
+		// check if we are within a subfolder deeper than the requested name (because
+		// this is a ReadDir function, we do not intend to traverse subfolders) (issue #310)
+		if path.Dir(file.NameInArchive) != name {
+			return fs.SkipDir
+		}
+
 		entries = append(entries, fs.FileInfoToDirEntry(file))
 
-		// don't traverse into subfolders
+		// don't traverse deeper into subfolders
 		if file.IsDir() {
 			return fs.SkipDir
 		}
