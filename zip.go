@@ -165,6 +165,12 @@ func (z Zip) Archive(ctx context.Context, output io.Writer, files []File) error 
 	return nil
 }
 
+// Extract extracts files from z, implementing the Extractor interface. Uniquely, however,
+// sourceArchive must be an io.ReaderAt and io.Seeker, which are oddly disjoint interfaces
+// from io.Reader which is what the method signature requires. We chose this signature for
+// the interface because we figure you can Read() from anything you can ReadAt() or Seek()
+// with. Due to the nature of the zip archive format, if sourceArchive is not an io.Seeker
+// and io.ReaderAt, an error is returned.
 func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
 	if ctx == nil {
 		ctx = context.Background()
