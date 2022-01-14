@@ -392,7 +392,7 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		// the chance to return SkipDir before traversing into it, so we have to also
 		// check if we are within a subfolder deeper than the requested name (because
 		// this is a ReadDir function, we do not intend to traverse subfolders) (issue #310)
-		if path.Dir(file.NameInArchive) != name {
+		if path.Dir(strings.TrimSuffix(file.NameInArchive, "/")) != name {
 			return fs.SkipDir
 		}
 
