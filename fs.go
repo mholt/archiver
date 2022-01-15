@@ -207,7 +207,9 @@ func (f FileFS) checkName(name, op string) error {
 // reading of archive contents the same way as any normal directory on disk.
 // The contents of compressed archives are transparently decompressed.
 type ArchiveFS struct {
-	Path    string          // path to the archive file on disk
+	Path   string        // path to the archive file on disk
+	Stream io.ReadSeeker // stream from which to read archive
+
 	Format  Archival        // the archive format
 	Prefix  string          // optional subdirectory in which to root the fs
 	Context context.Context // optional
@@ -220,24 +222,28 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
 
-	archiveFile, err := os.Open(f.Path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		// close the archive file if extraction failed; we can only
-		// count on the user/caller closing it if they successfully
-		// got the handle to the extracted file
+	var archiveFile *os.File
+	var err error
+	if f.Stream == nil {
+		archiveFile, err = os.Open(f.Path)
 		if err != nil {
-			archiveFile.Close()
+			return nil, err
 		}
-	}()
+		defer func() {
+			// close the archive file if extraction failed; we can only
+			// count on the user/caller closing it if they successfully
+			// got the handle to the extracted file
+			if err != nil {
+				archiveFile.Close()
+			}
+		}()
+	}
 
 	// apply prefix if fs is rooted in a subtree
 	name = path.Join(f.Prefix, name)
 
 	// handle special case of opening the archive root
-	if name == "." {
+	if name == "." && archiveFile != nil {
 		archiveInfo, err := archiveFile.Stat()
 		if err != nil {
 			return nil, err
@@ -295,7 +301,12 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		return errStopWalk
 	}
 
-	err = f.Format.Extract(f.Context, archiveFile, []string{name}, handler)
+	var inputStream io.ReadSeeker = archiveFile
+	if f.Stream != nil {
+		inputStream = f.Stream
+	}
+
+	err = f.Format.Extract(f.Context, inputStream, []string{name}, handler)
 	if err != nil && fsFile != nil {
 		if ef, ok := fsFile.(extractedFile); ok {
 			if ef.parentArchive != nil {
@@ -325,7 +336,7 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	// apply prefix if fs is rooted in a subtree
 	name = path.Join(f.Prefix, name)
 
-	if name == "." {
+	if name == "." && f.Path != "" {
 		fileInfo, err := os.Stat(f.Path)
 		if err != nil {
 			return nil, err
@@ -333,11 +344,15 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 		return dirFileInfo{fileInfo}, nil
 	}
 
-	archiveFile, err := os.Open(f.Path)
-	if err != nil {
-		return nil, err
+	var archiveFile *os.File
+	var err error
+	if f.Stream == nil {
+		archiveFile, err = os.Open(f.Path)
+		if err != nil {
+			return nil, err
+		}
+		defer archiveFile.Close()
 	}
-	defer archiveFile.Close()
 
 	var result File
 	handler := func(_ context.Context, file File) error {
@@ -352,7 +367,11 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 		}
 		return nil
 	}
-	err = f.Format.Extract(f.Context, archiveFile, []string{name}, handler)
+	var inputStream io.ReadSeeker = archiveFile
+	if f.Stream != nil {
+		inputStream = f.Stream
+	}
+	err = f.Format.Extract(f.Context, inputStream, []string{name}, handler)
 	if err != nil && result.FileInfo == nil {
 		return nil, err
 	}
@@ -368,11 +387,15 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
 	}
 
-	archiveFile, err := os.Open(f.Path)
-	if err != nil {
-		return nil, err
+	var archiveFile *os.File
+	var err error
+	if f.Stream == nil {
+		archiveFile, err = os.Open(f.Path)
+		if err != nil {
+			return nil, err
+		}
+		defer archiveFile.Close()
 	}
-	defer archiveFile.Close()
 
 	// apply prefix if fs is rooted in a subtree
 	name = path.Join(f.Prefix, name)
@@ -412,12 +435,17 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		filter = []string{name}
 	}
 
-	err = f.Format.Extract(f.Context, archiveFile, filter, handler)
+	var inputStream io.ReadSeeker = archiveFile
+	if f.Stream != nil {
+		inputStream = f.Stream
+	}
+
+	err = f.Format.Extract(f.Context, inputStream, filter, handler)
 	return entries, err
 }
 
 // Sub returns an FS corresponding to the subtree rooted at dir.
-func (f ArchiveFS) Sub(dir string) (fs.FS, error) {
+func (f *ArchiveFS) Sub(dir string) (fs.FS, error) {
 	if !fs.ValidPath(dir) {
 		return nil, &fs.PathError{Op: "sub", Path: dir, Err: fs.ErrInvalid}
 	}
