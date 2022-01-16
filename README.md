@@ -63,16 +63,18 @@ $ go get github.com/mholt/archiver/v4
 
 Creating archives can be done entirely without needing a real disk or storage device since all you need is a list of [`File` structs](https://pkg.go.dev/github.com/mholt/archiver/v4#File) to pass in.
 
-However, creating archives from files on disk is very common, so you can use the `FilesFromDisk()` function to help you map filenames on disk to their paths in the archive. Then create and customize the format type.
+However, creating archives from files on disk is very common, so you can use the [`FilesFromDisk()` function](https://pkg.go.dev/github.com/mholt/archiver/v4#FilesFromDisk) to help you map filenames on disk to their paths in the archive. Then create and customize the format type.
 
-In this example, we add 2 files and a directory (which includes its contents recursively) to a .tar.gz file:
+In this example, we add 4 files and a directory (which includes its contents recursively) to a .tar.gz file:
 
 ```go
 // map files on disk to their paths in the archive
-files, err := archiver.FilesFromDisk(map[string]string{
+files, err := archiver.FilesFromDisk(nil, map[string]string{
 	"/path/on/disk/file1.txt": "file1.txt",
 	"/path/on/disk/file2.txt": "subfolder/file2.txt",
-	"/path/on/disk/folder":    "",
+	"/path/on/disk/file3.txt": "",              // put in root of archive as file3.txt
+	"/path/on/disk/file4.txt": "subfolder/",    // put in subfolder as file4.txt
+	"/path/on/disk/folder":    "Custom Folder", // contents added recursively
 })
 if err != nil {
 	return err
@@ -98,6 +100,8 @@ if err != nil {
 	return err
 }
 ```
+
+The first parameter to `FilesFromDisk()` is an optional options struct, allowing you to customize how files are added.
 
 ### Extract archive
 
