@@ -284,7 +284,7 @@ if err != nil {
 defer tarball.Close()
 
 // prepare a text file for the root of the archive
-files, err := archiver.FilesFromDisk(map[string]string{
+files, err := archiver.FilesFromDisk(nil, map[string]string{
 	"/home/you/lastminute.txt": "",
 })
 
