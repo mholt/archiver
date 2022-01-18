@@ -207,8 +207,8 @@ func (f FileFS) checkName(name, op string) error {
 // reading of archive contents the same way as any normal directory on disk.
 // The contents of compressed archives are transparently decompressed.
 type ArchiveFS struct {
-	Path   string        // path to the archive file on disk
-	Stream io.ReadSeeker // stream from which to read archive
+	Path   string            // path to the archive file on disk
+	Stream *io.SectionReader // alternative stream from which to read archive instead of a file path
 
 	Format  Archival        // the archive format
 	Prefix  string          // optional subdirectory in which to root the fs
@@ -301,9 +301,9 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		return errStopWalk
 	}
 
-	var inputStream io.ReadSeeker = archiveFile
+	var inputStream io.Reader = archiveFile
 	if f.Stream != nil {
-		inputStream = f.Stream
+		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
 	err = f.Format.Extract(f.Context, inputStream, []string{name}, handler)
@@ -367,9 +367,9 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 		}
 		return nil
 	}
-	var inputStream io.ReadSeeker = archiveFile
+	var inputStream io.Reader = archiveFile
 	if f.Stream != nil {
-		inputStream = f.Stream
+		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 	err = f.Format.Extract(f.Context, inputStream, []string{name}, handler)
 	if err != nil && result.FileInfo == nil {
@@ -435,9 +435,9 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		filter = []string{name}
 	}
 
-	var inputStream io.ReadSeeker = archiveFile
+	var inputStream io.Reader = archiveFile
 	if f.Stream != nil {
-		inputStream = f.Stream
+		io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
 	err = f.Format.Extract(f.Context, inputStream, filter, handler)
