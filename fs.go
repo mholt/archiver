@@ -437,7 +437,7 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 	var inputStream io.Reader = archiveFile
 	if f.Stream != nil {
-		io.NewSectionReader(f.Stream, 0, f.Stream.Size())
+		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
 	err = f.Format.Extract(f.Context, inputStream, filter, handler)
