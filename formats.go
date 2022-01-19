@@ -79,6 +79,12 @@ func Identify(filename string, stream io.ReadSeeker) (Format, error) {
 }
 
 func identifyOne(format Format, filename string, stream io.ReadSeeker, comp Compression) (MatchResult, error) {
+	if stream == nil {
+		// shimming an empty stream is easier than hoping every format's
+		// implementation of Match() expects and handles a nil stream
+		stream = strings.NewReader("")
+	}
+
 	// reset stream position to beginning, then restore current position when done
 	previousOffset, err := stream.Seek(0, io.SeekCurrent)
 	if err != nil {
