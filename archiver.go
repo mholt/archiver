@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // File is a virtualized, generalized file abstraction for interacting with archives.
@@ -77,6 +78,7 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 			nameInArchive := path.Join(rootInArchive, strings.TrimPrefix(filename, rootOnDisk))
 			var linkTarget string
 
+			// handle symbolic links
 			if isSymlink(info) {
 				if options != nil && options.FollowSymlinks {
 					// dereference symlinks
@@ -97,6 +99,11 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 				}
 			}
 
+			// handle file attributes
+			if options != nil && options.ClearAttributes {
+				info = noAttrFileInfo{info}
+			}
+
 			file := File{
 				FileInfo:      info,
 				NameInArchive: nameInArchive,
@@ -113,12 +120,22 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 	return files, nil
 }
 
+// noAttrFileInfo is used to zero out file attributes (issue #280)
+type noAttrFileInfo struct{ fs.FileInfo }
+
+func (noAttrFileInfo) Mode() fs.FileMode  { return 0 }
+func (noAttrFileInfo) ModTime() time.Time { return time.Time{} }
+func (noAttrFileInfo) Sys() interface{}   { return nil }
+
 // FromDiskOptions specifies various options for gathering files from disk.
 type FromDiskOptions struct {
 	// If true, symbolic links will be dereferenced, meaning that
 	// the link will not be added as a link, but what the link
 	// points to will be added as a file.
 	FollowSymlinks bool
+
+	// If true, file attributes will not be preserved.
+	ClearAttributes bool
 }
 
 // FileHandler is a callback function that is used to handle files as they are read
