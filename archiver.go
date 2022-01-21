@@ -43,16 +43,22 @@ func (f File) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
 
 // FilesFromDisk returns a list of files by walking the directories in the
 // given filenames map. The keys are the names on disk, and the values are
-// their associated names in the archive. For convenience, empty values are
-// interpreted as the base name of the file (sans path) in the root of the
-// archive; and values that end in a slash will use the bae name of the file
-// in that folder of the archive. Keys that specify directories on disk will
-// be walked and added to the archive recursively, rooted at the named
-// directory.
+// their associated names in the archive.
+//
+// Map keys that specify directories on disk will be walked and added to the
+// archive recursively, rooted at the named directory. They should use the
+// platform's path separator (backslash on Windows; slash on everything else).
+//
+// Map values should typically use slash ('/') as the separator regardless of
+// the platform, as most archive formats standardize on that rune as the
+// directory separator for filenames within an archive. For convenience, map
+// values that are empty string are interpreted as the base name of the file
+// (sans path) in the root of the archive; and map values that end in a slash
+// will use the base name of the file in that folder of the archive.
 //
 // File gathering will adhere to the settings specified in options.
 //
-// This function is primarily used when preparing a list of files to add to
+// This function is used primarily when preparing a list of files to add to
 // an archive.
 func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]File, error) {
 	var files []File
@@ -74,7 +80,8 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 				return err
 			}
 
-			nameInArchive := path.Join(rootInArchive, strings.TrimPrefix(filename, rootOnDisk))
+			truncPath := strings.TrimPrefix(filename, rootOnDisk)
+			nameInArchive := path.Join(rootInArchive, filepath.ToSlash(truncPath))
 			var linkTarget string
 
 			if isSymlink(info) {
