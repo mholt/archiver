@@ -154,24 +154,6 @@ func (f FileFS) Open(name string) (fs.File, error) {
 	return compressedFile{file, r}, nil
 }
 
-// compressedFile is an fs.File that specially reads
-// from a decompression reader, and which closes both
-// that reader and the underlying file.
-type compressedFile struct {
-	*os.File
-	decomp io.ReadCloser
-}
-
-func (cf compressedFile) Read(p []byte) (int, error) { return cf.decomp.Read(p) }
-func (cf compressedFile) Close() error {
-	err := cf.File.Close()
-	err2 := cf.decomp.Close()
-	if err2 != nil && err == nil {
-		err = err2
-	}
-	return err
-}
-
 // ReadDir returns a directory listing with the file as the singular entry.
 func (f FileFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	if err := f.checkName(name, "stat"); err != nil {
@@ -200,6 +182,24 @@ func (f FileFS) checkName(name, op string) error {
 		return &fs.PathError{Op: op, Path: name, Err: fs.ErrNotExist}
 	}
 	return nil
+}
+
+// compressedFile is an fs.File that specially reads
+// from a decompression reader, and which closes both
+// that reader and the underlying file.
+type compressedFile struct {
+	*os.File
+	decomp io.ReadCloser
+}
+
+func (cf compressedFile) Read(p []byte) (int, error) { return cf.decomp.Read(p) }
+func (cf compressedFile) Close() error {
+	err := cf.File.Close()
+	err2 := cf.decomp.Close()
+	if err2 != nil && err == nil {
+		err = err2
+	}
+	return err
 }
 
 // ArchiveFS allows accessing an archive (or a compressed archive) using a

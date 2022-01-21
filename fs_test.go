@@ -44,7 +44,7 @@ func TestPathWithoutTopDir(t *testing.T) {
 //go:embed testdata/test.zip
 var testZIP []byte
 
-func ExampleEmbed() {
+func ExampleArchiveFS_Stream() {
 	fsys := ArchiveFS{
 		Stream: io.NewSectionReader(bytes.NewReader(testZIP), 0, int64(len(testZIP))),
 		Format: Zip{},
