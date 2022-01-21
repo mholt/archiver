@@ -206,9 +206,15 @@ func (f FileFS) checkName(name, op string) error {
 // consistent file system interface. Essentially, it allows traversal and
 // reading of archive contents the same way as any normal directory on disk.
 // The contents of compressed archives are transparently decompressed.
+//
+// A valid ArchiveFS value must set either Path or Stream. If Path is set,
+// a literal file will be opened from the disk. If Stream is set, new
+// SectionReaders will be implicitly created to access the stream, enabling
+// safe, concurrent access.
 type ArchiveFS struct {
-	Path   string            // path to the archive file on disk
-	Stream *io.SectionReader // alternative stream from which to read archive instead of a file path
+	// set one of these
+	Path   string            // path to the archive file on disk, or...
+	Stream *io.SectionReader // ...stream from which to read archive
 
 	Format  Archival        // the archive format
 	Prefix  string          // optional subdirectory in which to root the fs
