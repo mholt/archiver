@@ -123,7 +123,7 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 // noAttrFileInfo is used to zero out file attributes (issue #280)
 type noAttrFileInfo struct{ fs.FileInfo }
 
-func (no noAttrFileInfo) Mode() fs.FileMode { return no.FileInfo.Mode() | fs.ModeType }
+func (no noAttrFileInfo) Mode() fs.FileMode { return no.FileInfo.Mode() & fs.ModeType }
 func (noAttrFileInfo) ModTime() time.Time   { return time.Time{} }
 func (noAttrFileInfo) Sys() interface{}     { return nil }
 
