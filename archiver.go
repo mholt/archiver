@@ -120,10 +120,11 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 	return files, nil
 }
 
-// noAttrFileInfo is used to zero out file attributes (issue #280)
+// noAttrFileInfo is used to zero out some file attributes (issue #280).
 type noAttrFileInfo struct{ fs.FileInfo }
 
-func (no noAttrFileInfo) Mode() fs.FileMode { return no.FileInfo.Mode() & fs.ModeType }
+// Mode preserves only the type and permission bits.
+func (no noAttrFileInfo) Mode() fs.FileMode { return no.FileInfo.Mode() & fs.ModeType & fs.ModePerm }
 func (noAttrFileInfo) ModTime() time.Time   { return time.Time{} }
 func (noAttrFileInfo) Sys() interface{}     { return nil }
 
@@ -134,7 +135,8 @@ type FromDiskOptions struct {
 	// points to will be added as a file.
 	FollowSymlinks bool
 
-	// If true, file attributes will not be preserved.
+	// If true, some file attributes will not be preserved.
+	// Name, size, type, and permissions will still be preserved.
 	ClearAttributes bool
 }
 
