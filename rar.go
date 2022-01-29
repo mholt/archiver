@@ -41,11 +41,18 @@ func (r Rar) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header (there are two versions; allocate buffer for larger one)
-	buf := make([]byte, len(rarHeaderV5_0))
-	if _, err := io.ReadFull(stream, buf); err != nil {
+	buf, err := head(stream, uint(len(rarHeaderV5_0)))
+	if err != nil {
 		return mr, err
 	}
-	mr.ByStream = bytes.Equal(buf[:len(rarHeaderV1_5)], rarHeaderV1_5) || bytes.Equal(buf, rarHeaderV5_0)
+
+	availLengthBufV1_5 := len(rarHeaderV1_5)
+	if availLengthBufV1_5 > len(buf) {
+		// because there may not be enough bytes in the stream
+		availLengthBufV1_5 = len(buf)
+	}
+
+	mr.ByStream = bytes.Equal(buf[:availLengthBufV1_5], rarHeaderV1_5) || bytes.Equal(buf, rarHeaderV5_0)
 
 	return mr, nil
 }

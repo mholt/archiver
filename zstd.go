@@ -29,8 +29,8 @@ func (zs Zstd) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf := make([]byte, len(zstdHeader))
-	if _, err := io.ReadFull(stream, buf); err != nil {
+	buf, err := head(stream, uint(len(zstdHeader)))
+	if err != nil {
 		return mr, err
 	}
 	mr.ByStream = bytes.Equal(buf, zstdHeader)

@@ -28,8 +28,8 @@ func (bz Bz2) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf := make([]byte, len(bzip2Header))
-	if _, err := io.ReadFull(stream, buf); err != nil {
+	buf, err := head(stream, uint(len(bzip2Header)))
+	if err != nil {
 		return mr, err
 	}
 	mr.ByStream = bytes.Equal(buf, bzip2Header)

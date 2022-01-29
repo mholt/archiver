@@ -27,8 +27,8 @@ func (x Xz) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf := make([]byte, len(xzHeader))
-	if _, err := io.ReadFull(stream, buf); err != nil {
+	buf, err := head(stream, uint(len(xzHeader)))
+	if err != nil {
 		return mr, err
 	}
 	mr.ByStream = bytes.Equal(buf, xzHeader)
