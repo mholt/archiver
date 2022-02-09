@@ -56,8 +56,20 @@ type Decompressor interface {
 type Archiver interface {
 	// Archive writes an archive file to output with the given files.
 	//
-	// Context is optional, but if given, cancellation must be honored.
+	// Context cancellation must be honored.
 	Archive(ctx context.Context, output io.Writer, files []File) error
+}
+
+// ArchiverAsync is an Archiver that can also create archives
+// asynchronously by pumping files into a channel as they are
+// discovered.
+type ArchiverAsync interface {
+	Archiver
+
+	// Use ArchiveAsync if you can't pre-assemble a list of all
+	// the files for the archive. Close the files channel after
+	// all the files have been sent.
+	ArchiveAsync(ctx context.Context, output io.Writer, files <-chan File) error
 }
 
 // Extractor can extract files from an archive.
@@ -68,7 +80,7 @@ type Extractor interface {
 	// If a path refers to a directory, all files within it are extracted.
 	// Extracted files are passed to the handleFile callback for handling.
 	//
-	// Context is optional, but if given, cancellation must be honored.
+	// Context cancellation must be honored.
 	Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error
 }
 
@@ -76,6 +88,6 @@ type Extractor interface {
 type Inserter interface {
 	// Insert inserts the files into archive.
 	//
-	// Context is optional, but if given, cancellation must be honored.
+	// Context cancellation must be honored.
 	Insert(ctx context.Context, archive io.ReadWriteSeeker, files []File) error
 }
