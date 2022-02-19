@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -24,9 +25,14 @@ func RegisterFormat(format Format) {
 // value can be type-asserted to ascertain its capabilities.
 //
 // If no matching formats were found, special error ErrNoMatch is returned.
-func Identify(filename string, stream io.ReadSeeker) (Format, error) {
+//
+// The returned io.Reader will always be non-nil, and will read from the same point
+// as the reader which was passed in.
+func Identify(filename string, stream io.Reader) (Format, io.Reader, error) {
 	var compression Compression
 	var archival Archival
+
+	headerReader := newHeaderReader(stream)
 
 	// try compression format first, since that's the outer "layer"
 	for name, format := range formats {
@@ -35,9 +41,9 @@ func Identify(filename string, stream io.ReadSeeker) (Format, error) {
 			continue
 		}
 
-		matchResult, err := identifyOne(format, filename, stream, nil)
+		matchResult, err := identifyOne(format, filename, headerReader, nil)
 		if err != nil {
-			return nil, fmt.Errorf("matching %s: %w", name, err)
+			return nil, headerReader.Reader(), fmt.Errorf("matching %s: %w", name, err)
 		}
 
 		// if matched, wrap input stream with decompression
@@ -49,52 +55,39 @@ func Identify(filename string, stream io.ReadSeeker) (Format, error) {
 	}
 
 	// try archive format next
-	for name, format := range formats {
-		af, isArchive := format.(Archival)
-		if !isArchive {
-			continue
-		}
+	// for name, format := range formats {
+	// 	af, isArchive := format.(Archival)
+	// 	if !isArchive {
+	// 		continue
+	// 	}
 
-		matchResult, err := identifyOne(format, filename, stream, compression)
-		if err != nil {
-			return nil, fmt.Errorf("matching %s: %w", name, err)
-		}
+	// 	matchResult, err := identifyOne(format, filename, headerReader, compression)
+	// 	if err != nil {
+	// 		return nil, headerReader.Reader(), fmt.Errorf("matching %s: %w", name, err)
+	// 	}
 
-		if matchResult.Matched() {
-			archival = af
-			break
-		}
-	}
+	// 	if matchResult.Matched() {
+	// 		archival = af
+	// 		break
+	// 	}
+	// }
 
+	// the stream should be rewound by identifyOne
+	streamOut := headerReader.Reader()
 	switch {
 	case compression != nil && archival == nil:
-		return compression, nil
+		return compression, streamOut, nil
 	case compression == nil && archival != nil:
-		return archival, nil
+		return archival, streamOut, nil
 	case compression != nil && archival != nil:
-		return CompressedArchive{compression, archival}, nil
+		return CompressedArchive{compression, archival}, streamOut, nil
 	default:
-		return nil, ErrNoMatch
+		return nil, streamOut, ErrNoMatch
 	}
 }
 
-func identifyOne(format Format, filename string, stream io.ReadSeeker, comp Compression) (MatchResult, error) {
-	if stream == nil {
-		// shimming an empty stream is easier than hoping every format's
-		// implementation of Match() expects and handles a nil stream
-		stream = strings.NewReader("")
-	}
-
-	// reset stream position to beginning, then restore current position when done
-	previousOffset, err := stream.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return MatchResult{}, err
-	}
-	_, err = stream.Seek(0, io.SeekStart)
-	if err != nil {
-		return MatchResult{}, err
-	}
-	defer stream.Seek(previousOffset, io.SeekStart)
+func identifyOne(format Format, filename string, stream *headerReader, comp Compression) (mr MatchResult, err error) {
+	defer stream.Rewind()
 
 	// if looking within a compressed format, wrap the stream in a
 	// reader that can decompress it so we can match the "inner" format
@@ -102,21 +95,22 @@ func identifyOne(format Format, filename string, stream io.ReadSeeker, comp Comp
 	// because we reset/seek the stream each time and that can mess up
 	// the compression reader's state if we don't discard it also)
 	if comp != nil {
-		decompressedStream, err := comp.OpenReader(stream)
-		if err != nil {
-			return MatchResult{}, err
+		decompressedStream, openErr := comp.OpenReader(stream)
+		if openErr != nil {
+			return MatchResult{}, openErr
 		}
 		defer decompressedStream.Close()
-		stream = struct {
-			io.Reader
-			io.Seeker
-		}{
-			Reader: decompressedStream,
-			Seeker: stream,
-		}
+		mr, err = format.Match(filename, decompressedStream)
+	} else {
+		mr, err = format.Match(filename, stream)
 	}
 
-	return format.Match(filename, stream)
+	// if the error is EOF, we can just ignore it.
+	// Just means we have a small input file.
+	if errors.Is(err, io.EOF) {
+		err = nil
+	}
+	return mr, err
 }
 
 // CompressedArchive combines a compression format on top of an archive
@@ -229,6 +223,24 @@ type MatchResult struct {
 
 // Matched returns true if a match was made by either name or stream.
 func (mr MatchResult) Matched() bool { return mr.ByName || mr.ByStream }
+
+// Compare match results returning 0 if the values are the same, 1 if this match
+// ir stronger than the other, and -1 if the other match is stronger.
+func (mr MatchResult) compare(other MatchResult) int {
+	if mr.ByStream && !other.ByStream {
+		return 1
+	}
+	if other.ByStream && !mr.ByStream {
+		return -1
+	}
+	if mr.ByName && !other.ByName {
+		return 1
+	}
+	if other.ByName && !mr.ByName {
+		return -1
+	}
+	return 0
+}
 
 // ErrNoMatch is returned if there are no matching formats.
 var ErrNoMatch = fmt.Errorf("no formats matched")
