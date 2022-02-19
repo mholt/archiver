@@ -55,22 +55,22 @@ func Identify(filename string, stream io.Reader) (Format, io.Reader, error) {
 	}
 
 	// try archive format next
-	// for name, format := range formats {
-	// 	af, isArchive := format.(Archival)
-	// 	if !isArchive {
-	// 		continue
-	// 	}
+	for name, format := range formats {
+		af, isArchive := format.(Archival)
+		if !isArchive {
+			continue
+		}
 
-	// 	matchResult, err := identifyOne(format, filename, headerReader, compression)
-	// 	if err != nil {
-	// 		return nil, headerReader.Reader(), fmt.Errorf("matching %s: %w", name, err)
-	// 	}
+		matchResult, err := identifyOne(format, filename, headerReader, compression)
+		if err != nil {
+			return nil, headerReader.Reader(), fmt.Errorf("matching %s: %w", name, err)
+		}
 
-	// 	if matchResult.Matched() {
-	// 		archival = af
-	// 		break
-	// 	}
-	// }
+		if matchResult.Matched() {
+			archival = af
+			break
+		}
+	}
 
 	// the stream should be rewound by identifyOne
 	streamOut := headerReader.Reader()
@@ -223,24 +223,6 @@ type MatchResult struct {
 
 // Matched returns true if a match was made by either name or stream.
 func (mr MatchResult) Matched() bool { return mr.ByName || mr.ByStream }
-
-// Compare match results returning 0 if the values are the same, 1 if this match
-// ir stronger than the other, and -1 if the other match is stronger.
-func (mr MatchResult) compare(other MatchResult) int {
-	if mr.ByStream && !other.ByStream {
-		return 1
-	}
-	if other.ByStream && !mr.ByStream {
-		return -1
-	}
-	if mr.ByName && !other.ByName {
-		return 1
-	}
-	if other.ByName && !mr.ByName {
-		return -1
-	}
-	return 0
-}
 
 // ErrNoMatch is returned if there are no matching formats.
 var ErrNoMatch = fmt.Errorf("no formats matched")

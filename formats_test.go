@@ -36,20 +36,19 @@ func TestCompression(t *testing.T) {
 		checkErr(t, err, "writing contents")
 		checkErr(t, wc.Close(), "closing writer")
 
+		// make sure Identify correctly chooses this compression method
 		format, stream, err := Identify(testFilename, compressed)
 		checkErr(t, err, "identifying")
-
 		if format.Name() != comp.Name() {
 			t.Fatalf("expected format %s but got %s", comp.Name(), format.Name())
 		}
 
+		// read the contents back out and compare
 		decompReader, err := format.(Decompressor).OpenReader(stream)
 		checkErr(t, err, "opening with decompressor '%s'", format.Name())
-
 		data, err := io.ReadAll(decompReader)
 		checkErr(t, err, "reading decompressed data")
 		checkErr(t, decompReader.Close(), "closing decompressor")
-
 		if !bytes.Equal(data, contents) {
 			t.Fatalf("not equal to original")
 		}
