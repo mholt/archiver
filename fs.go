@@ -221,6 +221,14 @@ type ArchiveFS struct {
 	Context context.Context // optional
 }
 
+// context always return a context, preferring f.Context if not nil.
+func (f ArchiveFS) context() context.Context {
+	if f.Context != nil {
+		return f.Context
+	}
+	return context.Background()
+}
+
 // Open opens the named file from within the archive. If name is "." then
 // the archive file itself will be opened as a directory file.
 func (f ArchiveFS) Open(name string) (fs.File, error) {
@@ -312,7 +320,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
-	err = f.Format.Extract(f.Context, inputStream, []string{name}, handler)
+	err = f.Format.Extract(f.context(), inputStream, []string{name}, handler)
 	if err != nil && fsFile != nil {
 		if ef, ok := fsFile.(extractedFile); ok {
 			if ef.parentArchive != nil {
@@ -377,7 +385,7 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	if f.Stream != nil {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
-	err = f.Format.Extract(f.Context, inputStream, []string{name}, handler)
+	err = f.Format.Extract(f.context(), inputStream, []string{name}, handler)
 	if err != nil && result.FileInfo == nil {
 		return nil, err
 	}
@@ -446,7 +454,7 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
-	err = f.Format.Extract(f.Context, inputStream, filter, handler)
+	err = f.Format.Extract(f.context(), inputStream, filter, handler)
 	return entries, err
 }
 

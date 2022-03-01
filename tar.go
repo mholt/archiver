@@ -42,19 +42,28 @@ func (t Tar) Match(filename string, stream io.Reader) (MatchResult, error) {
 }
 
 func (t Tar) Archive(ctx context.Context, output io.Writer, files []File) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	tw := tar.NewWriter(output)
 	defer tw.Close()
 
 	for _, file := range files {
-		if err := ctx.Err(); err != nil {
-			return err // honor context cancellation
+		if err := t.writeFileToArchive(ctx, tw, file); err != nil {
+			if t.ContinueOnError && ctx.Err() == nil { // context errors should always abort
+				log.Printf("[ERROR] %v", err)
+				continue
+			}
+			return err
 		}
-		err := t.writeFileToArchive(ctx, tw, file)
-		if err != nil {
+	}
+
+	return nil
+}
+
+func (t Tar) ArchiveAsync(ctx context.Context, output io.Writer, files <-chan File) error {
+	tw := tar.NewWriter(output)
+	defer tw.Close()
+
+	for file := range files {
+		if err := t.writeFileToArchive(ctx, tw, file); err != nil {
 			if t.ContinueOnError && ctx.Err() == nil { // context errors should always abort
 				log.Printf("[ERROR] %v", err)
 				continue
@@ -67,6 +76,10 @@ func (t Tar) Archive(ctx context.Context, output io.Writer, files []File) error 
 }
 
 func (Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) error {
+	if err := ctx.Err(); err != nil {
+		return err // honor context cancellation
+	}
+
 	hdr, err := tar.FileInfoHeader(file, file.LinkTarget)
 	if err != nil {
 		return fmt.Errorf("file %s: creating header: %w", file.NameInArchive, err)
@@ -91,10 +104,6 @@ func (Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) er
 }
 
 func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	// Tar files may end with some, none, or a lot of zero-byte padding. The spec says
 	// it should end with two 512-byte trailer records consisting solely of null/0
 	// bytes: https://www.gnu.org/software/tar/manual/html_node/Standard.html. However,
@@ -165,10 +174,6 @@ func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) 
 }
 
 func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	tr := tar.NewReader(sourceArchive)
 
 	// important to initialize to non-nil, empty value due to how fileIsIncluded works

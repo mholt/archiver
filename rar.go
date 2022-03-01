@@ -56,10 +56,6 @@ func (r Rar) Archive(_ context.Context, _ io.Writer, _ []File) error {
 }
 
 func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	var options []rardecode.Option
 	if r.Password != "" {
 		options = append(options, rardecode.Password(r.Password))
