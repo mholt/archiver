@@ -11,8 +11,8 @@ import (
 )
 
 func TestIdentifyDoesNotMatchContentFromTrimmedKnownHeaderHaving0Suffix(t *testing.T) {
-	//Using the outcome of <<n, err := io.ReadFull(stream, buf)>> without minding <<n>>
-	// may lead to a mis-caraterization for cases with known header ending with 0
+	// Using the outcome of `n, err := io.ReadFull(stream, buf)` without minding n
+	// may lead to a mis-characterization for cases with known header ending with 0x0
 	// because the default byte value in a declared array is 0.
 	// This test guards against those cases.
 	tests := []struct {
@@ -20,16 +20,16 @@ func TestIdentifyDoesNotMatchContentFromTrimmedKnownHeaderHaving0Suffix(t *testi
 		header []byte
 	}{
 		{
-			name:   "rarv5_0",
-			header: rarHeaderV5_0[:],
+			name:   "rar_v5.0",
+			header: rarHeaderV5_0,
 		},
 		{
-			name:   "rarv1_5",
-			header: rarHeaderV1_5[:],
+			name:   "rar_v1.5",
+			header: rarHeaderV1_5,
 		},
 		{
 			name:   "xz",
-			header: xzHeader[:],
+			header: xzHeader,
 		},
 	}
 	for _, tt := range tests {
@@ -141,13 +141,9 @@ func archive(t *testing.T, arch Archiver, fname string, fileInfo fs.FileInfo) []
 
 }
 
-type writeNopCloser struct {
-	io.Writer
-}
+type writeNopCloser struct{ io.Writer }
 
-func (wnc writeNopCloser) Close() error {
-	return nil
-}
+func (wnc writeNopCloser) Close() error { return nil }
 
 func newWriteNopCloser(w io.Writer) (io.WriteCloser, error) {
 	return writeNopCloser{w}, nil
@@ -179,6 +175,7 @@ func newTmpTextFile(t *testing.T, content string) (string, fs.FileInfo) {
 		t.Fatalf("fail to get tmp-txt-file stats: err=%v", err)
 		return "", nil
 	}
+
 	return fname, fi
 }
 

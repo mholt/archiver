@@ -28,7 +28,7 @@ func (bz Bz2) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf, err := head(stream, uint(len(bzip2Header)))
+	buf, err := readAtMost(stream, len(bzip2Header))
 	if err != nil {
 		return mr, err
 	}

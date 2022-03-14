@@ -28,7 +28,7 @@ func (lz Lz4) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf, err := head(stream, uint(len(lz4Header)))
+	buf, err := readAtMost(stream, len(lz4Header))
 	if err != nil {
 		return mr, err
 	}

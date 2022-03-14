@@ -26,7 +26,7 @@ func (sz Sz) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf, err := head(stream, uint(len(snappyHeader)))
+	buf, err := readAtMost(stream, len(snappyHeader))
 	if err != nil {
 		return mr, err
 	}

@@ -36,7 +36,7 @@ func (gz Gz) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf, err := head(stream, uint(len(gzHeader)))
+	buf, err := readAtMost(stream, len(gzHeader))
 	if err != nil {
 		return mr, err
 	}

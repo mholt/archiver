@@ -29,7 +29,7 @@ func (zs Zstd) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf, err := head(stream, uint(len(zstdHeader)))
+	buf, err := readAtMost(stream, len(zstdHeader))
 	if err != nil {
 		return mr, err
 	}

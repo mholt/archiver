@@ -91,7 +91,7 @@ func (z Zip) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf, err := head(stream, uint(len(zipHeader)))
+	buf, err := readAtMost(stream, len(zipHeader))
 	if err != nil {
 		return mr, err
 	}
