@@ -211,6 +211,19 @@ func (cf compressedFile) Close() error {
 // a literal file will be opened from the disk. If Stream is set, new
 // SectionReaders will be implicitly created to access the stream, enabling
 // safe, concurrent access.
+//
+// NOTE: Due to Go's file system APIs (see package io/fs), the performance
+// of ArchiveFS when used with fs.WalkDir() is poor for archives with lots
+// of files (see issue #326). The fs.WalkDir() API requires listing each
+// directory's contents in turn, and the only way to ensure we return the
+// complete list of folder contents is to traverse the whole archive and
+// build a slice; so if this is done for the root of an archive with many
+// files, performance tends toward O(n^2) as the entire archive is walked
+// for every folder that is enumerated (WalkDir calls ReadDir recursively).
+// If you do not need each directory's contents walked in order, please
+// prefer calling Extract() from an archive type directly; this will perform
+// a O(n) walk of the contents in archive order, rather than the slower
+// directory tree order.
 type ArchiveFS struct {
 	// set one of these
 	Path   string            // path to the archive file on disk, or...
