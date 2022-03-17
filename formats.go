@@ -27,8 +27,11 @@ func RegisterFormat(format Format) {
 //
 // If no matching formats were found, special error ErrNoMatch is returned.
 //
-// The returned io.Reader will always be non-nil, and will read from the same point
-// as the reader which was passed in.
+// The returned io.Reader will always be non-nil and will read from the
+// same point as the reader which was passed in; it should be used in place
+// of the input stream after calling Identify() because it preserves and
+// re-reads the bytes that were already read during the identification
+// process.
 func Identify(filename string, stream io.Reader) (Format, io.Reader, error) {
 	var compression Compression
 	var archival Archival
