@@ -46,7 +46,7 @@ func FileSystem(root string) (fs.FS, error) {
 		return nil, err
 	}
 	defer file.Close()
-	format, err := Identify(filepath.Base(root), file)
+	format, _, err := Identify(filepath.Base(root), file)
 	if err != nil && !errors.Is(err, ErrNoMatch) {
 		return nil, err
 	}
