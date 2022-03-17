@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -32,7 +33,7 @@ func Identify(filename string, stream io.Reader) (Format, io.Reader, error) {
 	var compression Compression
 	var archival Archival
 
-	headerReader := newHeaderReader(stream)
+	rewindableStream := newRewindReader(stream)
 
 	// try compression format first, since that's the outer "layer"
 	for name, format := range formats {
@@ -41,9 +42,9 @@ func Identify(filename string, stream io.Reader) (Format, io.Reader, error) {
 			continue
 		}
 
-		matchResult, err := identifyOne(format, filename, headerReader, nil)
+		matchResult, err := identifyOne(format, filename, rewindableStream, nil)
 		if err != nil {
-			return nil, headerReader.Reader(), fmt.Errorf("matching %s: %w", name, err)
+			return nil, rewindableStream.reader(), fmt.Errorf("matching %s: %w", name, err)
 		}
 
 		// if matched, wrap input stream with decompression
@@ -61,9 +62,9 @@ func Identify(filename string, stream io.Reader) (Format, io.Reader, error) {
 			continue
 		}
 
-		matchResult, err := identifyOne(format, filename, headerReader, compression)
+		matchResult, err := identifyOne(format, filename, rewindableStream, compression)
 		if err != nil {
-			return nil, headerReader.Reader(), fmt.Errorf("matching %s: %w", name, err)
+			return nil, rewindableStream.reader(), fmt.Errorf("matching %s: %w", name, err)
 		}
 
 		if matchResult.Matched() {
@@ -73,21 +74,21 @@ func Identify(filename string, stream io.Reader) (Format, io.Reader, error) {
 	}
 
 	// the stream should be rewound by identifyOne
-	streamOut := headerReader.Reader()
+	bufferedStream := rewindableStream.reader()
 	switch {
 	case compression != nil && archival == nil:
-		return compression, streamOut, nil
+		return compression, bufferedStream, nil
 	case compression == nil && archival != nil:
-		return archival, streamOut, nil
+		return archival, bufferedStream, nil
 	case compression != nil && archival != nil:
-		return CompressedArchive{compression, archival}, streamOut, nil
+		return CompressedArchive{compression, archival}, bufferedStream, nil
 	default:
-		return nil, streamOut, ErrNoMatch
+		return nil, bufferedStream, ErrNoMatch
 	}
 }
 
-func identifyOne(format Format, filename string, stream *headerReader, comp Compression) (mr MatchResult, err error) {
-	defer stream.Rewind()
+func identifyOne(format Format, filename string, stream *rewindReader, comp Compression) (mr MatchResult, err error) {
+	defer stream.rewind()
 
 	// if looking within a compressed format, wrap the stream in a
 	// reader that can decompress it so we can match the "inner" format
@@ -223,6 +224,76 @@ type MatchResult struct {
 
 // Matched returns true if a match was made by either name or stream.
 func (mr MatchResult) Matched() bool { return mr.ByName || mr.ByStream }
+
+// rewindReader is a Reader that can be rewound (reset) to re-read what
+// was already read and then continue to read more from the underlying
+// stream. When no more rewinding is necessary, call reader() to get a
+// new reader that first reads the buffered bytes, then continues to
+// read from the stream. This is useful for "peeking" a stream an
+// arbitrary number of bytes. Loosely based on the Connection type
+// from https://github.com/mholt/caddy-l4.
+type rewindReader struct {
+	io.Reader
+	buf       *bytes.Buffer
+	bufReader io.Reader
+}
+
+func newRewindReader(r io.Reader) *rewindReader {
+	return &rewindReader{
+		Reader: r,
+		buf:    new(bytes.Buffer),
+	}
+}
+
+func (rr *rewindReader) Read(p []byte) (n int, err error) {
+	// if there is a buffer we should read from, start
+	// with that; we only read from the underlying stream
+	// after the buffer has been "depleted"
+	if rr.bufReader != nil {
+		n, err = rr.bufReader.Read(p)
+		if err == io.EOF {
+			rr.bufReader = nil
+			err = nil
+		}
+		if n == len(p) {
+			return
+		}
+	}
+
+	// buffer has been "depleted" so read from
+	// underlying connection
+	nr, err := rr.Reader.Read(p[n:])
+
+	// anything that was read needs to be written to
+	// the buffer, even if there was an error
+	if nr > 0 {
+		if nw, errw := rr.buf.Write(p[n : n+nr]); errw != nil {
+			return nw, errw
+		}
+	}
+
+	// up to now, n was how many bytes were read from
+	// the buffer, and nr was how many bytes were read
+	// from the stream; add them to return total count
+	n += nr
+
+	return
+}
+
+// rewind resets the stream to the beginning by causing
+// Read() to start reading from the beginning of the
+// buffered bytes.
+func (rr *rewindReader) rewind() {
+	rr.bufReader = bytes.NewReader(rr.buf.Bytes())
+}
+
+// reader returns a reader that reads first from the buffered
+// bytes, then from the underlying stream. After calling this,
+// no more rewinding is allowed since reads from the stream are
+// not recorded, so rewinding properly is impossible.
+func (rr *rewindReader) reader() io.Reader {
+	return io.MultiReader(bytes.NewReader(rr.buf.Bytes()), rr.Reader)
+}
 
 // ErrNoMatch is returned if there are no matching formats.
 var ErrNoMatch = fmt.Errorf("no formats matched")
