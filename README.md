@@ -137,11 +137,12 @@ if err != nil {
 Have an input stream with unknown contents? No problem, archiver can identify it for you. It will try matching based on filename and/or the header (which peeks at the stream):
 
 ```go
-format, err := archiver.Identify("filename.tar.zst", input)
+format, input, err := archiver.Identify("filename.tar.zst", input)
 if err != nil {
 	return err
 }
-// you can now type-assert format to whatever you need
+// you can now type-assert format to whatever you need;
+// be sure to use returned stream to re-read consumed bytes during Identify()
 
 // want to extract something?
 if ex, ok := format.(archiver.Extractor); ok {
@@ -159,6 +160,8 @@ if decom, ok := format.(archiver.Decompressor); ok {
 	// read from rc to get decompressed data
 }
 ```
+
+`Identify()` works by reading an arbitrary number of bytes from the beginning of the stream (just enough to check for file headers). It buffers them and returns a new reader that lets you re-read them anew.
 
 ### Virtual file systems
 
