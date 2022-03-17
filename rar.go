@@ -41,11 +41,17 @@ func (r Rar) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header (there are two versions; allocate buffer for larger one)
-	buf := make([]byte, len(rarHeaderV5_0))
-	if _, err := io.ReadFull(stream, buf); err != nil {
+	buf, err := readAtMost(stream, len(rarHeaderV5_0))
+	if err != nil {
 		return mr, err
 	}
-	mr.ByStream = bytes.Equal(buf[:len(rarHeaderV1_5)], rarHeaderV1_5) || bytes.Equal(buf, rarHeaderV5_0)
+
+	matchedV1_5 := len(buf) >= len(rarHeaderV1_5) &&
+		bytes.Equal(rarHeaderV1_5, buf[:len(rarHeaderV1_5)])
+	matchedV5_0 := len(buf) >= len(rarHeaderV5_0) &&
+		bytes.Equal(rarHeaderV5_0, buf[:len(rarHeaderV5_0)])
+
+	mr.ByStream = matchedV1_5 || matchedV5_0
 
 	return mr, nil
 }
@@ -56,10 +62,6 @@ func (r Rar) Archive(_ context.Context, _ io.Writer, _ []File) error {
 }
 
 func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	var options []rardecode.Option
 	if r.Password != "" {
 		options = append(options, rardecode.Password(r.Password))

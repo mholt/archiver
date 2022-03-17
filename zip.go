@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"path"
 	"strings"
 
@@ -91,8 +92,8 @@ func (z Zip) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	buf := make([]byte, len(zipHeader))
-	if _, err := io.ReadFull(stream, buf); err != nil {
+	buf, err := readAtMost(stream, len(zipHeader))
+	if err != nil {
 		return mr, err
 	}
 	mr.ByStream = bytes.Equal(buf, zipHeader)
@@ -101,52 +102,75 @@ func (z Zip) Match(filename string, stream io.Reader) (MatchResult, error) {
 }
 
 func (z Zip) Archive(ctx context.Context, output io.Writer, files []File) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	zw := zip.NewWriter(output)
 	defer zw.Close()
 
 	for i, file := range files {
-		if err := ctx.Err(); err != nil {
-			return err // honor context cancellation
+		if err := z.archiveOneFile(ctx, zw, i, file); err != nil {
+			return err
 		}
+	}
 
-		hdr, err := zip.FileInfoHeader(file)
-		if err != nil {
-			return fmt.Errorf("getting info for file %d: %s: %w", i, file.Name(), err)
-		}
-		hdr.Name = file.NameInArchive // complete path, since FileInfoHeader() only has base name
+	return nil
+}
 
-		// customize header based on file properties
-		if file.IsDir() {
-			if !strings.HasSuffix(hdr.Name, "/") {
-				hdr.Name += "/" // required
+func (z Zip) ArchiveAsync(ctx context.Context, output io.Writer, files <-chan File) error {
+	zw := zip.NewWriter(output)
+	defer zw.Close()
+
+	var i int
+	for file := range files {
+		if err := z.archiveOneFile(ctx, zw, i, file); err != nil {
+			if z.ContinueOnError && ctx.Err() == nil { // context errors should always abort
+				log.Printf("[ERROR] %v", err)
+				continue
 			}
+			return err
+		}
+		i++
+	}
+
+	return nil
+}
+
+func (z Zip) archiveOneFile(ctx context.Context, zw *zip.Writer, idx int, file File) error {
+	if err := ctx.Err(); err != nil {
+		return err // honor context cancellation
+	}
+
+	hdr, err := zip.FileInfoHeader(file)
+	if err != nil {
+		return fmt.Errorf("getting info for file %d: %s: %w", idx, file.Name(), err)
+	}
+	hdr.Name = file.NameInArchive // complete path, since FileInfoHeader() only has base name
+
+	// customize header based on file properties
+	if file.IsDir() {
+		if !strings.HasSuffix(hdr.Name, "/") {
+			hdr.Name += "/" // required
+		}
+		hdr.Method = zip.Store
+	} else if z.SelectiveCompression {
+		// only enable compression on compressable files
+		ext := strings.ToLower(path.Ext(hdr.Name))
+		if _, ok := compressedFormats[ext]; ok {
 			hdr.Method = zip.Store
-		} else if z.SelectiveCompression {
-			// only enable compression on compressable files
-			ext := strings.ToLower(path.Ext(hdr.Name))
-			if _, ok := compressedFormats[ext]; ok {
-				hdr.Method = zip.Store
-			} else {
-				hdr.Method = z.Compression
-			}
+		} else {
+			hdr.Method = z.Compression
 		}
+	}
 
-		w, err := zw.CreateHeader(hdr)
-		if err != nil {
-			return fmt.Errorf("creating header for file %d: %s: %w", i, file.Name(), err)
-		}
+	w, err := zw.CreateHeader(hdr)
+	if err != nil {
+		return fmt.Errorf("creating header for file %d: %s: %w", idx, file.Name(), err)
+	}
 
-		// directories have no file body
-		if file.IsDir() {
-			continue
-		}
-		if err := openAndCopyFile(file, w); err != nil {
-			return fmt.Errorf("writing file %d: %s: %w", i, file.Name(), err)
-		}
+	// directories have no file body
+	if file.IsDir() {
+		return nil
+	}
+	if err := openAndCopyFile(file, w); err != nil {
+		return fmt.Errorf("writing file %d: %s: %w", idx, file.Name(), err)
 	}
 
 	return nil
@@ -159,10 +183,6 @@ func (z Zip) Archive(ctx context.Context, output io.Writer, files []File) error 
 // with. Due to the nature of the zip archive format, if sourceArchive is not an io.Seeker
 // and io.ReaderAt, an error is returned.
 func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	sra, ok := sourceArchive.(seekReaderAt)
 	if !ok {
 		return fmt.Errorf("input type must be an io.ReaderAt and io.Seeker because of zip format constraints")

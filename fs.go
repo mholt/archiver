@@ -211,6 +211,19 @@ func (cf compressedFile) Close() error {
 // a literal file will be opened from the disk. If Stream is set, new
 // SectionReaders will be implicitly created to access the stream, enabling
 // safe, concurrent access.
+//
+// NOTE: Due to Go's file system APIs (see package io/fs), the performance
+// of ArchiveFS when used with fs.WalkDir() is poor for archives with lots
+// of files (see issue #326). The fs.WalkDir() API requires listing each
+// directory's contents in turn, and the only way to ensure we return the
+// complete list of folder contents is to traverse the whole archive and
+// build a slice; so if this is done for the root of an archive with many
+// files, performance tends toward O(n^2) as the entire archive is walked
+// for every folder that is enumerated (WalkDir calls ReadDir recursively).
+// If you do not need each directory's contents walked in order, please
+// prefer calling Extract() from an archive type directly; this will perform
+// a O(n) walk of the contents in archive order, rather than the slower
+// directory tree order.
 type ArchiveFS struct {
 	// set one of these
 	Path   string            // path to the archive file on disk, or...
@@ -219,6 +232,14 @@ type ArchiveFS struct {
 	Format  Archival        // the archive format
 	Prefix  string          // optional subdirectory in which to root the fs
 	Context context.Context // optional
+}
+
+// context always return a context, preferring f.Context if not nil.
+func (f ArchiveFS) context() context.Context {
+	if f.Context != nil {
+		return f.Context
+	}
+	return context.Background()
 }
 
 // Open opens the named file from within the archive. If name is "." then
@@ -312,7 +333,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
-	err = f.Format.Extract(f.Context, inputStream, []string{name}, handler)
+	err = f.Format.Extract(f.context(), inputStream, []string{name}, handler)
 	if err != nil && fsFile != nil {
 		if ef, ok := fsFile.(extractedFile); ok {
 			if ef.parentArchive != nil {
@@ -377,7 +398,7 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	if f.Stream != nil {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
-	err = f.Format.Extract(f.Context, inputStream, []string{name}, handler)
+	err = f.Format.Extract(f.context(), inputStream, []string{name}, handler)
 	if err != nil && result.FileInfo == nil {
 		return nil, err
 	}
@@ -446,7 +467,7 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
-	err = f.Format.Extract(f.Context, inputStream, filter, handler)
+	err = f.Format.Extract(f.context(), inputStream, filter, handler)
 	return entries, err
 }
 
