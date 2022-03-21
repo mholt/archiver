@@ -323,7 +323,7 @@ func (rr *rewindReader) rewind() {
 // underlying reader will be used directly.
 func (rr *rewindReader) reader() io.Reader {
 	if ras, ok := rr.Reader.(io.Seeker); ok {
-		if _, err := ras.Seek(-int64(rr.buf.Len()), io.SeekCurrent); err == nil {
+		if _, err := ras.Seek(0, io.SeekStart); err == nil {
 			return rr.Reader
 		}
 	}
