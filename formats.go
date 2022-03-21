@@ -319,7 +319,14 @@ func (rr *rewindReader) rewind() {
 // bytes, then from the underlying stream. After calling this,
 // no more rewinding is allowed since reads from the stream are
 // not recorded, so rewinding properly is impossible.
+// If the underlying reader implements io.Seeker, then the
+// underlying reader will be used directly.
 func (rr *rewindReader) reader() io.Reader {
+	if ras, ok := rr.Reader.(io.Seeker); ok {
+		if _, err := ras.Seek(0, io.SeekStart); err == nil {
+			return rr.Reader
+		}
+	}
 	return io.MultiReader(bytes.NewReader(rr.buf.Bytes()), rr.Reader)
 }
 
