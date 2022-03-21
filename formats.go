@@ -320,6 +320,11 @@ func (rr *rewindReader) rewind() {
 // no more rewinding is allowed since reads from the stream are
 // not recorded, so rewinding properly is impossible.
 func (rr *rewindReader) reader() io.Reader {
+	if ras, ok := rr.Reader.(seekReaderAt); ok {
+		if _, err := ras.Seek(-int64(rr.buf.Len()), io.SeekCurrent); err == nil {
+			return rr.Reader
+		}
+	}
 	return io.MultiReader(bytes.NewReader(rr.buf.Bytes()), rr.Reader)
 }
 

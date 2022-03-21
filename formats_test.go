@@ -387,3 +387,26 @@ func TestIdentifyFindFormatByStreamContent(t *testing.T) {
 		})
 	}
 }
+
+func TestIdentifyAndOpenZip(t *testing.T) {
+	f, err := os.Open("testdata/test.zip")
+	checkErr(t, err, "opening zip")
+	defer f.Close()
+
+	format, reader, err := Identify("test.zip", f)
+	checkErr(t, err, "identifying zip")
+	if format.Name() != ".zip" {
+		t.Fatalf("unexpected format found: expected=.zip actual:%s", format.Name())
+	}
+
+	err = format.(Extractor).Extract(context.Background(), reader, nil, func(ctx context.Context, f File) error {
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+		_, err = io.ReadAll(rc)
+		return err
+	})
+	checkErr(t, err, "extracting zip")
+}
