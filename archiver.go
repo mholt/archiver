@@ -49,6 +49,8 @@ func (f File) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
 // Map keys that specify directories on disk will be walked and added to the
 // archive recursively, rooted at the named directory. They should use the
 // platform's path separator (backslash on Windows; slash on everything else).
+// For convenience, map keys that end in a separator ('/', or '\' on Windows)
+// will enumerate contents only without adding the folder itself to the archive.
 //
 // Map values should typically use slash ('/') as the separator regardless of
 // the platform, as most archive formats standardize on that rune as the
@@ -64,13 +66,6 @@ func (f File) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
 func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]File, error) {
 	var files []File
 	for rootOnDisk, rootInArchive := range filenames {
-		if rootInArchive == "" {
-			rootInArchive = filepath.Base(rootOnDisk)
-		}
-		if strings.HasSuffix(rootInArchive, "/") {
-			rootInArchive += filepath.Base(rootOnDisk)
-		}
-
 		filepath.WalkDir(rootOnDisk, func(filename string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
@@ -81,11 +76,10 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 				return err
 			}
 
-			truncPath := strings.TrimPrefix(filename, rootOnDisk)
-			nameInArchive := path.Join(rootInArchive, filepath.ToSlash(truncPath))
-			var linkTarget string
+			nameInArchive := nameOnDiskToNameInArchive(filename, rootOnDisk, rootInArchive)
 
 			// handle symbolic links
+			var linkTarget string
 			if isSymlink(info) {
 				if options != nil && options.FollowSymlinks {
 					// dereference symlinks
@@ -125,6 +119,50 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 		})
 	}
 	return files, nil
+}
+
+// nameOnDiskToNameInArchive converts a filename from disk to a name in an archive,
+// respecting rules defined by FilesFromDisk. nameOnDisk is the full filename on disk
+// which is expected to be prefixed by rootOnDisk (according to fs.WalkDirFunc godoc)
+// and which will be placed into a folder rootInArchive in the archive.
+func nameOnDiskToNameInArchive(nameOnDisk, rootOnDisk, rootInArchive string) string {
+	// These manipulations of rootInArchive could be done just once instead of on
+	// every walked file since they don't rely on nameOnDisk which is the only
+	// variable that changes during the walk, but combining all the logic into this
+	// one function is easier to reason about and test. I suspect the performance
+	// penalty is insignificant.
+	if strings.HasSuffix(rootOnDisk, string(filepath.Separator)) {
+		rootInArchive = trimTopDir(rootInArchive)
+	} else if rootInArchive == "" {
+		rootInArchive = filepath.Base(rootOnDisk)
+	}
+	if strings.HasSuffix(rootInArchive, "/") {
+		rootInArchive += filepath.Base(rootOnDisk)
+	}
+	truncPath := strings.TrimPrefix(nameOnDisk, rootOnDisk)
+	return path.Join(rootInArchive, filepath.ToSlash(truncPath))
+}
+
+// trimTopDir strips the top or first directory from the path.
+// It expects a forward-slashed path.
+//
+// For example, "a/b/c" => "b/c".
+func trimTopDir(dir string) string {
+	if pos := strings.Index(dir, "/"); pos >= 0 {
+		return dir[pos+1:]
+	}
+	return dir
+}
+
+// topDir returns the top or first directory in the path.
+// It expects a forward-slashed path.
+//
+// For example, "a/b/c" => "a".
+func topDir(dir string) string {
+	if pos := strings.Index(dir, "/"); pos >= 0 {
+		return dir[:pos]
+	}
+	return dir
 }
 
 // noAttrFileInfo is used to zero out some file attributes (issue #280).
