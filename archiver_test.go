@@ -148,6 +148,12 @@ func TestNameOnDiskToNameInArchive(t *testing.T) {
 			expect:        "c",
 		},
 		{
+			rootOnDisk:    "a/b/",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: ".",
+			expect:        "c",
+		},
+		{
 			rootOnDisk:    "a/b/c",
 			nameOnDisk:    "a/b/c",
 			rootInArchive: "",
@@ -195,7 +201,7 @@ func TestNameOnDiskToNameInArchive(t *testing.T) {
 			rootOnDisk:    `C:\foo`,
 			nameOnDisk:    `C:\foo\bar`,
 			rootInArchive: "subfolder",
-			expect:        "subfolder/foo/bar",
+			expect:        "subfolder/bar",
 		},
 	} {
 		if !strings.HasPrefix(tc.nameOnDisk, tc.rootOnDisk) {
