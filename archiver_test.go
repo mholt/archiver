@@ -2,6 +2,8 @@ package archiver
 
 import (
 	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -115,6 +117,109 @@ func TestSkipList(t *testing.T) {
 		if !reflect.DeepEqual(tc.start, tc.expect) {
 			t.Errorf("Test %d (start=%v add=%v): expected %v but got %v",
 				i, start, tc.add, tc.expect, tc.start)
+		}
+	}
+}
+
+func TestNameOnDiskToNameInArchive(t *testing.T) {
+	for i, tc := range []struct {
+		windows       bool   // only run this test on Windows
+		rootOnDisk    string // user says they want to archive this file/folder
+		nameOnDisk    string // the walk encounters a file with this name (with rootOnDisk as a prefix)
+		rootInArchive string // file should be placed in this dir within the archive (rootInArchive becomes a prefix)
+		expect        string // final filename in archive
+	}{
+		{
+			rootOnDisk:    "a",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "",
+			expect:        "a/b/c",
+		},
+		{
+			rootOnDisk:    "a/b",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "",
+			expect:        "b/c",
+		},
+		{
+			rootOnDisk:    "a/b/",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "",
+			expect:        "c",
+		},
+		{
+			rootOnDisk:    "a/b/",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: ".",
+			expect:        "c",
+		},
+		{
+			rootOnDisk:    "a/b/c",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "",
+			expect:        "c",
+		},
+		{
+			rootOnDisk:    "a/b",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "foo",
+			expect:        "foo/c",
+		},
+		{
+			rootOnDisk:    "a",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "foo",
+			expect:        "foo/b/c",
+		},
+		{
+			rootOnDisk:    "a",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "foo/",
+			expect:        "foo/a/b/c",
+		},
+		{
+			rootOnDisk:    "a/",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "foo",
+			expect:        "foo/b/c",
+		},
+		{
+			rootOnDisk:    "a/",
+			nameOnDisk:    "a/b/c",
+			rootInArchive: "foo",
+			expect:        "foo/b/c",
+		},
+		{
+			windows:       true,
+			rootOnDisk:    `C:\foo`,
+			nameOnDisk:    `C:\foo\bar`,
+			rootInArchive: "",
+			expect:        "foo/bar",
+		},
+		{
+			windows:       true,
+			rootOnDisk:    `C:\foo`,
+			nameOnDisk:    `C:\foo\bar`,
+			rootInArchive: "subfolder",
+			expect:        "subfolder/bar",
+		},
+	} {
+		if !strings.HasPrefix(tc.nameOnDisk, tc.rootOnDisk) {
+			t.Fatalf("Test %d: Invalid test case! Filename (on disk) will have rootOnDisk as a prefix according to the fs.WalkDirFunc godoc.", i)
+		}
+		if tc.windows && runtime.GOOS != "windows" {
+			t.Logf("Test %d: Skipping test that is only compatible with Windows", i)
+			continue
+		}
+		if !tc.windows && runtime.GOOS == "windows" {
+			t.Logf("Test %d: Skipping test that is not compatible with Windows", i)
+			continue
+		}
+
+		actual := nameOnDiskToNameInArchive(tc.nameOnDisk, tc.rootOnDisk, tc.rootInArchive)
+		if actual != tc.expect {
+			t.Errorf("Test %d: Got '%s' but expected '%s' (nameOnDisk=%s rootOnDisk=%s rootInArchive=%s)",
+				i, actual, tc.expect, tc.nameOnDisk, tc.rootOnDisk, tc.rootInArchive)
 		}
 	}
 }
