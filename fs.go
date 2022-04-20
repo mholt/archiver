@@ -250,9 +250,9 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
 
-	var archiveFile *os.File
+	var archiveFile fs.File
 	var err error
-	if f.Stream == nil {
+	if f.Path != "" {
 		archiveFile, err = os.Open(f.Path)
 		if err != nil {
 			return nil, err
@@ -265,6 +265,8 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 				archiveFile.Close()
 			}
 		}()
+	} else if f.Stream != nil {
+		archiveFile = fakeArchiveFile{}
 	}
 
 	// apply prefix if fs is rooted in a subtree
@@ -364,12 +366,16 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	// apply prefix if fs is rooted in a subtree
 	name = path.Join(f.Prefix, name)
 
-	if name == "." && f.Path != "" {
-		fileInfo, err := os.Stat(f.Path)
-		if err != nil {
-			return nil, err
+	if name == "." {
+		if f.Path != "" {
+			fileInfo, err := os.Stat(f.Path)
+			if err != nil {
+				return nil, err
+			}
+			return dirFileInfo{fileInfo}, nil
+		} else if f.Stream != nil {
+			return implicitDirInfo{implicitDirEntry{name}}, nil
 		}
-		return dirFileInfo{fileInfo}, nil
 	}
 
 	var archiveFile *os.File
@@ -389,7 +395,7 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 		// created depth-first (i.e. directory contents added before the
 		// directory itself), in which case we have to iterate through the
 		// contents first; hence the check for exact filename match (issue #310)
-		if file.NameInArchive == name {
+		if strings.TrimRight(file.NameInArchive, "/") == strings.TrimRight(name, "/") {
 			result = file
 			return errStopWalk
 		}
@@ -586,6 +592,16 @@ func pathWithoutTopDir(fpath string) string {
 // even if that file is a directory and would otherwise be
 // traversed during the walk.
 var errStopWalk = fmt.Errorf("stop walk")
+
+type fakeArchiveFile struct{}
+
+func (f fakeArchiveFile) Stat() (fs.FileInfo, error) {
+	return implicitDirInfo{
+		implicitDirEntry{name: "."},
+	}, nil
+}
+func (f fakeArchiveFile) Read([]byte) (int, error) { return 0, io.EOF }
+func (f fakeArchiveFile) Close() error             { return nil }
 
 // dirFile implements the fs.ReadDirFile interface.
 type dirFile struct {
