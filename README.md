@@ -30,14 +30,15 @@ Introducing **Archiver 4.0** - a cross-platform, multi-format archive utility an
 
 ### Supported compression formats
 
-- brotli (br)
-- bzip2 (bz2)
-- flate (zip)
-- gzip (gz)
-- lz4
-- snappy (sz)
-- xz
-- zstandard (zst)
+- brotli (.br)
+- bzip2 (.bz2)
+- flate (.zip)
+- gzip (.gz)
+- lz4 (.lz4)
+- snappy (.sz)
+- xz (.xz)
+- zlib (.zz)
+- zstandard (.zst)
 
 ### Supported archive formats
 
