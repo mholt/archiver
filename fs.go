@@ -458,13 +458,17 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 			// leaving them to be inferred from the names of files instead (issue #330)
 			// so as we traverse deeper, we need to implicitly find subfolders within
 			// this current directory and add fake entries to the output
-			remainingPath := strings.TrimPrefix(file.NameInArchive, name)
+			remainingPath := file.NameInArchive
+
+			if name != "." {
+				remainingPath = strings.TrimPrefix(file.NameInArchive, name)
+			}
 			nextDir := topDir(remainingPath)        // if name in archive is "a/b/c" and root is "a", this becomes "b" (the implied folder to add)
 			implicitDir := path.Join(name, nextDir) // the full path of the implied directory
 
 			// create fake entry only if no entry currently exists (don't overwrite a real entry)
 			if _, ok := entries[implicitDir]; !ok {
-				entries[implicitDir] = implicitDirEntry{implicitDir}
+				entries[implicitDir] = implicitDirEntry{nextDir}
 			}
 
 			return fs.SkipDir

@@ -148,6 +148,9 @@ func nameOnDiskToNameInArchive(nameOnDisk, rootOnDisk, rootInArchive string) str
 //
 // For example, "a/b/c" => "b/c".
 func trimTopDir(dir string) string {
+	if len(dir) > 0 && dir[0] == '/' {
+		dir = dir[1:]
+	}
 	if pos := strings.Index(dir, "/"); pos >= 0 {
 		return dir[pos+1:]
 	}
@@ -159,6 +162,9 @@ func trimTopDir(dir string) string {
 //
 // For example, "a/b/c" => "a".
 func topDir(dir string) string {
+	if len(dir) > 0 && dir[0] == '/' {
+		dir = dir[1:]
+	}
 	if pos := strings.Index(dir, "/"); pos >= 0 {
 		return dir[:pos]
 	}
