@@ -244,6 +244,31 @@ if err != nil {
 }
 ```
 
+#### Use with http.FileServer
+
+It can be used with http.FileServer to browse directory listing through browser, however due to how http.FileServer works, don't directly use http.FileServer with compressed files, instead wrap it like following
+
+```go
+fileServer := http.FileServer(http.FS(af))
+http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+	// disable range request
+	writer.Header().Set("Accept-Ranges", "none")
+	request.Header.Del("Range")
+	
+	// disable content-type sniffing
+	ctype := mime.TypeByExtension(filepath.Ext(request.URL.Path))
+	writer.Header()["Content-Type"] = nil
+	if ctype != "" {
+		writer.Header().Set("Content-Type", ctype)
+	}
+	fileServer.ServeHTTP(writer, request)
+})
+```
+
+Because http.FileServer by default will try to sniff content-type, if it can't be inferred from file name, http.FileServer will try to read from the file and then Seek back to file start, which the libray can't achieve currently. The same goes with the range request.
+
+If content-type is desirable, you can [register it](https://pkg.go.dev/mime#AddExtensionType) yourself.
+
 ### Compress data
 
 Compression formats let you open writers to compress data:
