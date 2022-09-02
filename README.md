@@ -244,12 +244,12 @@ if err != nil {
 }
 ```
 
-#### Use with http.FileServer
+#### Use with `http.FileServer`
 
-It can be used with http.FileServer to browse directory listing through browser, however due to how http.FileServer works, don't directly use http.FileServer with compressed files, instead wrap it like following
+It can be used with http.FileServer to browse archives and directories in a browser. However, due to how http.FileServer works, don't directly use http.FileServer with compressed files; instead wrap it like following:
 
 ```go
-fileServer := http.FileServer(http.FS(af))
+fileServer := http.FileServer(http.FS(archiveFS))
 http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 	// disable range request
 	writer.Header().Set("Accept-Ranges", "none")
@@ -265,7 +265,7 @@ http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 })
 ```
 
-Because http.FileServer by default will try to sniff content-type, if it can't be inferred from file name, http.FileServer will try to read from the file and then Seek back to file start, which the libray can't achieve currently. The same goes with the range request.
+http.FileServer will try to sniff the Content-Type by default if it can't be inferred from file name. To do this, the http package will try to read from the file and then Seek back to file start, which the libray can't achieve currently. The same goes with Range requests. Seeking in archives is not currently supported by archiver due to limitations in dependencies.
 
 If content-type is desirable, you can [register it](https://pkg.go.dev/mime#AddExtensionType) yourself.
 
