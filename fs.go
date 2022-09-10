@@ -59,7 +59,6 @@ func FileSystem(root string) (fs.FS, error) {
 			// zip.Reader is more performant thant ArchiveFS, because zip.Reader caches content information
 			// and zip.Reader can open several content files concurrently because of io.ReaderAt requirement
 			// while ArchiveFS can't.
-
 			// zip.Reader doesn't suffer from issue #330 and #310 according to local test
 			if _, ok = format.(Zip); ok {
 				return zip.NewReader(file, info.Size())
