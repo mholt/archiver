@@ -1,7 +1,6 @@
 package archiver
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"errors"
@@ -13,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/dsnet/compress/bzip2"
+	"github.com/klauspost/compress/zip"
 	"github.com/klauspost/compress/zstd"
 	"github.com/ulikunitz/xz"
 	"golang.org/x/text/encoding"
