@@ -177,15 +177,20 @@ func (z Zip) archiveOneFile(ctx context.Context, zw *zip.Writer, idx int, file F
 }
 
 // Extract extracts files from z, implementing the Extractor interface. Uniquely, however,
-// sourceArchive must be an io.ReaderAt and io.Seeker, which are oddly disjoint interfaces
+// sourceArchive should be an io.ReaderAt and io.Seeker, which are oddly disjoint interfaces
 // from io.Reader which is what the method signature requires. We chose this signature for
 // the interface because we figure you can Read() from anything you can ReadAt() or Seek()
 // with. Due to the nature of the zip archive format, if sourceArchive is not an io.Seeker
-// and io.ReaderAt, an error is returned.
+// and io.ReaderAt, read all of sourceArchive onto in-memory buffer.
 func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
 	sra, ok := sourceArchive.(seekReaderAt)
 	if !ok {
-		return fmt.Errorf("input type must be an io.ReaderAt and io.Seeker because of zip format constraints")
+		// fallback to in-memory buffer stream
+		b, err := io.ReadAll(sourceArchive)
+		if err != nil {
+			return err
+		}
+		sra = bytes.NewReader(b)
 	}
 
 	size, err := streamSizeBySeeking(sra)
