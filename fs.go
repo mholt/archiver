@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -302,42 +303,19 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		}, nil
 	}
 
-	var fsFile fs.File
+	var (
+		files []File
+		found bool
+	)
+	// collect them all or stop at exact file match, note we don't stop at folder match
 	handler := func(_ context.Context, file File) error {
-		// if this is the requested file, and it's a directory, set up the dirFile,
-		// which will include a listing of all its contents as we continue the walk
-		trimmedName := strings.Trim(file.NameInArchive, "/")
-		if trimmedName == name && file.IsDir() {
-			fsFile = &dirFile{extractedFile: extractedFile{File: file}}
-			return nil
-		}
-
-		// if the named file was a directory and we are filling its entries,
-		// add this entry to the list
-		if df, ok := fsFile.(*dirFile); ok {
-			df.entries = append(df.entries, fs.FileInfoToDirEntry(file))
-
-			// don't traverse into subfolders
-			if file.IsDir() {
-				return fs.SkipDir
-			}
-
-			return nil
-		}
-
-		// if named file is not a regular file, it can't be opened
-		if !file.Mode().IsRegular() {
-			fsFile = extractedFile{File: file}
+		file.NameInArchive = strings.Trim(file.NameInArchive, "/")
+		files = append(files, file)
+		if file.NameInArchive == name && !file.IsDir() {
+			found = true
 			return errStopWalk
 		}
-
-		// regular files can be read, so open it for reading
-		rc, err := file.Open()
-		if err != nil {
-			return err
-		}
-		fsFile = extractedFile{File: file, ReadCloser: rc, parentArchive: archiveFile}
-		return errStopWalk
+		return nil
 	}
 
 	var inputStream io.Reader = archiveFile
@@ -346,23 +324,145 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	}
 
 	err = f.Format.Extract(f.context(), inputStream, []string{name}, handler)
-	if err != nil && fsFile != nil {
-		if ef, ok := fsFile.(extractedFile); ok {
-			if ef.parentArchive != nil {
-				// don't close the archive file in above defer; it
-				// will be closed when the returned file is closed
-				err = nil
-			}
-		}
+	if found {
+		err = nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if fsFile == nil {
+
+	if len(files) == 0 {
 		return nil, fs.ErrNotExist
 	}
 
-	return fsFile, nil
+	// exactly one or exact file found, test name match to detect implicit dir name https://github.com/mholt/archiver/issues/340
+	if (len(files) == 1 && files[0].NameInArchive == name) || found {
+		file := files[len(files)-1]
+		if file.IsDir() {
+			return &dirFile{extractedFile: extractedFile{File: file}}, nil
+		}
+
+		// if named file is not a regular file, it can't be opened
+		if !file.Mode().IsRegular() {
+			return extractedFile{File: file}, nil
+		}
+
+		// regular files can be read, so open it for reading
+		rc, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		return extractedFile{File: file, ReadCloser: rc, parentArchive: archiveFile}, nil
+	}
+
+	// implicit files
+	files = fillImplicit(files)
+	file := search(name, files)
+	if file == nil {
+		return nil, fs.ErrNotExist
+	}
+
+	if file.IsDir() {
+		return &dirFile{extractedFile: extractedFile{File: *file}, entries: openReadDir(name, files)}, nil
+	}
+
+	// very unlikely
+	// maybe just panic, because extractor already walk through all the entries, file is impossible to read
+	// unless it's from a zip file.
+
+	// if named file is not a regular file, it can't be opened
+	if !file.Mode().IsRegular() {
+		return extractedFile{File: *file}, nil
+	}
+
+	// regular files can be read, so open it for reading
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	return extractedFile{File: *file, ReadCloser: rc, parentArchive: archiveFile}, nil
+}
+
+// copy of the same function from zip
+func split(name string) (dir, elem string, isDir bool) {
+	if name[len(name)-1] == '/' {
+		isDir = true
+		name = name[:len(name)-1]
+	}
+	i := len(name) - 1
+	for i >= 0 && name[i] != '/' {
+		i--
+	}
+	if i < 0 {
+		return ".", name, isDir
+	}
+	return name[:i], name[i+1:], isDir
+}
+
+// modified from zip.Reader initFileList, it's used to find all implicit dirs
+func fillImplicit(files []File) []File {
+	dirs := make(map[string]bool)
+	knownDirs := make(map[string]bool)
+	entries := make([]File, 0, 0)
+	for _, file := range files {
+		for dir := path.Dir(file.NameInArchive); dir != "."; dir = path.Dir(dir) {
+			dirs[dir] = true
+		}
+		entries = append(entries, file)
+		if file.IsDir() {
+			knownDirs[file.NameInArchive] = true
+		}
+	}
+	for dir := range dirs {
+		if !knownDirs[dir] {
+			entries = append(entries, File{FileInfo: implicitDirInfo{implicitDirEntry{path.Base(dir)}}, NameInArchive: dir})
+		}
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		fi, fj := entries[i], entries[j]
+		di, ei, _ := split(fi.NameInArchive)
+		dj, ej, _ := split(fj.NameInArchive)
+
+		if di != dj {
+			return di < dj
+		}
+		return ei < ej
+	})
+	return entries
+}
+
+// modified from zip.Reader openLookup
+func search(name string, entries []File) *File {
+	dir, elem, _ := split(name)
+	i := sort.Search(len(entries), func(i int) bool {
+		idir, ielem, _ := split(entries[i].NameInArchive)
+		return idir > dir || idir == dir && ielem >= elem
+	})
+	if i < len(entries) {
+		fname := entries[i].NameInArchive
+		if fname == name || len(fname) == len(name)+1 && fname[len(name)] == '/' && fname[:len(name)] == name {
+			return &entries[i]
+		}
+	}
+	return nil
+}
+
+// modified from zip.Reader openReadDir
+func openReadDir(dir string, entries []File) []fs.DirEntry {
+	i := sort.Search(len(entries), func(i int) bool {
+		idir, _, _ := split(entries[i].NameInArchive)
+		return idir >= dir
+	})
+	j := sort.Search(len(entries), func(j int) bool {
+		jdir, _, _ := split(entries[j].NameInArchive)
+		return jdir > dir
+	})
+	dirs := make([]fs.DirEntry, j-i)
+	for idx := range dirs {
+		dirs[idx] = fs.FileInfoToDirEntry(entries[i+idx])
+	}
+	return dirs
 }
 
 // Stat stats the named file from within the archive. If name is "." then
@@ -397,15 +497,15 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 		defer archiveFile.Close()
 	}
 
-	var result File
+	var (
+		files []File
+		found bool
+	)
 	handler := func(_ context.Context, file File) error {
-		// in theory, the first file handled should be the one requested,
-		// unless... the file requested is a directory and the archive was
-		// created depth-first (i.e. directory contents added before the
-		// directory itself), in which case we have to iterate through the
-		// contents first; hence the check for exact filename match (issue #310)
-		if strings.TrimRight(file.NameInArchive, "/") == strings.TrimRight(name, "/") {
-			result = file
+		file.NameInArchive = strings.Trim(file.NameInArchive, "/")
+		files = append(files, file)
+		if file.NameInArchive == name {
+			found = true
 			return errStopWalk
 		}
 		return nil
@@ -415,13 +515,23 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 	err = f.Format.Extract(f.context(), inputStream, []string{name}, handler)
-	if err != nil && result.FileInfo == nil {
+	if found {
+		err = nil
+	}
+	if err != nil {
 		return nil, err
 	}
-	if result.FileInfo == nil {
+
+	if (len(files) == 0 && files[0].NameInArchive == name) || found {
+		return files[len(files)-1].FileInfo, nil
+	}
+
+	files = fillImplicit(files)
+	file := search(name, files)
+	if file == nil {
 		return nil, fs.ErrNotExist
 	}
-	return result.FileInfo, nil
+	return file.FileInfo, nil
 }
 
 // ReadDir reads the named directory from within the archive.
@@ -443,53 +553,18 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	// apply prefix if fs is rooted in a subtree
 	name = path.Join(f.Prefix, name)
 
-	// store entries in a map to inexpensively avoid duplication
-	entries := make(map[string]fs.DirEntry)
+	// collect all files with prefix
+	var (
+		files     []File
+		foundFile bool
+	)
 	handler := func(_ context.Context, file File) error {
-		// directories may end with trailing slash; standardize name
-		trimmedName := strings.Trim(file.NameInArchive, "/")
-
-		// don't include the named directory itself in the list of entries
-		if trimmedName == name {
-			return nil
+		file.NameInArchive = strings.Trim(file.NameInArchive, "/")
+		files = append(files, file)
+		if file.NameInArchive == name && !file.IsDir() {
+			foundFile = true
+			return errStopWalk
 		}
-
-		// items added to an archive depth-first results in the subfolder entry being
-		// added to the archive after all the files within it, meaning we won't have
-		// the chance to return SkipDir before traversing into it; so we have to also
-		// check if we are within a subfolder deeper than the requested name (because
-		// this is a ReadDir function, we do not intend to traverse subfolders) (issue #310)
-		// in other words, archive entries can be created out-of-(breadth-first)-order,
-		// or even an arbitrary/random order, and we need to make sure we get all entries
-		// in just this directory
-		if path.Dir(trimmedName) != name {
-			// additionally, some archive files don't have actual entries for folders,
-			// leaving them to be inferred from the names of files instead (issue #330)
-			// so as we traverse deeper, we need to implicitly find subfolders within
-			// this current directory and add fake entries to the output
-			remainingPath := file.NameInArchive
-
-			if name != "." {
-				remainingPath = strings.TrimPrefix(file.NameInArchive, name)
-			}
-			nextDir := topDir(remainingPath)        // if name in archive is "a/b/c" and root is "a", this becomes "b" (the implied folder to add)
-			implicitDir := path.Join(name, nextDir) // the full path of the implied directory
-
-			// create fake entry only if no entry currently exists (don't overwrite a real entry)
-			if _, ok := entries[implicitDir]; !ok {
-				entries[implicitDir] = implicitDirEntry{nextDir}
-			}
-
-			return fs.SkipDir
-		}
-
-		entries[file.NameInArchive] = fs.FileInfoToDirEntry(file)
-
-		// don't traverse deeper into subfolders
-		if file.IsDir() {
-			return fs.SkipDir
-		}
-
 		return nil
 	}
 
@@ -505,17 +580,29 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	}
 
 	err = f.Format.Extract(f.context(), inputStream, filter, handler)
+	if foundFile {
+		return nil, &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not a dir")}
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	// convert map to slice
-	entriesSlice := make([]fs.DirEntry, 0, len(entries))
-	for _, ent := range entries {
-		entriesSlice = append(entriesSlice, ent)
+	// always find all implicit directories
+	files = fillImplicit(files)
+	// and return early for dot file
+	if name == "." {
+		return openReadDir(name, files), nil
 	}
 
-	return entriesSlice, nil
+	file := search(name, files)
+	if file == nil {
+		return nil, fs.ErrNotExist
+	}
+
+	if !file.IsDir() {
+		return nil, &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not a dir")}
+	}
+	return openReadDir(name, files), nil
 }
 
 // Sub returns an FS corresponding to the subtree rooted at dir.
@@ -533,70 +620,6 @@ func (f *ArchiveFS) Sub(dir string) (fs.FS, error) {
 	result := f
 	result.Prefix = dir
 	return result, nil
-}
-
-// TopDirOpen is a special Open() function that may be useful if
-// a file system root was created by extracting an archive.
-//
-// It first tries the file name as given, but if that returns an
-// error, it tries the name without the first element of the path.
-// In other words, if "a/b/c" returns an error, then "b/c" will
-// be tried instead.
-//
-// Consider an archive that contains a file "a/b/c". When the
-// archive is extracted, the contents may be created without a
-// new parent/root folder to contain them, and the path of the
-// same file outside the archive may be lacking an exclusive root
-// or parent container. Thus it is likely for a file system
-// created for the same files extracted to disk to be rooted at
-// one of the top-level files/folders from the archive instead of
-// a parent folder. For example, the file known as "a/b/c" when
-// rooted at the archive becomes "b/c" after extraction when rooted
-// at "a" on disk (because no new, exclusive top-level folder was
-// created). This difference in paths can make it difficult to use
-// archives and directories uniformly. Hence these TopDir* functions
-// which attempt to smooth over the difference.
-//
-// Some extraction utilities do create a container folder for
-// archive contents when extracting, in which case the user
-// may give that path as the root. In that case, these TopDir*
-// functions are not necessary (but aren't harmful either). They
-// are primarily useful if you are not sure whether the root is
-// an archive file or is an extracted archive file, as they will
-// work with the same filename/path inputs regardless of the
-// presence of a top-level directory.
-func TopDirOpen(fsys fs.FS, name string) (fs.File, error) {
-	file, err := fsys.Open(name)
-	if err == nil {
-		return file, nil
-	}
-	return fsys.Open(pathWithoutTopDir(name))
-}
-
-// TopDirStat is like TopDirOpen but for Stat.
-func TopDirStat(fsys fs.StatFS, name string) (fs.FileInfo, error) {
-	info, err := fsys.Stat(name)
-	if err == nil {
-		return info, nil
-	}
-	return fsys.Stat(pathWithoutTopDir(name))
-}
-
-// TopDirReadDir is like TopDirOpen but for ReadDir.
-func TopDirReadDir(fsys fs.ReadDirFS, name string) ([]fs.DirEntry, error) {
-	entries, err := fsys.ReadDir(name)
-	if err == nil {
-		return entries, nil
-	}
-	return fsys.ReadDir(pathWithoutTopDir(name))
-}
-
-func pathWithoutTopDir(fpath string) string {
-	slashIdx := strings.Index(fpath, "/")
-	if slashIdx < 0 {
-		return fpath
-	}
-	return fpath[slashIdx+1:]
 }
 
 // errStopWalk is an arbitrary error value, since returning
