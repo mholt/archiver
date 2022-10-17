@@ -77,6 +77,10 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 			}
 
 			nameInArchive := nameOnDiskToNameInArchive(filename, rootOnDisk, rootInArchive)
+			// this is the root folder and we are adding its contents to target rootInArchive
+			if info.IsDir() && nameInArchive == "" {
+				return nil
+			}
 
 			// handle symbolic links
 			var linkTarget string
