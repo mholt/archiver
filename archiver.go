@@ -66,7 +66,7 @@ func (f File) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
 func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]File, error) {
 	var files []File
 	for rootOnDisk, rootInArchive := range filenames {
-		filepath.WalkDir(rootOnDisk, func(filename string, d fs.DirEntry, err error) error {
+		walkErr := filepath.WalkDir(rootOnDisk, func(filename string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -121,6 +121,9 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 			files = append(files, file)
 			return nil
 		})
+		if walkErr != nil {
+			return nil, walkErr
+		}
 	}
 	return files, nil
 }
