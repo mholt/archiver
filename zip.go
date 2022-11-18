@@ -232,6 +232,10 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			}
 			skipDirs.add(dirPath)
 		} else if err != nil {
+			if z.ContinueOnError {
+				log.Printf("[ERROR] %s: %v", f.Name, err)
+				continue
+			}
 			return fmt.Errorf("handling file %d: %s: %w", i, f.Name, err)
 		}
 	}

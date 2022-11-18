@@ -19,6 +19,7 @@ Introducing **Archiver 4.0** - a cross-platform, multi-format archive utility an
 - Walk or traverse into archive files
 - Extract only specific files from archives
 - Insert (append) into .tar files
+- Read from password-protected 7-Zip files
 - Numerous archive and compression formats supported
 - Extensible (add more formats just by registering them)
 - Cross-platform, static binary
@@ -45,6 +46,7 @@ Introducing **Archiver 4.0** - a cross-platform, multi-format archive utility an
 - .zip
 - .tar (including any compressed variants like .tar.gz)
 - .rar (read-only)
+- .7z (read-only)
 
 Tar files can optionally be compressed using any compression format.
 
