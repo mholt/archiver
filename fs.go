@@ -622,6 +622,70 @@ func (f *ArchiveFS) Sub(dir string) (fs.FS, error) {
 	return result, nil
 }
 
+// TopDirOpen is a special Open() function that may be useful if
+// a file system root was created by extracting an archive.
+//
+// It first tries the file name as given, but if that returns an
+// error, it tries the name without the first element of the path.
+// In other words, if "a/b/c" returns an error, then "b/c" will
+// be tried instead.
+//
+// Consider an archive that contains a file "a/b/c". When the
+// archive is extracted, the contents may be created without a
+// new parent/root folder to contain them, and the path of the
+// same file outside the archive may be lacking an exclusive root
+// or parent container. Thus it is likely for a file system
+// created for the same files extracted to disk to be rooted at
+// one of the top-level files/folders from the archive instead of
+// a parent folder. For example, the file known as "a/b/c" when
+// rooted at the archive becomes "b/c" after extraction when rooted
+// at "a" on disk (because no new, exclusive top-level folder was
+// created). This difference in paths can make it difficult to use
+// archives and directories uniformly. Hence these TopDir* functions
+// which attempt to smooth over the difference.
+//
+// Some extraction utilities do create a container folder for
+// archive contents when extracting, in which case the user
+// may give that path as the root. In that case, these TopDir*
+// functions are not necessary (but aren't harmful either). They
+// are primarily useful if you are not sure whether the root is
+// an archive file or is an extracted archive file, as they will
+// work with the same filename/path inputs regardless of the
+// presence of a top-level directory.
+func TopDirOpen(fsys fs.FS, name string) (fs.File, error) {
+	file, err := fsys.Open(name)
+	if err == nil {
+		return file, nil
+	}
+	return fsys.Open(pathWithoutTopDir(name))
+}
+
+// TopDirStat is like TopDirOpen but for Stat.
+func TopDirStat(fsys fs.StatFS, name string) (fs.FileInfo, error) {
+	info, err := fsys.Stat(name)
+	if err == nil {
+		return info, nil
+	}
+	return fsys.Stat(pathWithoutTopDir(name))
+}
+
+// TopDirReadDir is like TopDirOpen but for ReadDir.
+func TopDirReadDir(fsys fs.ReadDirFS, name string) ([]fs.DirEntry, error) {
+	entries, err := fsys.ReadDir(name)
+	if err == nil {
+		return entries, nil
+	}
+	return fsys.ReadDir(pathWithoutTopDir(name))
+}
+
+func pathWithoutTopDir(fpath string) string {
+	slashIdx := strings.Index(fpath, "/")
+	if slashIdx < 0 {
+		return fpath
+	}
+	return fpath[slashIdx+1:]
+}
+
 // errStopWalk is an arbitrary error value, since returning
 // any error (other than fs.SkipDir) will stop a walk. We
 // use this as we may only want 1 file from an extraction,
