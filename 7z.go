@@ -51,6 +51,11 @@ func (z SevenZip) Match(filename string, stream io.Reader) (MatchResult, error) 
 	return mr, nil
 }
 
+// Archive is not implemented for 7z, but the method exists so that SevenZip satisfies the ArchiveFormat interface.
+func (z SevenZip) Archive(_ context.Context, _ io.Writer, _ []File) error {
+	return fmt.Errorf("not implemented for 7z because there is no pure Go implementation found")
+}
+
 // Extract extracts files from z, implementing the Extractor interface. Uniquely, however,
 // sourceArchive must be an io.ReaderAt and io.Seeker, which are oddly disjoint interfaces
 // from io.Reader which is what the method signature requires. We chose this signature for
