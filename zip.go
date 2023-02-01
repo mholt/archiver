@@ -202,6 +202,7 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 	skipDirs := skipList{}
 
 	for i, f := range zr.File {
+		f := f		// make a copy for the Open closure
 		if err := ctx.Err(); err != nil {
 			return err // honor context cancellation
 		}
