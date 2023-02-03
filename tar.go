@@ -60,18 +60,12 @@ func (t Tar) Archive(ctx context.Context, output io.Writer, files []File) error 
 	return nil
 }
 
-func (t Tar) ArchiveAsync(ctx context.Context, output io.Writer, files <-chan File) error {
+func (t Tar) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan ArchiveAsyncJob) error {
 	tw := tar.NewWriter(output)
 	defer tw.Close()
 
-	for file := range files {
-		if err := t.writeFileToArchive(ctx, tw, file); err != nil {
-			if t.ContinueOnError && ctx.Err() == nil { // context errors should always abort
-				log.Printf("[ERROR] %v", err)
-				continue
-			}
-			return err
-		}
+	for job := range jobs {
+		job.Result <- t.writeFileToArchive(ctx, tw, job.File)
 	}
 
 	return nil
@@ -234,7 +228,8 @@ func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 
 // Interface guards
 var (
-	_ Archiver  = (*Tar)(nil)
-	_ Extractor = (*Tar)(nil)
-	_ Inserter  = (*Tar)(nil)
+	_ Archiver      = (*Tar)(nil)
+	_ ArchiverAsync = (*Tar)(nil)
+	_ Extractor     = (*Tar)(nil)
+	_ Inserter      = (*Tar)(nil)
 )

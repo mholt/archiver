@@ -114,19 +114,13 @@ func (z Zip) Archive(ctx context.Context, output io.Writer, files []File) error 
 	return nil
 }
 
-func (z Zip) ArchiveAsync(ctx context.Context, output io.Writer, files <-chan File) error {
+func (z Zip) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan ArchiveAsyncJob) error {
 	zw := zip.NewWriter(output)
 	defer zw.Close()
 
 	var i int
-	for file := range files {
-		if err := z.archiveOneFile(ctx, zw, i, file); err != nil {
-			if z.ContinueOnError && ctx.Err() == nil { // context errors should always abort
-				log.Printf("[ERROR] %v", err)
-				continue
-			}
-			return err
-		}
+	for job := range jobs {
+		job.Result <- z.archiveOneFile(ctx, zw, i, job.File)
 		i++
 	}
 
@@ -202,7 +196,7 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 	skipDirs := skipList{}
 
 	for i, f := range zr.File {
-		f := f		// make a copy for the Open closure
+		f := f // make a copy for the Open closure
 		if err := ctx.Err(); err != nil {
 			return err // honor context cancellation
 		}
@@ -383,3 +377,10 @@ func decodeText(input, charset string) (string, error) {
 }
 
 var zipHeader = []byte("PK\x03\x04") // NOTE: headers of empty zip files might end with 0x05,0x06 or 0x06,0x06 instead of 0x03,0x04
+
+// Interface guards
+var (
+	_ Archiver      = Zip{}
+	_ ArchiverAsync = Zip{}
+	_ Extractor     = Zip{}
+)
