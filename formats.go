@@ -235,6 +235,23 @@ func (caf CompressedArchive) Archive(ctx context.Context, output io.Writer, file
 	return caf.Archival.Archive(ctx, output, files)
 }
 
+// ArchiveAsync adds files to the output archive while compressing the result asynchronously.
+func (caf CompressedArchive) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan ArchiveAsyncJob) error {
+	do, ok := caf.Archival.(ArchiverAsync)
+	if !ok {
+		return fmt.Errorf("%s archive does not support async writing", caf.Name())
+	}
+	if caf.Compression != nil {
+		wc, err := caf.Compression.OpenWriter(output)
+		if err != nil {
+			return err
+		}
+		defer wc.Close()
+		output = wc
+	}
+	return do.ArchiveAsync(ctx, output, jobs)
+}
+
 // Extract reads files out of an archive while decompressing the results.
 func (caf CompressedArchive) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
 	if caf.Compression != nil {
@@ -358,7 +375,8 @@ var formats = make(map[string]Format)
 
 // Interface guards
 var (
-	_ Format    = (*CompressedArchive)(nil)
-	_ Archiver  = (*CompressedArchive)(nil)
-	_ Extractor = (*CompressedArchive)(nil)
+	_ Format        = (*CompressedArchive)(nil)
+	_ Archiver      = (*CompressedArchive)(nil)
+	_ ArchiverAsync = (*CompressedArchive)(nil)
+	_ Extractor     = (*CompressedArchive)(nil)
 )
