@@ -27,11 +27,14 @@ func RegisterFormat(format Format) {
 //
 // If no matching formats were found, special error ErrNoMatch is returned.
 //
-// The returned io.Reader will always be non-nil and will read from the
-// same point as the reader which was passed in; it should be used in place
-// of the input stream after calling Identify() because it preserves and
-// re-reads the bytes that were already read during the identification
-// process.
+// If stream is nil then it will only match on file name and the
+// returned io.Reader will be nil.
+//
+// If stream is non-nil then the returned io.Reader will always be
+// non-nil and will read from the same point as the reader which was
+// passed in; it should be used in place of the input stream after
+// calling Identify() because it preserves and re-reads the bytes that
+// were already read during the identification process.
 func Identify(filename string, stream io.Reader) (Format, io.Reader, error) {
 	var compression Compression
 	var archival Archival
@@ -98,7 +101,7 @@ func identifyOne(format Format, filename string, stream *rewindReader, comp Comp
 	// (yes, we have to make a new reader every time we do a match,
 	// because we reset/seek the stream each time and that can mess up
 	// the compression reader's state if we don't discard it also)
-	if comp != nil {
+	if comp != nil && stream != nil {
 		decompressedStream, openErr := comp.OpenReader(stream)
 		if openErr != nil {
 			return MatchResult{}, openErr
@@ -106,7 +109,12 @@ func identifyOne(format Format, filename string, stream *rewindReader, comp Comp
 		defer decompressedStream.Close()
 		mr, err = format.Match(filename, decompressedStream)
 	} else {
-		mr, err = format.Match(filename, stream)
+		// Make sure we pass a nil io.Reader not a *rewindReader(nil)
+		var r io.Reader
+		if stream != nil {
+			r = stream
+		}
+		mr, err = format.Match(filename, r)
 	}
 
 	// if the error is EOF, we can just ignore it.
@@ -267,6 +275,9 @@ type rewindReader struct {
 }
 
 func newRewindReader(r io.Reader) *rewindReader {
+	if r == nil {
+		return nil
+	}
 	return &rewindReader{
 		Reader: r,
 		buf:    new(bytes.Buffer),
@@ -274,6 +285,9 @@ func newRewindReader(r io.Reader) *rewindReader {
 }
 
 func (rr *rewindReader) Read(p []byte) (n int, err error) {
+	if rr == nil {
+		panic("internal error: reading from nil rewindReader")
+	}
 	// if there is a buffer we should read from, start
 	// with that; we only read from the underlying stream
 	// after the buffer has been "depleted"
@@ -312,6 +326,9 @@ func (rr *rewindReader) Read(p []byte) (n int, err error) {
 // Read() to start reading from the beginning of the
 // buffered bytes.
 func (rr *rewindReader) rewind() {
+	if rr == nil {
+		return
+	}
 	rr.bufReader = bytes.NewReader(rr.buf.Bytes())
 }
 
@@ -322,6 +339,9 @@ func (rr *rewindReader) rewind() {
 // If the underlying reader implements io.Seeker, then the
 // underlying reader will be used directly.
 func (rr *rewindReader) reader() io.Reader {
+	if rr == nil {
+		return nil
+	}
 	if ras, ok := rr.Reader.(io.Seeker); ok {
 		if _, err := ras.Seek(0, io.SeekStart); err == nil {
 			return rr.Reader

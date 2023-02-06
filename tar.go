@@ -34,9 +34,11 @@ func (t Tar) Match(filename string, stream io.Reader) (MatchResult, error) {
 	}
 
 	// match file header
-	r := tar.NewReader(stream)
-	_, err := r.Next()
-	mr.ByStream = err == nil
+	if stream != nil {
+		r := tar.NewReader(stream)
+		_, err := r.Next()
+		mr.ByStream = err == nil
+	}
 
 	return mr, nil
 }
