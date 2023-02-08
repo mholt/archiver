@@ -60,6 +60,13 @@ type Archiver interface {
 	Archive(ctx context.Context, output io.Writer, files []File) error
 }
 
+// ArchiveAsyncJob contains a File to be archived and a channel that
+// the result of the archiving should be returned on.
+type ArchiveAsyncJob struct {
+	File   File
+	Result chan<- error
+}
+
 // ArchiverAsync is an Archiver that can also create archives
 // asynchronously by pumping files into a channel as they are
 // discovered.
@@ -67,9 +74,11 @@ type ArchiverAsync interface {
 	Archiver
 
 	// Use ArchiveAsync if you can't pre-assemble a list of all
-	// the files for the archive. Close the files channel after
+	// the files for the archive. Close the jobs channel after
 	// all the files have been sent.
-	ArchiveAsync(ctx context.Context, output io.Writer, files <-chan File) error
+	//
+	// This won't return until the channel is closed.
+	ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan ArchiveAsyncJob) error
 }
 
 // Extractor can extract files from an archive.
