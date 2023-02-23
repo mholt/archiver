@@ -16,7 +16,7 @@ require (
 	github.com/bodgit/sevenzip v1.3.0
 	github.com/golang/snappy v0.0.4
 	github.com/pierrec/lz4/v4 v4.1.15
-	golang.org/x/text v0.3.7
+	golang.org/x/text v0.3.8
 )
 
 require (
