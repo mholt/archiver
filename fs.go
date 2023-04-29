@@ -244,8 +244,8 @@ func (cf compressedFile) Close() error {
 // directory tree order.
 type ArchiveFS struct {
 	// set one of these
-	Path   string            // path to the archive file on disk, or...
-	Stream *io.SectionReader // ...stream from which to read archive
+	Path   string    // path to the archive file on disk, or...
+	Stream io.Reader // ...stream from which to read archive
 
 	Format  Archival        // the archive format
 	Prefix  string          // optional subdirectory in which to root the fs
@@ -327,7 +327,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 
 	var inputStream io.Reader = archiveFile
 	if f.Stream != nil {
-		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
+		inputStream = f.Stream
 	}
 
 	err = f.Format.Extract(f.context(), inputStream, []string{name}, handler)
@@ -519,7 +519,7 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	}
 	var inputStream io.Reader = archiveFile
 	if f.Stream != nil {
-		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
+		inputStream = f.Stream
 	}
 	err = f.Format.Extract(f.context(), inputStream, []string{name}, handler)
 	if found {
@@ -583,7 +583,7 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 	var inputStream io.Reader = archiveFile
 	if f.Stream != nil {
-		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
+		inputStream = f.Stream
 	}
 
 	err = f.Format.Extract(f.context(), inputStream, filter, handler)
