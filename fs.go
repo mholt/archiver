@@ -575,7 +575,6 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 			foundFile = true
 			return errStopWalk
 		}
-		}
 		return nil
 	}
 
