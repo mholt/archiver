@@ -3,7 +3,6 @@ package archiver
 import (
 	"bytes"
 	_ "embed"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -59,11 +58,11 @@ func TestSelfTar(t *testing.T) {
 	fn := "testdata/self-tar.tar"
 	fh, err := os.Open(fn)
 	if err != nil {
-		t.Error("Could not load test tar")
+		t.Fatalf("Could not load test tar: %v", fn)
 	}
 	fstat, err := os.Stat(fn)
 	if err != nil {
-		t.Error("Could not stat test tar")
+		t.Fatalf("Could not stat test tar: %v", fn)
 	}
 	fsys := ArchiveFS{
 		Stream: io.NewSectionReader(fh, 0, fstat.Size()),
@@ -73,7 +72,7 @@ func TestSelfTar(t *testing.T) {
 	err = fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if count > 10 {
 			t.Error("walking test tar appears to be recursing in error")
-			return errors.New("recursing tar")
+			return fmt.Errorf("recursing tar: %v", fn)
 		}
 		count++
 		return nil
