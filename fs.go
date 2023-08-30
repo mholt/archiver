@@ -567,12 +567,14 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	)
 	handler := func(_ context.Context, file File) error {
 		file.NameInArchive = strings.Trim(file.NameInArchive, "/")
-		if file.NameInArchive != "." {
-			files = append(files, file)
-			if file.NameInArchive == name && !file.IsDir() {
-				foundFile = true
-				return errStopWalk
-			}
+		if file.NameInArchive == "." {
+			return nil
+		}
+		files = append(files, file)
+		if file.NameInArchive == name && !file.IsDir() {
+			foundFile = true
+			return errStopWalk
+		}
 		}
 		return nil
 	}
