@@ -567,10 +567,12 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	)
 	handler := func(_ context.Context, file File) error {
 		file.NameInArchive = strings.Trim(file.NameInArchive, "/")
-		files = append(files, file)
-		if file.NameInArchive == name && !file.IsDir() {
-			foundFile = true
-			return errStopWalk
+		if file.NameInArchive != "." {
+			files = append(files, file)
+			if file.NameInArchive == name && !file.IsDir() {
+				foundFile = true
+				return errStopWalk
+			}
 		}
 		return nil
 	}
@@ -596,8 +598,6 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 	// always find all implicit directories
 	files = fillImplicit(files)
-	// Remove bogus "." entries that some tar files generate
-	files = removeSubdirDots(files)
 	// and return early for dot file
 	if name == "." {
 		return openReadDir(name, files), nil
@@ -612,17 +612,6 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not a dir")}
 	}
 	return openReadDir(name, files), nil
-}
-
-// Certain tars have the current directory (.) listed as a file, remove that from the listing as it causes recurrsion issues
-func removeSubdirDots(files []File) []File {
-	ret := make([]File, 0, len(files))
-	for _, item := range files {
-		if item.Name() != "." {
-			ret = append(ret, item)
-		}
-	}
-	return ret
 }
 
 // Sub returns an FS corresponding to the subtree rooted at dir.
