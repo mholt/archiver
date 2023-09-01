@@ -192,11 +192,15 @@ func (f FileFS) Stat(name string) (fs.FileInfo, error) {
 	return os.Stat(f.Path)
 }
 
+// checkName ensures the name is a valid path and also, in the case of
+// the FileFS, that it is either ".", the filename originally passed in
+// to create the FileFS, or the base of the filename (name without path).
+// Other names do not make sense for a FileFS since the FS is only 1 file.
 func (f FileFS) checkName(name, op string) error {
 	if !fs.ValidPath(name) {
 		return &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
-	if name != "." && name != path.Base(f.Path) {
+	if name != "." && name != f.Path && name != filepath.Base(f.Path) {
 		return &fs.PathError{Op: op, Path: name, Err: fs.ErrNotExist}
 	}
 	return nil
