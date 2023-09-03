@@ -17,6 +17,12 @@ func init() {
 }
 
 type Tar struct {
+	// If true, leave only numeric user id
+	NumericUid bool
+
+	// If true, leave only numeric group id
+	NumericGid bool
+
 	// If true, errors encountered during reading or writing
 	// a file within an archive will be logged and the
 	// operation will continue on remaining files.
@@ -71,7 +77,7 @@ func (t Tar) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan Arc
 	return nil
 }
 
-func (Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) error {
+func (t Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) error {
 	if err := ctx.Err(); err != nil {
 		return err // honor context cancellation
 	}
@@ -81,6 +87,12 @@ func (Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) er
 		return fmt.Errorf("file %s: creating header: %w", file.NameInArchive, err)
 	}
 	hdr.Name = file.NameInArchive // complete path, since FileInfoHeader() only has base name
+	if t.NumericUid {
+		hdr.Uname = ""
+	}
+	if t.NumericGid {
+		hdr.Gname = ""
+	}
 
 	if err := tw.WriteHeader(hdr); err != nil {
 		return fmt.Errorf("file %s: writing header: %w", file.NameInArchive, err)
