@@ -3,6 +3,7 @@ package archiver
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"math/rand"
@@ -409,4 +410,31 @@ func TestIdentifyAndOpenZip(t *testing.T) {
 		return err
 	})
 	checkErr(t, err, "extracting zip")
+}
+
+func TestIdentifyASCIIFileStartingWithX(t *testing.T) {
+	// Create a temporary file starting with the letter 'x'
+	tmpFile, err := os.CreateTemp("", "TestIdentifyASCIIFileStartingWithX-tmp-*.txt")
+	if err != nil {
+		t.Fatalf("fail to create tmp test file for archive tests: err=%v", err)
+	}
+
+	_, err = tmpFile.Write([]byte("xThis is a test file"))
+	if err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	// Open the file and use the Identify function
+	file, err := os.Open(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to open temp file: %v", err)
+	}
+	defer file.Close()
+
+	_, _, err = Identify(tmpFile.Name(), file)
+	if !errors.Is(err, ErrNoMatch) {
+		t.Fatalf("Identify failed: %v", err)
+	}
+
 }
