@@ -371,6 +371,13 @@ func TestIdentifyFindFormatByStreamContent(t *testing.T) {
 			compressorName:        "",
 			wantFormatName:        ".rar",
 		},
+		{
+			name:                  "should recognize zz",
+			openCompressionWriter: Zlib{}.OpenWriter,
+			content:               []byte("this is text"),
+			compressorName:        ".zz",
+			wantFormatName:        ".zz",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
