@@ -253,16 +253,30 @@ func (caf CompressedArchive) ArchiveAsync(ctx context.Context, output io.Writer,
 }
 
 // Extract reads files out of an archive while decompressing the results.
+// If Extract is not called from ArchiveFS.Open, then the FileHandler passed
+// in must close all opened files by the time the Extract walk finishes.
 func (caf CompressedArchive) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
 	if caf.Compression != nil {
 		rc, err := caf.Compression.OpenReader(sourceArchive)
 		if err != nil {
 			return err
 		}
-		defer rc.Close()
+		// I don't like this solution, but we have to close the decompressor.
+		// The problem is that if we simply defer rc.Close(), we potentially
+		// close it before the caller is done using files it opened. Ideally
+		// it should be closed when the sourceArchive is also closed. But since
+		// we don't originate sourceArchive, we can't close it when it closes.
+		// The best I can think of for now is this hack where we tell a type
+		// that supports this to close another reader when itself closes.
+		// See issue #365.
+		if cc, ok := sourceArchive.(compressorCloser); ok {
+			cc.closeCompressor(rc)
+		} else {
+			defer rc.Close()
+		}
 		sourceArchive = rc
 	}
-	return caf.Archival.(Extractor).Extract(ctx, sourceArchive, pathsInArchive, handleFile)
+	return caf.Archival.Extract(ctx, sourceArchive, pathsInArchive, handleFile)
 }
 
 // MatchResult returns true if the format was matched either

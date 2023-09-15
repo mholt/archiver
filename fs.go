@@ -329,8 +329,12 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		return nil
 	}
 
-	var inputStream io.Reader = archiveFile
-	if f.Stream != nil {
+	var inputStream io.Reader
+	if f.Stream == nil {
+		// when the archive file is closed, any (soon-to-be) associated decompressor should also be closed; see #365
+		archiveFile = &closeBoth{File: archiveFile}
+		inputStream = archiveFile
+	} else {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
@@ -368,13 +372,13 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 
 	// implicit files
 	files = fillImplicit(files)
-	file := search(name, files)
-	if file == nil {
+	file, foundFile := search(name, files)
+	if !foundFile {
 		return nil, fs.ErrNotExist
 	}
 
 	if file.IsDir() {
-		return &dirFile{extractedFile: extractedFile{File: *file}, entries: openReadDir(name, files)}, nil
+		return &dirFile{extractedFile: extractedFile{File: file}, entries: openReadDir(name, files)}, nil
 	}
 
 	// very unlikely
@@ -383,7 +387,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 
 	// if named file is not a regular file, it can't be opened
 	if !file.Mode().IsRegular() {
-		return extractedFile{File: *file}, nil
+		return extractedFile{File: file}, nil
 	}
 
 	// regular files can be read, so open it for reading
@@ -391,7 +395,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	return extractedFile{File: *file, ReadCloser: rc, parentArchive: archiveFile}, nil
+	return extractedFile{File: file, ReadCloser: rc, parentArchive: archiveFile}, nil
 }
 
 // copy of the same function from zip
@@ -414,7 +418,7 @@ func split(name string) (dir, elem string, isDir bool) {
 func fillImplicit(files []File) []File {
 	dirs := make(map[string]bool)
 	knownDirs := make(map[string]bool)
-	entries := make([]File, 0, 0)
+	entries := make([]File, 0)
 	for _, file := range files {
 		for dir := path.Dir(file.NameInArchive); dir != "."; dir = path.Dir(dir) {
 			dirs[dir] = true
@@ -444,7 +448,7 @@ func fillImplicit(files []File) []File {
 }
 
 // modified from zip.Reader openLookup
-func search(name string, entries []File) *File {
+func search(name string, entries []File) (File, bool) {
 	dir, elem, _ := split(name)
 	i := sort.Search(len(entries), func(i int) bool {
 		idir, ielem, _ := split(entries[i].NameInArchive)
@@ -453,10 +457,10 @@ func search(name string, entries []File) *File {
 	if i < len(entries) {
 		fname := entries[i].NameInArchive
 		if fname == name || len(fname) == len(name)+1 && fname[len(name)] == '/' && fname[:len(name)] == name {
-			return &entries[i]
+			return entries[i], true
 		}
 	}
-	return nil
+	return File{}, false
 }
 
 // modified from zip.Reader openReadDir
@@ -538,8 +542,8 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	}
 
 	files = fillImplicit(files)
-	file := search(name, files)
-	if file == nil {
+	file, found := search(name, files)
+	if !found {
 		return nil, fs.ErrNotExist
 	}
 	return file.FileInfo, nil
@@ -608,8 +612,8 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		return openReadDir(name, files), nil
 	}
 
-	file := search(name, files)
-	if file == nil {
+	file, foundFile := search(name, files)
+	if !foundFile {
 		return nil, fs.ErrNotExist
 	}
 
@@ -799,6 +803,36 @@ func (ef extractedFile) Close() error {
 	return nil
 }
 
+// compressorCloser is a type that closes two closers at the same time.
+// It only exists to fix #365. If a better solution can be found, I'd
+// likely prefer it.
+type compressorCloser interface {
+	io.Closer
+	closeCompressor(io.Closer)
+}
+
+// closeBoth closes both the file and an associated
+// closer, such as a (de)compressor that wraps the
+// reading/writing of the file. See issue #365. If a
+// better solution is found, I'd probably prefer that.
+type closeBoth struct {
+	fs.File
+	c io.Closer
+}
+
+// closeCompressor will have the closer closed when the associated File closes.
+func (dc *closeBoth) closeCompressor(c io.Closer) { dc.c = c }
+
+// Close closes both the file and the associated closer. It always calls
+// Close() on both, but returns only the first error, if any.
+func (dc closeBoth) Close() error {
+	err1, err2 := dc.File.Close(), dc.c.Close()
+	if err1 != nil {
+		return err1
+	}
+	return err2
+}
+
 // implicitDirEntry represents a directory that does
 // not actually exist in the archive but is inferred
 // from the paths of actual files in the archive.
@@ -840,4 +874,6 @@ var (
 	_ fs.ReadDirFS = (*ArchiveFS)(nil)
 	_ fs.StatFS    = (*ArchiveFS)(nil)
 	_ fs.SubFS     = (*ArchiveFS)(nil)
+
+	_ compressorCloser = (*closeBoth)(nil)
 )
