@@ -221,8 +221,11 @@ func openAndCopyFile(file File, w io.Writer) error {
 		return err
 	}
 	defer fileReader.Close()
-	_, err = io.Copy(w, fileReader)
-	return err
+	_, err = io.CopyN(w, fileReader, file.Size())
+	if err != nil && err != io.EOF {
+		return err
+	}
+	return nil
 }
 
 // fileIsIncluded returns true if filename is included according to
