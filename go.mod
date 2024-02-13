@@ -1,6 +1,8 @@
 module github.com/mholt/archiver/v4
 
-go 1.20
+go 1.21.3
+
+toolchain go1.22.0
 
 require (
 	github.com/andybalholm/brotli v1.0.5
@@ -13,6 +15,7 @@ require (
 )
 
 require (
+	github.com/STARRY-S/zip v0.1.0
 	github.com/bodgit/sevenzip v1.4.3
 	github.com/golang/snappy v0.0.4
 	github.com/pierrec/lz4/v4 v4.1.18

@@ -18,7 +18,7 @@ Introducing **Archiver 4.0** - a cross-platform, multi-format archive utility an
 - Create and extract archive files
 - Walk or traverse into archive files
 - Extract only specific files from archives
-- Insert (append) into .tar files
+- Insert (append) into .tar and .zip archives
 - Read from password-protected 7-Zip files
 - Numerous archive and compression formats supported
 - Extensible (add more formats just by registering them)
@@ -301,9 +301,9 @@ defer decompressor.Close()
 // reads from decompressor will be decompressed
 ```
 
-### Append to tarball
+### Append to tarball and zip archives
 
-Tar archives can be appended to without creating a whole new archive by calling `Insert()` on a tar stream. However, this requires that the tarball is not compressed (due to complexities with modifying compression dictionaries).
+Tar and Zip archives can be appended to without creating a whole new archive by calling `Insert()` on a tar or zip stream. However, for tarballs, this requires that the tarball is not compressed (due to complexities with modifying compression dictionaries).
 
 Here is an example that appends a file to a tarball on disk:
 
@@ -324,4 +324,6 @@ if err != nil {
 	return err
 }
 ```
+
+The code is similar for inserting into a Zip archive, except you'll call `Insert()` on the `Zip` type instead.
 

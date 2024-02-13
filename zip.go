@@ -11,6 +11,8 @@ import (
 	"path"
 	"strings"
 
+	szip "github.com/STARRY-S/zip"
+
 	"github.com/dsnet/compress/bzip2"
 	"github.com/klauspost/compress/zip"
 	"github.com/klauspost/compress/zstd"
@@ -137,6 +139,9 @@ func (z Zip) archiveOneFile(ctx context.Context, zw *zip.Writer, idx int, file F
 		return fmt.Errorf("getting info for file %d: %s: %w", idx, file.Name(), err)
 	}
 	hdr.Name = file.NameInArchive // complete path, since FileInfoHeader() only has base name
+	if hdr.Name == "" {
+		hdr.Name = file.Name() // assume base name of file I guess
+	}
 
 	// customize header based on file properties
 	if file.IsDir() {
@@ -254,6 +259,66 @@ func (z Zip) decodeText(hdr *zip.FileHeader) {
 			}
 		}
 	}
+}
+
+// Insert appends the listed files into the provided Zip archive stream.
+func (z Zip) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) error {
+	// following very simple example at https://github.com/STARRY-S/zip?tab=readme-ov-file#usage
+	zu, err := szip.NewUpdater(into)
+	if err != nil {
+		return err
+	}
+	defer zu.Close()
+
+	for idx, file := range files {
+		if err := ctx.Err(); err != nil {
+			return err // honor context cancellation
+		}
+
+		hdr, err := szip.FileInfoHeader(file)
+		if err != nil {
+			return fmt.Errorf("getting info for file %d: %s: %w", idx, file.NameInArchive, err)
+		}
+		hdr.Name = file.NameInArchive // complete path, since FileInfoHeader() only has base name
+		if hdr.Name == "" {
+			hdr.Name = file.Name() // assume base name of file I guess
+		}
+
+		// customize header based on file properties
+		if file.IsDir() {
+			if !strings.HasSuffix(hdr.Name, "/") {
+				hdr.Name += "/" // required
+			}
+			hdr.Method = zip.Store
+		} else if z.SelectiveCompression {
+			// only enable compression on compressable files
+			ext := strings.ToLower(path.Ext(hdr.Name))
+			if _, ok := compressedFormats[ext]; ok {
+				hdr.Method = zip.Store
+			} else {
+				hdr.Method = z.Compression
+			}
+		}
+
+		w, err := zu.AppendHeaderAt(hdr, -1)
+		if err != nil {
+			return fmt.Errorf("inserting file header: %d: %s: %w", idx, file.Name(), err)
+		}
+
+		// directories have no file body
+		if file.IsDir() {
+			return nil
+		}
+		if err := openAndCopyFile(file, w); err != nil {
+			if z.ContinueOnError && ctx.Err() == nil {
+				log.Printf("[ERROR] appending file %d into archive: %s: %v", idx, file.Name(), err)
+				continue
+			}
+			return fmt.Errorf("copying inserted file %d: %s: %w", idx, file.Name(), err)
+		}
+	}
+
+	return nil
 }
 
 type seekReaderAt interface {

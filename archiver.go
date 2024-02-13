@@ -27,6 +27,11 @@ type File struct {
 	// it is such a common field and we want to preserve
 	// format-agnosticism (no type assertions) for basic
 	// operations.
+	//
+	// EXPERIMENTAL: If inserting a file into an archive,
+	// and this is left blank, the implementation of the
+	// archive format can default to using the file's base
+	// name.
 	NameInArchive string
 
 	// For symbolic and hard links, the target of the link.
@@ -224,7 +229,7 @@ func openAndCopyFile(file File, w io.Writer) error {
 	// When file is in use and size is being written to, creating the compressed
 	// file will fail with "archive/tar: write too long." Using CopyN gracefully
 	// handles this.
-	_, err = io.CopyN(w, fileReader, file.Size())
+	_, err = io.Copy(w, fileReader)
 	if err != nil && err != io.EOF {
 		return err
 	}

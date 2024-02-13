@@ -84,6 +84,9 @@ func (t Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) 
 		return fmt.Errorf("file %s: creating header: %w", file.NameInArchive, err)
 	}
 	hdr.Name = file.NameInArchive // complete path, since FileInfoHeader() only has base name
+	if hdr.Name == "" {
+		hdr.Name = file.Name() // assume base name of file I guess
+	}
 	if t.NumericUIDGID {
 		hdr.Uname = ""
 		hdr.Gname = ""

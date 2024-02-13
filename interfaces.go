@@ -94,6 +94,7 @@ type Extractor interface {
 }
 
 // Inserter can insert files into an existing archive.
+// EXPERIMENTAL: This API is subject to change.
 type Inserter interface {
 	// Insert inserts the files into archive.
 	//
