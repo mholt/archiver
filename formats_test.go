@@ -316,6 +316,13 @@ func TestIdentifyFindFormatByStreamContent(t *testing.T) {
 			wantFormatName:        ".lz4",
 		},
 		{
+			name:                  "should recognize lz",
+			openCompressionWriter: Lzip{}.OpenWriter,
+			content:               []byte("this is text"),
+			compressorName:        ".lz",
+			wantFormatName:        ".lz",
+		},
+		{
 			name:                  "should recognize sz",
 			openCompressionWriter: Sz{}.OpenWriter,
 			content:               []byte("this is text"),
