@@ -36,6 +36,7 @@ Introducing **Archiver 4.0** - a cross-platform, multi-format archive utility an
 - flate (.zip)
 - gzip (.gz)
 - lz4 (.lz4)
+- lzip (.lz)
 - snappy (.sz)
 - xz (.xz)
 - zlib (.zz)
