@@ -3,6 +3,7 @@ package archiver
 import (
 	"bytes"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/sorairolake/lzip-go"
@@ -21,7 +22,7 @@ func (lz Lzip) Match(filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), lz.Name()) {
+	if filepath.Ext(strings.ToLower(filename)) == lz.Name() {
 		mr.ByName = true
 	}
 
