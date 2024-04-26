@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/mholt/archiver/v3"
@@ -75,7 +76,13 @@ func TestDefaultTar_Unarchive_SymlinkPathTraversal(t *testing.T) {
 func TestDefaultTar_Unarchive_SymlinkPathTraversal_AbsLinkDestination(t *testing.T) {
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "source.tar")
-	createSymlinkPathTraversalSample(t, source, "/tmp/thing")
+
+	linkPath := "/tmp/thing"
+	if runtime.GOOS == "windows" {
+		linkPath = "C:\\tmp\\thing"
+	}
+
+	createSymlinkPathTraversalSample(t, source, linkPath)
 	destination := filepath.Join(tmp, "destination")
 
 	err := archiver.DefaultTar.Unarchive(source, destination)
