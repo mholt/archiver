@@ -53,7 +53,7 @@ func (t Tar) Archive(ctx context.Context, output io.Writer, files []File) error 
 	for _, file := range files {
 		if err := t.writeFileToArchive(ctx, tw, file); err != nil {
 			if t.ContinueOnError && ctx.Err() == nil { // context errors should always abort
-				log.Printf("[ERROR] %v", err)
+				log.Printf("[ERROR] %v\n", err)
 				continue
 			}
 			return err
@@ -169,7 +169,7 @@ func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) 
 		err = t.writeFileToArchive(ctx, tw, file)
 		if err != nil {
 			if t.ContinueOnError && ctx.Err() == nil {
-				log.Printf("[ERROR] appending file %d into archive: %s: %v", i, file.Name(), err)
+				log.Printf("[ERROR] appending file %d into archive: %s: %v\n", i, file.Name(), err)
 				continue
 			}
 			return fmt.Errorf("appending file %d into archive: %s: %w", i, file.Name(), err)
@@ -196,7 +196,7 @@ func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 		}
 		if err != nil {
 			if t.ContinueOnError && ctx.Err() == nil {
-				log.Printf("[ERROR] Advancing to next file in tar archive: %v", err)
+				log.Printf("[ERROR] Advancing to next file in tar archive: %v\n", err)
 				continue
 			}
 			return err

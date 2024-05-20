@@ -86,7 +86,7 @@ func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 		}
 		if err != nil {
 			if r.ContinueOnError {
-				log.Printf("[ERROR] Advancing to next file in rar archive: %v", err)
+				log.Printf("[ERROR] Advancing to next file in rar archive: %v\n", err)
 				continue
 			}
 			return err

@@ -233,7 +233,7 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			skipDirs.add(dirPath)
 		} else if err != nil {
 			if z.ContinueOnError {
-				log.Printf("[ERROR] %s: %v", f.Name, err)
+				log.Printf("[ERROR] %s: %v\n", f.Name, err)
 				continue
 			}
 			return fmt.Errorf("handling file %d: %s: %w", i, f.Name, err)
@@ -311,7 +311,7 @@ func (z Zip) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) 
 		}
 		if err := openAndCopyFile(file, w); err != nil {
 			if z.ContinueOnError && ctx.Err() == nil {
-				log.Printf("[ERROR] appending file %d into archive: %s: %v", idx, file.Name(), err)
+				log.Printf("[ERROR] appending file %d into archive: %s: %v\n", idx, file.Name(), err)
 				continue
 			}
 			return fmt.Errorf("copying inserted file %d: %s: %w", idx, file.Name(), err)

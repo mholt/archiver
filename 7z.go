@@ -111,7 +111,7 @@ func (z SevenZip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInA
 			skipDirs.add(dirPath)
 		} else if err != nil {
 			if z.ContinueOnError {
-				log.Printf("[ERROR] %s: %v", f.Name, err)
+				log.Printf("[ERROR] %s: %v\n", f.Name, err)
 				continue
 			}
 			return fmt.Errorf("handling file %d: %s: %w", i, f.Name, err)
