@@ -20,6 +20,10 @@ type Gz struct {
 	// than no compression.
 	CompressionLevel int
 
+	// DisableMultistream controls whether the reader supports multistream files.
+	// See https://pkg.go.dev/compress/gzip#example-Reader.Multistream
+	DisableMultistream bool
+
 	// Use a fast parallel Gzip implementation. This is only
 	// effective for large streams (about 1 MB or greater).
 	Multithreaded bool
@@ -65,14 +69,19 @@ func (gz Gz) OpenWriter(w io.Writer) (io.WriteCloser, error) {
 }
 
 func (gz Gz) OpenReader(r io.Reader) (io.ReadCloser, error) {
-	var rc io.ReadCloser
-	var err error
 	if gz.Multithreaded {
-		rc, err = pgzip.NewReader(r)
-	} else {
-		rc, err = gzip.NewReader(r)
+		gzR, err := pgzip.NewReader(r)
+		if gzR != nil && gz.DisableMultistream {
+			gzR.Multistream(false)
+		}
+		return gzR, err
 	}
-	return rc, err
+
+	gzR, err := gzip.NewReader(r)
+	if gzR != nil && gz.DisableMultistream {
+		gzR.Multistream(false)
+	}
+	return gzR, err
 }
 
 // magic number at the beginning of gzip files
