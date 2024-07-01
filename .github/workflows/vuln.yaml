@@ -4,9 +4,9 @@ permissions: {} # no need any permissions
 
 on:
   push:
-    branches: [main]
+    branches: [main,master]
   pull_request:
-    branches: [main]
+    branches: [main,master]
   schedule:
   - cron: '0 10 * * 1' # run "At 10:00 on Monday"
   workflow_call:
