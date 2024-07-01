@@ -20,7 +20,7 @@ require (
 	github.com/golang/snappy v0.0.4
 	github.com/pierrec/lz4/v4 v4.1.18
 	github.com/sorairolake/lzip-go v0.3.1
-	golang.org/x/text v0.13.0
+	golang.org/x/text v0.16.0
 )
 
 require (
