@@ -537,7 +537,8 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 		return nil, err
 	}
 
-	if (len(files) == 0 && files[0].NameInArchive == name) || found {
+	// exactly one or exact file found, test name match to detect implicit dir name https://github.com/mholt/archiver/issues/340
+	if (len(files) == 1 && files[0].NameInArchive == name) || found {
 		return files[len(files)-1].FileInfo, nil
 	}
 
