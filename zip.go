@@ -157,6 +157,8 @@ func (z Zip) archiveOneFile(ctx context.Context, zw *zip.Writer, idx int, file F
 		} else {
 			hdr.Method = z.Compression
 		}
+	} else {
+		hdr.Method = z.Compression
 	}
 
 	w, err := zw.CreateHeader(hdr)
