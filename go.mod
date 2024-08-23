@@ -18,8 +18,8 @@ require (
 	github.com/STARRY-S/zip v0.1.0
 	github.com/bodgit/sevenzip v1.5.1
 	github.com/golang/snappy v0.0.4
+	github.com/mholt/lzip-go v0.3.6
 	github.com/pierrec/lz4/v4 v4.1.21
-	github.com/sorairolake/lzip-go v0.3.4
 	golang.org/x/text v0.16.0
 )
 
@@ -29,5 +29,6 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
+	github.com/sorairolake/lzip-go v0.3.5 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 )
