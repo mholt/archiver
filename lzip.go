@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mholt/lzip-go"
+	"github.com/sorairolake/lzip-go"
 )
 
 func init() {
