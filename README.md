@@ -111,7 +111,7 @@ The first parameter to `FilesFromDisk()` is an optional options struct, allowing
 
 Extracting an archive, extracting _from_ an archive, and walking an archive are all the same function.
 
-Simply use your format type (e.g. `Zip`) to call `Extract()`. You'll pass in a context (for cancellation), the input stream, the list of files you want out of the archive, and a callback function to handle each file. 
+Simply use your format type (e.g. `Zip`) to call `Extract()`. You'll pass in a context (for cancellation), the input stream, the list of files you want out of the archive, and a callback function to handle each file.
 
 If you want all the files, pass in a nil list of file paths.
 
@@ -166,6 +166,51 @@ if decom, ok := format.(archiver.Decompressor); ok {
 ```
 
 `Identify()` works by reading an arbitrary number of bytes from the beginning of the stream (just enough to check for file headers). It buffers them and returns a new reader that lets you re-read them anew.
+
+### Automatically identifying formats and extracting archives
+
+Combining the above two features, you can automatically identify the format of an input stream and extract it:
+
+```go
+func Unarchive(tarball, dst string) error {
+	f, err := os.Open(tarball)
+	if err != nil {
+		return fmt.Errorf("open tarball %s: %w", tarball, err)
+	}
+	// Identify the format and input stream for the archive
+	format, input, err := archiver.Identify(tarball, f)
+	if err != nil {
+		return fmt.Errorf("identify format: %w", err)
+	}
+
+	// Check if the format supports extraction
+	extractor, ok := format.(archiver.Extractor)
+	if !ok {
+		return fmt.Errorf("unsupported format for extraction")
+	}
+
+	// Ensure the destination directory exists
+	if err := createDir(dst); err != nil {
+		return fmt.Errorf("creating destination directory: %w", err)
+	}
+
+	// Extract files using the official handler
+	handler := func(ctx context.Context, f archiver.File) error {
+		log.Printf("Processing file: %s", f.NameInArchive)
+		return handleFile(f, dst) // implement handleFile to write the file to destination
+	}
+
+	// Use the extractor to process all files in the archive
+	if err := extractor.Extract(context.Background(), input, nil, handler); err != nil {
+		return fmt.Errorf("extracting files: %w", err)
+	}
+
+	log.Printf("Unarchiving completed successfully.")
+	return nil
+}
+```
+
+See the [example](./examples/unarchiver) for details.
 
 ### Virtual file systems
 
@@ -257,7 +302,7 @@ http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 	// disable range request
 	writer.Header().Set("Accept-Ranges", "none")
 	request.Header.Del("Range")
-	
+
 	// disable content-type sniffing
 	ctype := mime.TypeByExtension(filepath.Ext(request.URL.Path))
 	writer.Header()["Content-Type"] = nil
