@@ -64,7 +64,7 @@ func TestSelfTar(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not stat test tar: %v", fn)
 	}
-	fsys := ArchiveFS{
+	fsys := &ArchiveFS{
 		Stream: io.NewSectionReader(fh, 0, fstat.Size()),
 		Format: Tar{},
 	}
@@ -83,7 +83,7 @@ func TestSelfTar(t *testing.T) {
 }
 
 func ExampleArchiveFS_Stream() {
-	fsys := ArchiveFS{
+	fsys := &ArchiveFS{
 		Stream: io.NewSectionReader(bytes.NewReader(testZIP), 0, int64(len(testZIP))),
 		Format: Zip{},
 	}

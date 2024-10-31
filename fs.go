@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -58,7 +59,7 @@ func FileSystem(ctx context.Context, root string) (fs.FS, error) {
 
 	switch fileFormat := format.(type) {
 	case Extractor:
-		return ArchiveFS{Path: root, Format: fileFormat, Context: ctx}, nil
+		return &ArchiveFS{Path: root, Format: fileFormat, Context: ctx}, nil
 
 	// case Zip:
 	// 	// zip.Reader is more performant than ArchiveFS, because zip.Reader caches content information
@@ -210,17 +211,10 @@ type ArchiveFS struct {
 	Prefix  string          // optional subdirectory in which to root the fs
 	Context context.Context // optional
 
-	contents map[string][]fs.DirEntry
+	// TODO: probably put a mutex in here; the thing has to be a pointer to compile anyway
+	contents map[string]FileInfo
+	dirs     map[string][]fs.DirEntry
 }
-
-type fsIndex struct {
-}
-
-// type archiveEntry struct {
-// 	path  string
-// 	entry fs.DirEntry
-// 	info  fs.FileInfo
-// }
 
 // context always return a context, preferring f.Context if not nil.
 func (f ArchiveFS) context() context.Context {
@@ -232,7 +226,7 @@ func (f ArchiveFS) context() context.Context {
 
 // Open opens the named file from within the archive. If name is "." then
 // the archive file itself will be opened as a directory file.
-func (f ArchiveFS) Open(name string) (fs.File, error) {
+func (f *ArchiveFS) Open(name string) (fs.File, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
@@ -252,8 +246,8 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 				archiveFile.Close()
 			}
 		}()
-	} else if f.Stream != nil {
-		archiveFile = fakeArchiveFile{}
+	} else if f.Stream == nil {
+		return nil, fmt.Errorf("no input; one of Path or Stream must be set")
 	}
 
 	// apply prefix if fs is rooted in a subtree
@@ -448,7 +442,7 @@ func openReadDir(dir string, entries []FileInfo) []fs.DirEntry {
 
 // Stat stats the named file from within the archive. If name is "." then
 // the archive file itself is statted and treated as a directory file.
-func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
+func (f *ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrInvalid}
 	}
@@ -521,19 +515,22 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 // we call Open for each file, it's exponentially slow! Can we potentially add memory or something?
 
 // ReadDir reads the named directory from within the archive.
-func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
+func (f *ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
 	}
 
-	// fs.WalkDir calls ReadDir() once per directory, and for archives with
+	// fs.WalkDir() calls ReadDir() once per directory, and for archives with
 	// lots of directories, that is very slow, since we have to traverse the
-	// entire archive in order to know that we got all the entries for a
+	// entire archive in order to ensure that we got all the entries for a
 	// directory -- so we can fast-track this lookup if we've done the
 	// traversal already
-	if len(f.contents) > 0 {
-		return f.contents[name], nil
+	if len(f.dirs) > 0 {
+		return f.dirs[name], nil
 	}
+
+	f.contents = make(map[string]FileInfo)
+	f.dirs = make(map[string][]fs.DirEntry)
 
 	var archiveFile *os.File
 	var err error
@@ -548,25 +545,63 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	// apply prefix if fs is rooted in a subtree
 	name = path.Join(f.Prefix, name)
 
-	// collect all files with prefix
-	var (
-		files     []FileInfo
-		foundFile bool
-	)
 	handler := func(_ context.Context, file FileInfo) error {
-		file.NameInArchive = path.Clean(file.NameInArchive) // TODO: Should we always just "Clean" this inside Extract() for everyone?
+		// can't always trust path names
+		file.NameInArchive = path.Clean(file.NameInArchive)
 
-		// Apparently, creating a tar file in the target directory may result
-		// in an entry called "." in the archive; avoid infinite walk. see #384
+		// avoid infinite walk; apparently, creating a tar file in the target
+		// directory may result in an entry called "." in the archive; see #384
 		if file.NameInArchive == "." {
 			return nil
 		}
 
-		files = append(files, file)
+		// if the name being requested isn't a directory, return an error similar to
+		// what most OSes return from the readdir system call when given a non-dir
 		if file.NameInArchive == name && !file.IsDir() {
-			foundFile = true
-			return errStopWalk
+			return &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not a directory")}
 		}
+
+		// index this file info for quick access
+		f.contents[file.NameInArchive] = file
+
+		// this is a real directory; prefer its DirEntry over an implicit/fake one we may have created earlier;
+		// first try to find if it exists, and if so, replace the value; otherwise insert it in sorted position
+		if file.IsDir() {
+			dirEntry := fs.FileInfoToDirEntry(file)
+			idx, found := slices.BinarySearchFunc(f.dirs[path.Dir(file.NameInArchive)], dirEntry, func(a, b fs.DirEntry) int {
+				return strings.Compare(a.Name(), b.Name())
+			})
+			if found {
+				f.dirs[path.Dir(file.NameInArchive)][idx] = dirEntry
+			} else {
+				f.dirs[path.Dir(file.NameInArchive)] = slices.Insert(f.dirs[path.Dir(file.NameInArchive)], idx, dirEntry)
+			}
+		}
+
+		// this loop looks like an abomination, but it's really quite simple: we're
+		// just iterating the directories of the path up to the root; i.e. we lob off
+		// the base (last component) of the path until no separators remain, i.e. only
+		// one component remains -- then loop again to make sure it's not a duplicate
+		for dir, base := path.Dir(file.NameInArchive), path.Base(file.NameInArchive); ; dir, base = path.Dir(dir), path.Base(dir) {
+			var dirInfo fs.DirEntry = implicitDirInfo{implicitDirEntry{base}}
+
+			// we are "filling in" any directories that could potentially be only implicit,
+			// and since a nested directory can have more than 1 item, we need to prevent
+			// duplication; for example: given a/b/c and a/b/d, we need to avoid adding
+			// an entry for "b" twice within "a" -- hence we search for it first, and if
+			// it doesn't already exist, we insert it in sorted position
+			idx, found := slices.BinarySearchFunc(f.dirs[dir], dirInfo, func(a, b fs.DirEntry) int {
+				return strings.Compare(a.Name(), b.Name())
+			})
+			if !found {
+				f.dirs[dir] = slices.Insert(f.dirs[dir], idx, dirInfo)
+			}
+
+			if dir == "." {
+				break
+			}
+		}
+
 		return nil
 	}
 
@@ -582,29 +617,34 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	}
 
 	err = f.Format.Extract(f.context(), inputStream, filter, handler)
-	if foundFile {
-		return nil, &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not a dir")}
-	}
 	if err != nil {
+		// these being non-nil implies that we have indexed the archive,
+		// but if an error occurred, we likely only got part of the way
+		// through and our index is incomplete, and we'd have to re-walk
+		// the whole thing anyway; so reset these to nil to avoid bugs
+		f.dirs = nil
+		f.contents = nil
 		return nil, err
 	}
 
-	// always find all implicit directories
-	files = fillImplicit(files)
-	// and return early for dot file
-	if name == "." {
-		return openReadDir(name, files), nil
-	}
+	// // always find all implicit directories
+	// files = fillImplicit(files)
+	// // and return early for dot file
+	// if name == "." {
+	// 	return openReadDir(name, files), nil
+	// }
 
-	file, foundFile := search(name, files)
-	if !foundFile {
-		return nil, fs.ErrNotExist
-	}
+	// file, foundFile := search(name, files)
+	// if !foundFile {
+	// 	return nil, fs.ErrNotExist
+	// }
 
-	if !file.IsDir() {
-		return nil, &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not a dir")}
-	}
-	return openReadDir(name, files), nil
+	// if !file.IsDir() {
+	// 	return nil, &fs.PathError{Op: "readdir", Path: name, Err: errors.New("not a dir")}
+	// }
+	// return openReadDir(name, files), nil
+
+	return f.dirs[name], nil
 }
 
 // Sub returns an FS corresponding to the subtree rooted at dir.
@@ -619,6 +659,11 @@ func (f *ArchiveFS) Sub(dir string) (fs.FS, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", dir)
 	}
+	// result is the same as what we're starting with, except
+	// we indicate a path prefix to be used for all operations;
+	// the reason we don't append to the Path field directly
+	// is because the input might be a stream rather than a
+	// path on disk, and the Prefix field is applied on both
 	result := f
 	result.Prefix = dir
 	return result, nil
@@ -694,16 +739,6 @@ func pathWithoutTopDir(fpath string) string {
 // even if that file is a directory and would otherwise be
 // traversed during the walk.
 var errStopWalk = fmt.Errorf("stop walk")
-
-type fakeArchiveFile struct{}
-
-func (f fakeArchiveFile) Stat() (fs.FileInfo, error) {
-	return implicitDirInfo{
-		implicitDirEntry{name: "."},
-	}, nil
-}
-func (f fakeArchiveFile) Read([]byte) (int, error) { return 0, io.EOF }
-func (f fakeArchiveFile) Close() error             { return nil }
 
 // dirFile implements the fs.ReadDirFile interface.
 type dirFile struct {

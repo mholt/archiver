@@ -28,6 +28,10 @@ type FileInfo struct {
 	// format-agnosticism (no type assertions) for basic
 	// operations.
 	//
+	// When extracting, this name or path may not have
+	// been sanitized; it should not be trusted at face
+	// value. Consider using path.Clean() before using.
+	//
 	// EXPERIMENTAL: If inserting a file into an archive,
 	// and this is left blank, the implementation of the
 	// archive format can default to using the file's base
@@ -214,7 +218,7 @@ type FromDiskOptions struct {
 // archive contents are not necessarily ordered, skipping directories requires
 // memory, and skipping lots of directories may run up your memory bill.
 //
-// Any other returned error will terminate a walk.
+// Any other returned error will terminate a walk and be returned to the caller.
 type FileHandler func(ctx context.Context, f FileInfo) error
 
 // openAndCopyFile opens file for reading, copies its
