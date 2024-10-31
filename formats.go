@@ -223,7 +223,7 @@ func (caf CompressedArchive) Match(filename string, stream io.Reader) (MatchResu
 }
 
 // Archive adds files to the output archive while compressing the result.
-func (caf CompressedArchive) Archive(ctx context.Context, output io.Writer, files []File) error {
+func (caf CompressedArchive) Archive(ctx context.Context, output io.Writer, files []FileInfo) error {
 	if caf.Compression != nil {
 		wc, err := caf.Compression.OpenWriter(output)
 		if err != nil {

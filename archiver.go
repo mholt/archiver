@@ -12,14 +12,14 @@ import (
 	"time"
 )
 
-// File is a virtualized, generalized file abstraction for interacting with archives.
-type File struct {
+// FileInfo is a virtualized, generalized file abstraction for interacting with archives.
+type FileInfo struct {
 	fs.FileInfo
 
 	// The file header as used/provided by the archive format.
 	// Typically, you do not need to set this field when creating
 	// an archive.
-	Header interface{}
+	Header any
 
 	// The path of the file as it appears in the archive.
 	// This is equivalent to Header.Name (for most Header
@@ -40,12 +40,11 @@ type File struct {
 
 	// A callback function that opens the file to read its
 	// contents. The file must be closed when reading is
-	// complete. Nil for files that don't have content
-	// (such as directories and links).
-	Open func() (io.ReadCloser, error)
+	// complete.
+	Open func() (fs.File, error)
 }
 
-func (f File) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
+func (f FileInfo) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
 
 // FilesFromDisk returns a list of files by walking the directories in the
 // given filenames map. The keys are the names on disk, and the values are
@@ -68,8 +67,8 @@ func (f File) Stat() (fs.FileInfo, error) { return f.FileInfo, nil }
 //
 // This function is used primarily when preparing a list of files to add to
 // an archive.
-func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]File, error) {
-	var files []File
+func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]FileInfo, error) {
+	var files []FileInfo
 	for rootOnDisk, rootInArchive := range filenames {
 		walkErr := filepath.WalkDir(rootOnDisk, func(filename string, d fs.DirEntry, err error) error {
 			if err != nil {
@@ -114,11 +113,11 @@ func FilesFromDisk(options *FromDiskOptions, filenames map[string]string) ([]Fil
 				info = noAttrFileInfo{info}
 			}
 
-			file := File{
+			file := FileInfo{
 				FileInfo:      info,
 				NameInArchive: nameInArchive,
 				LinkTarget:    linkTarget,
-				Open: func() (io.ReadCloser, error) {
+				Open: func() (fs.File, error) {
 					return os.Open(filename)
 				},
 			}
@@ -191,7 +190,7 @@ func (no noAttrFileInfo) Mode() fs.FileMode {
 	return no.FileInfo.Mode() & (fs.ModeType | fs.ModePerm)
 }
 func (noAttrFileInfo) ModTime() time.Time { return time.Time{} }
-func (noAttrFileInfo) Sys() interface{}   { return nil }
+func (noAttrFileInfo) Sys() any           { return nil }
 
 // FromDiskOptions specifies various options for gathering files from disk.
 type FromDiskOptions struct {
@@ -216,11 +215,11 @@ type FromDiskOptions struct {
 // memory, and skipping lots of directories may run up your memory bill.
 //
 // Any other returned error will terminate a walk.
-type FileHandler func(ctx context.Context, f File) error
+type FileHandler func(ctx context.Context, f FileInfo) error
 
 // openAndCopyFile opens file for reading, copies its
 // contents to w, then closes file.
-func openAndCopyFile(file File, w io.Writer) error {
+func openAndCopyFile(file FileInfo, w io.Writer) error {
 	fileReader, err := file.Open()
 	if err != nil {
 		return err

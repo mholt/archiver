@@ -52,7 +52,7 @@ func (z SevenZip) Match(filename string, stream io.Reader) (MatchResult, error) 
 }
 
 // Archive is not implemented for 7z, but the method exists so that SevenZip satisfies the ArchiveFormat interface.
-func (z SevenZip) Archive(_ context.Context, _ io.Writer, _ []File) error {
+func (z SevenZip) Archive(_ context.Context, _ io.Writer, _ []FileInfo) error {
 	return fmt.Errorf("not implemented for 7z because there is no pure Go implementation found")
 }
 
@@ -94,11 +94,18 @@ func (z SevenZip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInA
 			continue
 		}
 
-		file := File{
-			FileInfo:      f.FileInfo(),
+		fi := f.FileInfo()
+		file := FileInfo{
+			FileInfo:      fi,
 			Header:        f.FileHeader,
 			NameInArchive: f.Name,
-			Open:          func() (io.ReadCloser, error) { return f.Open() },
+			Open: func() (fs.File, error) {
+				openedFile, err := f.Open()
+				if err != nil {
+					return nil, err
+				}
+				return archivedFile{openedFile, fi}, nil
+			},
 		}
 
 		err := handleFile(ctx, file)

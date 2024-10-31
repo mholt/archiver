@@ -57,13 +57,13 @@ type Archiver interface {
 	// Archive writes an archive file to output with the given files.
 	//
 	// Context cancellation must be honored.
-	Archive(ctx context.Context, output io.Writer, files []File) error
+	Archive(ctx context.Context, output io.Writer, files []FileInfo) error
 }
 
 // ArchiveAsyncJob contains a File to be archived and a channel that
 // the result of the archiving should be returned on.
 type ArchiveAsyncJob struct {
-	File   File
+	File   FileInfo
 	Result chan<- error
 }
 
@@ -99,5 +99,5 @@ type Inserter interface {
 	// Insert inserts the files into archive.
 	//
 	// Context cancellation must be honored.
-	Insert(ctx context.Context, archive io.ReadWriteSeeker, files []File) error
+	Insert(ctx context.Context, archive io.ReadWriteSeeker, files []FileInfo) error
 }

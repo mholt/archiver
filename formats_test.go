@@ -102,7 +102,7 @@ func TestCompression(t *testing.T) {
 	}
 }
 
-func checkErr(t *testing.T, err error, msgFmt string, args ...interface{}) {
+func checkErr(t *testing.T, err error, msgFmt string, args ...any) {
 	t.Helper()
 	if err == nil {
 		return
@@ -226,9 +226,9 @@ func compress(
 }
 
 func archive(t *testing.T, arch Archiver, fname string, fileInfo fs.FileInfo) []byte {
-	files := []File{
+	files := []FileInfo{
 		{FileInfo: fileInfo, NameInArchive: "tmp.txt",
-			Open: func() (io.ReadCloser, error) {
+			Open: func() (fs.File, error) {
 				return os.Open(fname)
 			}},
 	}
@@ -414,7 +414,7 @@ func TestIdentifyAndOpenZip(t *testing.T) {
 		t.Fatalf("unexpected format found: expected=.zip actual:%s", format.Name())
 	}
 
-	err = format.(Extractor).Extract(context.Background(), reader, nil, func(ctx context.Context, f File) error {
+	err = format.(Extractor).Extract(context.Background(), reader, nil, func(ctx context.Context, f FileInfo) error {
 		rc, err := f.Open()
 		if err != nil {
 			return err

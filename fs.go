@@ -9,12 +9,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/klauspost/compress/zip"
 )
 
 // FileSystem opens the file at root as a read-only file system. The root may be a
@@ -41,7 +38,7 @@ func FileSystem(ctx context.Context, root string) (fs.FS, error) {
 
 	// real folders can be accessed easily
 	if info.IsDir() {
-		return DirFS(root), nil
+		return os.DirFS(root), nil
 	}
 
 	// if any archive formats recognize this file, access it like a folder
@@ -52,89 +49,47 @@ func FileSystem(ctx context.Context, root string) (fs.FS, error) {
 	defer file.Close()
 
 	format, _, err := Identify(filepath.Base(root), file)
-	if err != nil && !errors.Is(err, ErrNoMatch) {
-		return nil, err
+	if errors.Is(err, ErrNoMatch) {
+		return FileFS{Path: root}, nil // must be an ordinary file
 	}
-
-	if format != nil {
-		switch ff := format.(type) {
-		case Zip:
-			// zip.Reader is more performant than ArchiveFS, because zip.Reader caches content information
-			// and zip.Reader can open several content files concurrently because of io.ReaderAt requirement
-			// while ArchiveFS can't.
-			// zip.Reader doesn't suffer from issue #330 and #310 according to local test (but they should be fixed anyway)
-
-			// open the file anew, as our original handle will be closed when we return
-			file, err := os.Open(root)
-			if err != nil {
-				return nil, err
-			}
-			return zip.NewReader(file, info.Size())
-		case Archival:
-			// TODO: we only really need Extractor and Decompressor here, not the combined interfaces...
-			return ArchiveFS{Path: root, Format: ff, Context: ctx}, nil
-		case Compression:
-			return FileFS{Path: root, Compression: ff}, nil
-		}
-	}
-
-	// otherwise consider it an ordinary file; make a file system with it as its only file
-	return FileFS{Path: root}, nil
-}
-
-// DirFS allows accessing a directory on disk with a consistent file system interface.
-// It is almost the same as os.DirFS, except for some reason os.DirFS only implements
-// Open() and Stat(), but we also need ReadDir(). Seems like an obvious miss (as of Go 1.17)
-// and I have questions: https://twitter.com/mholt6/status/1476058551432876032
-type DirFS string
-
-// Open opens the named file.
-func (f DirFS) Open(name string) (fs.File, error) {
-	if err := f.checkName(name, "open"); err != nil {
-		return nil, err
-	}
-	return os.Open(filepath.Join(string(f), name))
-}
-
-// ReadDir returns a listing of all the files in the named directory.
-func (f DirFS) ReadDir(name string) ([]fs.DirEntry, error) {
-	if err := f.checkName(name, "readdir"); err != nil {
-		return nil, err
-	}
-	return os.ReadDir(filepath.Join(string(f), name))
-}
-
-// Stat returns info about the named file.
-func (f DirFS) Stat(name string) (fs.FileInfo, error) {
-	if err := f.checkName(name, "stat"); err != nil {
-		return nil, err
-	}
-	return os.Stat(filepath.Join(string(f), name))
-}
-
-// Sub returns an FS corresponding to the subtree rooted at dir.
-func (f DirFS) Sub(dir string) (fs.FS, error) {
-	if err := f.checkName(dir, "sub"); err != nil {
-		return nil, err
-	}
-	info, err := f.Stat(dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("identify format: %w", err)
 	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("%s is not a directory", dir)
-	}
-	return DirFS(filepath.Join(string(f), dir)), nil
-}
 
-// checkName returns an error if name is not a valid path according to the docs of
-// the io/fs package, with an extra cue taken from the standard lib's implementation
-// of os.dirFS.Open(), which checks for invalid characters in Windows paths.
-func (f DirFS) checkName(name, op string) error {
-	if !fs.ValidPath(name) || runtime.GOOS == "windows" && strings.ContainsAny(name, `\:`) {
-		return &fs.PathError{Op: op, Path: name, Err: fs.ErrInvalid}
+	switch fileFormat := format.(type) {
+	case Extractor:
+		return ArchiveFS{Path: root, Format: fileFormat, Context: ctx}, nil
+
+	// case Zip:
+	// 	// zip.Reader is more performant than ArchiveFS, because zip.Reader caches content information
+	// 	// and zip.Reader can open several content files concurrently because of io.ReaderAt requirement
+	// 	// while ArchiveFS can't.
+	// 	// zip.Reader doesn't suffer from issue #330 and #310 according to local test (but they should be fixed anyway)
+
+	// 	// open the file anew, as our original handle will be closed when we return
+	// 	file, err := os.Open(root)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	return zip.NewReader(file, info.Size())
+	// case Archival:
+	// 	// TODO: we only really need Extractor and Decompressor here, not the combined interfaces...
+
+	// 	// open the file anew, as our original handle will be closed when we return
+	// 	file, err := os.Open(root)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	info, err := file.Stat()
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	return ArchiveFS{Stream: io.NewSectionReader(file, 0, info.Size()), Format: fileFormat, Context: ctx}, nil
+	case Compression:
+		return FileFS{Path: root, Compression: fileFormat}, nil
 	}
-	return nil
+
+	return nil, fmt.Errorf("unable to create file system rooted at %s due to unsupported file or folder type", root)
 }
 
 // FileFS allows accessing a file on disk using a consistent file system interface.
@@ -224,15 +179,15 @@ func (cf compressedFile) Close() error {
 	return err
 }
 
-// ArchiveFS allows accessing an archive (or a compressed archive) using a
+// ArchiveFS allows reading an archive (or a compressed archive) using a
 // consistent file system interface. Essentially, it allows traversal and
 // reading of archive contents the same way as any normal directory on disk.
 // The contents of compressed archives are transparently decompressed.
 //
-// A valid ArchiveFS value must set either Path or Stream. If Path is set,
-// a literal file will be opened from the disk. If Stream is set, new
-// SectionReaders will be implicitly created to access the stream, enabling
-// safe, concurrent access.
+// A valid ArchiveFS value must set either Path or Stream, but not both.
+// If Path is set, a literal file will be opened from the disk.
+// If Stream is set, new SectionReaders will be implicitly created to
+// access the stream, enabling safe, concurrent access.
 //
 // NOTE: Due to Go's file system APIs (see package io/fs), the performance
 // of ArchiveFS when used with fs.WalkDir() is poor for archives with lots
@@ -251,10 +206,21 @@ type ArchiveFS struct {
 	Path   string            // path to the archive file on disk, or...
 	Stream *io.SectionReader // ...stream from which to read archive
 
-	Format  Archival        // the archive format
+	Format  Extractor       // the archive format
 	Prefix  string          // optional subdirectory in which to root the fs
 	Context context.Context // optional
+
+	contents map[string][]fs.DirEntry
 }
+
+type fsIndex struct {
+}
+
+// type archiveEntry struct {
+// 	path  string
+// 	entry fs.DirEntry
+// 	info  fs.FileInfo
+// }
 
 // context always return a context, preferring f.Context if not nil.
 func (f ArchiveFS) context() context.Context {
@@ -305,7 +271,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		}
 		return &dirFile{
 			extractedFile: extractedFile{
-				File: File{
+				FileInfo: FileInfo{
 					FileInfo:      dirFileInfo{archiveInfo},
 					NameInArchive: ".",
 				},
@@ -315,11 +281,11 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	}
 
 	var (
-		files []File
+		files []FileInfo
 		found bool
 	)
 	// collect them all or stop at exact file match, note we don't stop at folder match
-	handler := func(_ context.Context, file File) error {
+	handler := func(_ context.Context, file FileInfo) error {
 		file.NameInArchive = strings.Trim(file.NameInArchive, "/")
 		files = append(files, file)
 		if file.NameInArchive == name && !file.IsDir() {
@@ -354,12 +320,12 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	if (len(files) == 1 && files[0].NameInArchive == name) || found {
 		file := files[len(files)-1]
 		if file.IsDir() {
-			return &dirFile{extractedFile: extractedFile{File: file}}, nil
+			return &dirFile{extractedFile: extractedFile{FileInfo: file}}, nil
 		}
 
 		// if named file is not a regular file, it can't be opened
 		if !file.Mode().IsRegular() {
-			return extractedFile{File: file}, nil
+			return extractedFile{FileInfo: file}, nil
 		}
 
 		// regular files can be read, so open it for reading
@@ -367,7 +333,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 		if err != nil {
 			return nil, err
 		}
-		return extractedFile{File: file, ReadCloser: rc, parentArchive: archiveFile}, nil
+		return extractedFile{FileInfo: file, archiveCloser: archiveCloser{rc, archiveFile}}, nil
 	}
 
 	// implicit files
@@ -378,7 +344,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	}
 
 	if file.IsDir() {
-		return &dirFile{extractedFile: extractedFile{File: file}, entries: openReadDir(name, files)}, nil
+		return &dirFile{extractedFile: extractedFile{FileInfo: file}, entries: openReadDir(name, files)}, nil
 	}
 
 	// very unlikely
@@ -387,7 +353,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 
 	// if named file is not a regular file, it can't be opened
 	if !file.Mode().IsRegular() {
-		return extractedFile{File: file}, nil
+		return extractedFile{FileInfo: file}, nil
 	}
 
 	// regular files can be read, so open it for reading
@@ -395,7 +361,7 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	return extractedFile{File: file, ReadCloser: rc, parentArchive: archiveFile}, nil
+	return extractedFile{FileInfo: file, archiveCloser: archiveCloser{rc, archiveFile}}, nil
 }
 
 // copy of the same function from zip
@@ -415,10 +381,10 @@ func split(name string) (dir, elem string, isDir bool) {
 }
 
 // modified from zip.Reader initFileList, it's used to find all implicit dirs
-func fillImplicit(files []File) []File {
+func fillImplicit(files []FileInfo) []FileInfo {
 	dirs := make(map[string]bool)
 	knownDirs := make(map[string]bool)
-	entries := make([]File, 0)
+	entries := make([]FileInfo, 0)
 	for _, file := range files {
 		for dir := path.Dir(file.NameInArchive); dir != "."; dir = path.Dir(dir) {
 			dirs[dir] = true
@@ -430,7 +396,7 @@ func fillImplicit(files []File) []File {
 	}
 	for dir := range dirs {
 		if !knownDirs[dir] {
-			entries = append(entries, File{FileInfo: implicitDirInfo{implicitDirEntry{path.Base(dir)}}, NameInArchive: dir})
+			entries = append(entries, FileInfo{FileInfo: implicitDirInfo{implicitDirEntry{path.Base(dir)}}, NameInArchive: dir})
 		}
 	}
 
@@ -448,7 +414,7 @@ func fillImplicit(files []File) []File {
 }
 
 // modified from zip.Reader openLookup
-func search(name string, entries []File) (File, bool) {
+func search(name string, entries []FileInfo) (FileInfo, bool) {
 	dir, elem, _ := split(name)
 	i := sort.Search(len(entries), func(i int) bool {
 		idir, ielem, _ := split(entries[i].NameInArchive)
@@ -460,11 +426,11 @@ func search(name string, entries []File) (File, bool) {
 			return entries[i], true
 		}
 	}
-	return File{}, false
+	return FileInfo{}, false
 }
 
 // modified from zip.Reader openReadDir
-func openReadDir(dir string, entries []File) []fs.DirEntry {
+func openReadDir(dir string, entries []FileInfo) []fs.DirEntry {
 	i := sort.Search(len(entries), func(i int) bool {
 		idir, _, _ := split(entries[i].NameInArchive)
 		return idir >= dir
@@ -513,10 +479,10 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	}
 
 	var (
-		files []File
+		files []FileInfo
 		found bool
 	)
-	handler := func(_ context.Context, file File) error {
+	handler := func(_ context.Context, file FileInfo) error {
 		file.NameInArchive = strings.Trim(file.NameInArchive, "/")
 		files = append(files, file)
 		if file.NameInArchive == name {
@@ -550,10 +516,23 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	return file.FileInfo, nil
 }
 
+// TODO: ReadDir, Open, Stat, etc, all involve a walk of up to the entire archive,
+// which is slow when using fs.WalkDir -- which calls ReadDir many times, and then if
+// we call Open for each file, it's exponentially slow! Can we potentially add memory or something?
+
 // ReadDir reads the named directory from within the archive.
 func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	if !fs.ValidPath(name) {
 		return nil, &fs.PathError{Op: "readdir", Path: name, Err: fs.ErrInvalid}
+	}
+
+	// fs.WalkDir calls ReadDir() once per directory, and for archives with
+	// lots of directories, that is very slow, since we have to traverse the
+	// entire archive in order to know that we got all the entries for a
+	// directory -- so we can fast-track this lookup if we've done the
+	// traversal already
+	if len(f.contents) > 0 {
+		return f.contents[name], nil
 	}
 
 	var archiveFile *os.File
@@ -571,14 +550,18 @@ func (f ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 
 	// collect all files with prefix
 	var (
-		files     []File
+		files     []FileInfo
 		foundFile bool
 	)
-	handler := func(_ context.Context, file File) error {
-		file.NameInArchive = strings.Trim(file.NameInArchive, "/")
+	handler := func(_ context.Context, file FileInfo) error {
+		file.NameInArchive = path.Clean(file.NameInArchive) // TODO: Should we always just "Clean" this inside Extract() for everyone?
+
+		// Apparently, creating a tar file in the target directory may result
+		// in an entry called "." in the archive; avoid infinite walk. see #384
 		if file.NameInArchive == "." {
 			return nil
 		}
+
 		files = append(files, file)
 		if file.NameInArchive == name && !file.IsDir() {
 			foundFile = true
@@ -771,38 +754,54 @@ func (dirFileInfo) Size() int64            { return 0 }
 func (info dirFileInfo) Mode() fs.FileMode { return info.FileInfo.Mode() | fs.ModeDir }
 func (dirFileInfo) IsDir() bool            { return true }
 
+// archiveCloser is an fs.File that, when closed, will also close the parent archive.
+// This is useful sometimes when extracting a single file from an archive and using it
+// in a different place from which the archive was opened.
+type archiveCloser struct {
+	// The extracted file that came out of the archive.
+	fs.File
+
+	// The archive file that contained the extracted file.
+	Archive io.Closer
+}
+
+func (ac archiveCloser) Close() error {
+	if ac.File != nil {
+		if err := ac.File.Close(); err != nil {
+			return fmt.Errorf("closing extracted file: %w", err)
+		}
+	}
+	if ac.Archive != nil {
+		if err := ac.Archive.Close(); err != nil {
+			return fmt.Errorf("closing archive: %w", err)
+		}
+	}
+	return nil
+}
+
 // extractedFile implements fs.File, thus it represents an "opened" file,
 // which is slightly different from our File type which represents a file
 // that possibly may be opened. If the file is actually opened, this type
 // ensures that the parent archive is closed when this file from within it
 // is also closed.
 type extractedFile struct {
-	File
+	FileInfo
 
-	// Set these fields if a "regular file" which has actual content
+	// Set this field if a "regular file" which has actual content
 	// that can be read, i.e. a file that is open for reading.
 	// ReadCloser should be the file's reader, and parentArchive is
 	// a reference to the archive the files comes out of.
 	// If parentArchive is set, it will also be closed along with
 	// the file when Close() is called.
-	io.ReadCloser
-	parentArchive io.Closer
+	archiveCloser
 }
 
-// Close closes the the current file if opened and
-// the parent archive if specified. This is a no-op
-// for directories which do not set those fields.
-func (ef extractedFile) Close() error {
-	if ef.parentArchive != nil {
-		if err := ef.parentArchive.Close(); err != nil {
-			return err
-		}
-	}
-	if ef.ReadCloser != nil {
-		return ef.ReadCloser.Close()
-	}
-	return nil
+type archivedFile struct {
+	io.ReadCloser
+	info fs.FileInfo
 }
+
+func (af archivedFile) Stat() (fs.FileInfo, error) { return af.info, nil }
 
 // compressorCloser is a type that closes two closers at the same time.
 // It only exists to fix #365. If a better solution can be found, I'd
@@ -861,14 +860,10 @@ func (d implicitDirInfo) Name() string      { return d.name }
 func (implicitDirInfo) Size() int64         { return 0 }
 func (d implicitDirInfo) Mode() fs.FileMode { return d.Type() }
 func (implicitDirInfo) ModTime() time.Time  { return time.Time{} }
-func (implicitDirInfo) Sys() interface{}    { return nil }
+func (implicitDirInfo) Sys() any            { return nil }
 
 // Interface guards
 var (
-	_ fs.ReadDirFS = (*DirFS)(nil)
-	_ fs.StatFS    = (*DirFS)(nil)
-	_ fs.SubFS     = (*DirFS)(nil)
-
 	_ fs.ReadDirFS = (*FileFS)(nil)
 	_ fs.StatFS    = (*FileFS)(nil)
 

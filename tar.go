@@ -46,7 +46,7 @@ func (t Tar) Match(filename string, stream io.Reader) (MatchResult, error) {
 	return mr, nil
 }
 
-func (t Tar) Archive(ctx context.Context, output io.Writer, files []File) error {
+func (t Tar) Archive(ctx context.Context, output io.Writer, files []FileInfo) error {
 	tw := tar.NewWriter(output)
 	defer tw.Close()
 
@@ -74,7 +74,7 @@ func (t Tar) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan Arc
 	return nil
 }
 
-func (t Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) error {
+func (t Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file FileInfo) error {
 	if err := ctx.Err(); err != nil {
 		return err // honor context cancellation
 	}
@@ -109,7 +109,7 @@ func (t Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) 
 	return nil
 }
 
-func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) error {
+func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []FileInfo) error {
 	// Tar files may end with some, none, or a lot of zero-byte padding. The spec says
 	// it should end with two 512-byte trailer records consisting solely of null/0
 	// bytes: https://www.gnu.org/software/tar/manual/html_node/Standard.html. However,
@@ -212,12 +212,15 @@ func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			continue
 		}
 
-		file := File{
-			FileInfo:      hdr.FileInfo(),
+		info := hdr.FileInfo()
+		file := FileInfo{
+			FileInfo:      info,
 			Header:        hdr,
 			NameInArchive: hdr.Name,
 			LinkTarget:    hdr.Linkname,
-			Open:          func() (io.ReadCloser, error) { return io.NopCloser(tr), nil },
+			Open: func() (fs.File, error) {
+				return archivedFile{io.NopCloser(tr), info}, nil
+			},
 		}
 
 		err = handleFile(ctx, file)

@@ -57,7 +57,7 @@ func (r Rar) Match(filename string, stream io.Reader) (MatchResult, error) {
 }
 
 // Archive is not implemented for RAR, but the method exists so that Rar satisfies the ArchiveFormat interface.
-func (r Rar) Archive(_ context.Context, _ io.Writer, _ []File) error {
+func (r Rar) Archive(_ context.Context, _ io.Writer, _ []FileInfo) error {
 	return fmt.Errorf("not implemented because RAR is a proprietary format")
 }
 
@@ -98,11 +98,14 @@ func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			continue
 		}
 
-		file := File{
-			FileInfo:      rarFileInfo{hdr},
+		info := rarFileInfo{hdr}
+		file := FileInfo{
+			FileInfo:      info,
 			Header:        hdr,
 			NameInArchive: hdr.Name,
-			Open:          func() (io.ReadCloser, error) { return io.NopCloser(rr), nil },
+			Open: func() (fs.File, error) {
+				return archivedFile{io.NopCloser(rr), info}, nil
+			},
 		}
 
 		err = handleFile(ctx, file)
@@ -133,7 +136,7 @@ func (rfi rarFileInfo) Size() int64        { return rfi.fh.UnPackedSize }
 func (rfi rarFileInfo) Mode() os.FileMode  { return rfi.fh.Mode() }
 func (rfi rarFileInfo) ModTime() time.Time { return rfi.fh.ModificationTime }
 func (rfi rarFileInfo) IsDir() bool        { return rfi.fh.IsDir }
-func (rfi rarFileInfo) Sys() interface{}   { return nil }
+func (rfi rarFileInfo) Sys() any           { return nil }
 
 var (
 	rarHeaderV1_5 = []byte("Rar!\x1a\x07\x00")     // v1.5
