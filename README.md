@@ -91,11 +91,12 @@ if err != nil {
 }
 defer out.Close()
 
-// we can use the CompressedArchive type to gzip a tarball
+// we can use the Archive type to gzip a tarball
 // (compression is not required; you could use Tar directly)
-format := archiver.CompressedArchive{
+format := archiver.Archive{
 	Compression: archiver.Gz{},
 	Archival:    archiver.Tar{},
+	Extraction:  archiver.Tar{},
 }
 
 // create the archive
@@ -111,26 +112,16 @@ The first parameter to `FilesFromDisk()` is an optional options struct, allowing
 
 Extracting an archive, extracting _from_ an archive, and walking an archive are all the same function.
 
-Simply use your format type (e.g. `Zip`) to call `Extract()`. You'll pass in a context (for cancellation), the input stream, the list of files you want out of the archive, and a callback function to handle each file. 
-
-If you want all the files, pass in a nil list of file paths.
+Simply use your format type (e.g. `Zip`) to call `Extract()`. You'll pass in a context (for cancellation), the input stream, and a callback function to handle each file.
 
 ```go
 // the type that will be used to read the input stream
 var format archiver.Zip
 
-// the list of files we want out of the archive; any
-// directories will include all their contents unless
-// we return fs.SkipDir from our handler
-// (leave this nil to walk ALL files from the archive)
-fileList := []string{"file1.txt", "subfolder"}
-
-handler := func(ctx context.Context, f archiver.File) error {
+err := format.Extract(ctx, input, func(ctx context.Context, f archiver.File) error {
 	// do something with the file
 	return nil
-}
-
-err := format.Extract(ctx, input, fileList, handler)
+})
 if err != nil {
 	return err
 }
@@ -154,8 +145,8 @@ if ex, ok := format.(archiver.Extractor); ok {
 }
 
 // or maybe it's compressed and you want to decompress it?
-if decom, ok := format.(archiver.Decompressor); ok {
-	rc, err := decom.OpenReader(unknownFile)
+if decomp, ok := format.(archiver.Decompressor); ok {
+	rc, err := decomp.OpenReader(unknownFile)
 	if err != nil {
 		return err
 	}
@@ -171,7 +162,7 @@ if decom, ok := format.(archiver.Decompressor); ok {
 
 This is my favorite feature.
 
-Let's say you have a file. It could be a real directory on disk, an archive, a compressed archive, or any other regular file. You don't really care; you just want to use it uniformly no matter what it is.
+Let's say you have a file. It could be a real directory on disk, an archive, a compressed archive, or any other regular file (or stream!). You don't really care; you just want to use it uniformly no matter what it is.
 
 Use archiver to simply create a file system:
 
@@ -182,7 +173,7 @@ Use archiver to simply create a file system:
 // - a compressed archive ("example.tar.gz")
 // - a regular file ("example.txt")
 // - a compressed regular file ("example.txt.gz")
-fsys, err := archiver.FileSystem(filename)
+fsys, err := archiver.FileSystem(ctx, filename, nil)
 if err != nil {
 	return err
 }
