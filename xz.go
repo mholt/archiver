@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"strings"
 
@@ -16,13 +17,13 @@ func init() {
 // Xz facilitates xz compression.
 type Xz struct{}
 
-func (Xz) Name() string { return ".xz" }
+func (Xz) Extension() string { return ".xz" }
 
-func (x Xz) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (x Xz) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), x.Name()) {
+	if strings.Contains(strings.ToLower(filename), x.Extension()) {
 		mr.ByName = true
 	}
 

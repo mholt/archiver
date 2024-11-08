@@ -16,7 +16,10 @@ import (
 func TestRewindReader(t *testing.T) {
 	data := "the header\nthe body\n"
 
-	r := newRewindReader(strings.NewReader(data))
+	r, err := newRewindReader(strings.NewReader(data))
+	if err != nil {
+		t.Errorf("creating rewindReader: %v", err)
+	}
 
 	buf := make([]byte, 10) // enough for 'the header'
 
@@ -25,10 +28,10 @@ func TestRewindReader(t *testing.T) {
 		r.rewind()
 		n, err := r.Read(buf)
 		if err != nil {
-			t.Fatalf("Read failed: %s", err)
+			t.Errorf("Read failed: %s", err)
 		}
 		if string(buf[:n]) != "the header" {
-			t.Fatalf("iteration %d: expected 'the header' but got '%s' (n=%d)", i, string(buf[:n]), n)
+			t.Errorf("iteration %d: expected 'the header' but got '%s' (n=%d)", i, string(buf[:n]), n)
 		}
 	}
 
@@ -38,10 +41,10 @@ func TestRewindReader(t *testing.T) {
 	buf = make([]byte, len(data))
 	n, err := io.ReadFull(finalReader, buf)
 	if err != nil {
-		t.Fatalf("ReadFull failed: %s (n=%d)", err, n)
+		t.Errorf("ReadFull failed: %s (n=%d)", err, n)
 	}
 	if string(buf) != data {
-		t.Fatalf("expected '%s' but got '%s'", string(data), string(buf))
+		t.Errorf("expected '%s' but got '%s'", string(data), string(buf))
 	}
 }
 
@@ -65,24 +68,24 @@ func TestCompression(t *testing.T) {
 		checkErr(t, wc.Close(), "closing writer")
 
 		// make sure Identify correctly chooses this compression method
-		format, stream, err := Identify(testFilename, compressed)
+		format, stream, err := Identify(context.Background(), testFilename, compressed)
 		checkErr(t, err, "identifying")
-		if format.Name() != comp.Name() {
-			t.Fatalf("expected format %s but got %s", comp.Name(), format.Name())
+		if format.Extension() != comp.Extension() {
+			t.Errorf("expected format %s but got %s", comp.Extension(), format.Extension())
 		}
 
 		// read the contents back out and compare
 		decompReader, err := format.(Decompressor).OpenReader(stream)
-		checkErr(t, err, "opening with decompressor '%s'", format.Name())
+		checkErr(t, err, "opening with decompressor '%s'", format.Extension())
 		data, err := io.ReadAll(decompReader)
 		checkErr(t, err, "reading decompressed data")
 		checkErr(t, decompReader.Close(), "closing decompressor")
 		if !bytes.Equal(data, contents) {
-			t.Fatalf("not equal to original")
+			t.Errorf("not equal to original")
 		}
 	}
 
-	var cannotIdentifyFromStream = map[string]bool{Brotli{}.Name(): true}
+	var cannotIdentifyFromStream = map[string]bool{Brotli{}.Extension(): true}
 
 	for _, f := range formats {
 		// only test compressors
@@ -91,24 +94,24 @@ func TestCompression(t *testing.T) {
 			continue
 		}
 
-		t.Run(f.Name()+"_with_extension", func(t *testing.T) {
-			testOK(t, comp, "file"+f.Name())
+		t.Run(f.Extension()+"_with_extension", func(t *testing.T) {
+			testOK(t, comp, "file"+f.Extension())
 		})
-		if !cannotIdentifyFromStream[f.Name()] {
-			t.Run(f.Name()+"_without_extension", func(t *testing.T) {
+		if !cannotIdentifyFromStream[f.Extension()] {
+			t.Run(f.Extension()+"_without_extension", func(t *testing.T) {
 				testOK(t, comp, "")
 			})
 		}
 	}
 }
 
-func checkErr(t *testing.T, err error, msgFmt string, args ...interface{}) {
+func checkErr(t *testing.T, err error, msgFmt string, args ...any) {
 	t.Helper()
 	if err == nil {
 		return
 	}
 	args = append(args, err)
-	t.Fatalf(msgFmt+": %s", args...)
+	t.Errorf(msgFmt+": %s", args...)
 }
 
 func TestIdentifyDoesNotMatchContentFromTrimmedKnownHeaderHaving0Suffix(t *testing.T) {
@@ -142,13 +145,13 @@ func TestIdentifyDoesNotMatchContentFromTrimmedKnownHeaderHaving0Suffix(t *testi
 			}
 			headerTrimmed := tt.header[:headerLen-1]
 			stream := bytes.NewReader(headerTrimmed)
-			got, _, err := Identify("", stream)
+			got, _, err := Identify(context.Background(), "", stream)
 			if got != nil {
-				t.Errorf("no Format expected for trimmed know %s header: found Format= %v", tt.name, got.Name())
+				t.Errorf("no Format expected for trimmed know %s header: found Format= %v", tt.name, got.Extension())
 				return
 			}
-			if ErrNoMatch != err {
-				t.Fatalf("ErrNoMatch expected for for trimmed know %s header: err :=%#v", tt.name, err)
+			if !errors.Is(err, NoMatch) {
+				t.Errorf("NoMatch expected for for trimmed know %s header: err :=%#v", tt.name, err)
 				return
 			}
 
@@ -185,13 +188,13 @@ func TestIdentifyCanAssessSmallOrNoContent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _, err := Identify("", tt.args.stream)
+			got, _, err := Identify(context.Background(), "", tt.args.stream)
 			if got != nil {
-				t.Errorf("no Format expected for non archive and not compressed stream: found Format= %v", got.Name())
+				t.Errorf("no Format expected for non archive and not compressed stream: found Format=%#v", got)
 				return
 			}
-			if ErrNoMatch != err {
-				t.Fatalf("ErrNoMatch expected for non archive and not compressed stream: err :=%#v", err)
+			if !errors.Is(err, NoMatch) {
+				t.Errorf("NoMatch expected for non archive and not compressed stream: %#v", err)
 				return
 			}
 
@@ -206,36 +209,36 @@ func compress(
 	buf := bytes.NewBuffer(make([]byte, 0, 128))
 	cwriter, err := openwriter(buf)
 	if err != nil {
-		t.Fatalf("fail to open compression writer: compression-name=%s, err=%#v", compName, err)
+		t.Errorf("fail to open compression writer: compression-name=%s, err=%#v", compName, err)
 		return nil
 	}
 	_, err = cwriter.Write(content)
 	if err != nil {
 		cerr := cwriter.Close()
-		t.Fatalf(
+		t.Errorf(
 			"fail to write using compression writer: compression-name=%s, err=%#v, close-err=%#v",
 			compName, err, cerr)
 		return nil
 	}
 	err = cwriter.Close()
 	if err != nil {
-		t.Fatalf("fail to close compression writer: compression-name=%s, err=%#v", compName, err)
+		t.Errorf("fail to close compression writer: compression-name=%s, err=%#v", compName, err)
 		return nil
 	}
 	return buf.Bytes()
 }
 
 func archive(t *testing.T, arch Archiver, fname string, fileInfo fs.FileInfo) []byte {
-	files := []File{
+	files := []FileInfo{
 		{FileInfo: fileInfo, NameInArchive: "tmp.txt",
-			Open: func() (io.ReadCloser, error) {
+			Open: func() (fs.File, error) {
 				return os.Open(fname)
 			}},
 	}
 	buf := bytes.NewBuffer(make([]byte, 0, 128))
 	err := arch.Archive(context.TODO(), buf, files)
 	if err != nil {
-		t.Fatalf("fail to create archive: err=%#v", err)
+		t.Errorf("fail to create archive: err=%#v", err)
 		return nil
 	}
 	return buf.Bytes()
@@ -251,29 +254,24 @@ func newWriteNopCloser(w io.Writer) (io.WriteCloser, error) {
 }
 
 func newTmpTextFile(t *testing.T, content string) (string, fs.FileInfo) {
-
 	tmpTxtFile, err := os.CreateTemp("", "TestIdentifyFindFormatByStreamContent-tmp-*.txt")
 	if err != nil {
-		t.Fatalf("fail to create tmp test file for archive tests: err=%v", err)
+		t.Errorf("fail to create tmp test file for archive tests: err=%v", err)
 		return "", nil
 	}
 	fname := tmpTxtFile.Name()
 
 	if _, err = tmpTxtFile.Write([]byte(content)); err != nil {
-		tmpTxtFile.Close()
-		os.Remove(fname)
-		t.Fatalf("fail to write content to tmp-txt-file: err=%#v", err)
+		t.Errorf("fail to write content to tmp-txt-file: err=%#v", err)
 		return "", nil
 	}
 	if err = tmpTxtFile.Close(); err != nil {
-		os.Remove(fname)
-		t.Fatalf("fail to close tmp-txt-file: err=%#v", err)
+		t.Errorf("fail to close tmp-txt-file: err=%#v", err)
 		return "", nil
 	}
 	fi, err := os.Stat(fname)
 	if err != nil {
-		os.Remove(fname)
-		t.Fatalf("fail to get tmp-txt-file stats: err=%v", err)
+		t.Errorf("fail to get tmp-txt-file stats: err=%v", err)
 		return "", nil
 	}
 
@@ -281,9 +279,9 @@ func newTmpTextFile(t *testing.T, content string) (string, fs.FileInfo) {
 }
 
 func TestIdentifyFindFormatByStreamContent(t *testing.T) {
-	tmpTxtFileName, tmpTxtFileInfo := newTmpTextFile(t, "this is text")
+	tmpTxtFileName, tmpTxtFileInfo := newTmpTextFile(t, "this is text that has to be long enough for brotli to match")
 	t.Cleanup(func() {
-		os.Remove(tmpTxtFileName)
+		os.RemoveAll(tmpTxtFileName)
 	})
 
 	tests := []struct {
@@ -293,7 +291,13 @@ func TestIdentifyFindFormatByStreamContent(t *testing.T) {
 		compressorName        string
 		wantFormatName        string
 	}{
-		//TODO add test case for brotli when Brotli.Match() by stream content is implemented
+		{
+			name:                  "should recognize brotli",
+			openCompressionWriter: Brotli{}.OpenWriter,
+			content:               []byte("this is text, but it has to be long enough to match brotli which doesn't have a magic number"),
+			compressorName:        ".br",
+			wantFormatName:        ".br",
+		},
 		{
 			name:                  "should recognize bz2",
 			openCompressionWriter: Bz2{}.OpenWriter,
@@ -389,13 +393,13 @@ func TestIdentifyFindFormatByStreamContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stream := bytes.NewReader(compress(t, tt.compressorName, tt.content, tt.openCompressionWriter))
-			got, _, err := Identify("", stream)
+			got, _, err := Identify(context.Background(), "", stream)
 			if err != nil {
-				t.Fatalf("should have found a corresponding Format: err :=%+v", err)
+				t.Errorf("should have found a corresponding Format, but got err=%+v", err)
 				return
 			}
-			if tt.wantFormatName != got.Name() {
-				t.Errorf("unexpected format found: expected=%s actual:%s", tt.wantFormatName, got.Name())
+			if tt.wantFormatName != got.Extension() {
+				t.Errorf("unexpected format found: expected=%s actual=%s", tt.wantFormatName, got.Extension())
 				return
 			}
 
@@ -408,13 +412,13 @@ func TestIdentifyAndOpenZip(t *testing.T) {
 	checkErr(t, err, "opening zip")
 	defer f.Close()
 
-	format, reader, err := Identify("test.zip", f)
+	format, reader, err := Identify(context.Background(), "test.zip", f)
 	checkErr(t, err, "identifying zip")
-	if format.Name() != ".zip" {
-		t.Fatalf("unexpected format found: expected=.zip actual:%s", format.Name())
+	if format.Extension() != ".zip" {
+		t.Errorf("unexpected format found: expected=.zip actual=%s", format.Extension())
 	}
 
-	err = format.(Extractor).Extract(context.Background(), reader, nil, func(ctx context.Context, f File) error {
+	err = format.(Extractor).Extract(context.Background(), reader, nil, func(ctx context.Context, f FileInfo) error {
 		rc, err := f.Open()
 		if err != nil {
 			return err
@@ -430,25 +434,26 @@ func TestIdentifyASCIIFileStartingWithX(t *testing.T) {
 	// Create a temporary file starting with the letter 'x'
 	tmpFile, err := os.CreateTemp("", "TestIdentifyASCIIFileStartingWithX-tmp-*.txt")
 	if err != nil {
-		t.Fatalf("fail to create tmp test file for archive tests: err=%v", err)
+		t.Errorf("fail to create tmp test file for archive tests: err=%v", err)
 	}
+	defer os.Remove(tmpFile.Name())
 
 	_, err = tmpFile.Write([]byte("xThis is a test file"))
 	if err != nil {
-		t.Fatalf("Failed to write to temp file: %v", err)
+		t.Errorf("Failed to write to temp file: %v", err)
 	}
 	tmpFile.Close()
 
 	// Open the file and use the Identify function
 	file, err := os.Open(tmpFile.Name())
 	if err != nil {
-		t.Fatalf("Failed to open temp file: %v", err)
+		t.Errorf("Failed to open temp file: %v", err)
 	}
 	defer file.Close()
 
-	_, _, err = Identify(tmpFile.Name(), file)
-	if !errors.Is(err, ErrNoMatch) {
-		t.Fatalf("Identify failed: %v", err)
+	_, _, err = Identify(context.Background(), tmpFile.Name(), file)
+	if !errors.Is(err, NoMatch) {
+		t.Errorf("Identify failed: %v", err)
 	}
 
 }

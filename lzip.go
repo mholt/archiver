@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"path/filepath"
 	"strings"
@@ -16,13 +17,13 @@ func init() {
 // Lzip facilitates lzip compression.
 type Lzip struct{}
 
-func (Lzip) Name() string { return ".lz" }
+func (Lzip) Extension() string { return ".lz" }
 
-func (lz Lzip) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (lz Lzip) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if filepath.Ext(strings.ToLower(filename)) == lz.Name() {
+	if filepath.Ext(strings.ToLower(filename)) == lz.Extension() {
 		mr.ByName = true
 	}
 

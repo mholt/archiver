@@ -26,13 +26,13 @@ type Tar struct {
 	ContinueOnError bool
 }
 
-func (Tar) Name() string { return ".tar" }
+func (Tar) Extension() string { return ".tar" }
 
-func (t Tar) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (t Tar) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), t.Name()) {
+	if strings.Contains(strings.ToLower(filename), t.Extension()) {
 		mr.ByName = true
 	}
 
@@ -46,7 +46,7 @@ func (t Tar) Match(filename string, stream io.Reader) (MatchResult, error) {
 	return mr, nil
 }
 
-func (t Tar) Archive(ctx context.Context, output io.Writer, files []File) error {
+func (t Tar) Archive(ctx context.Context, output io.Writer, files []FileInfo) error {
 	tw := tar.NewWriter(output)
 	defer tw.Close()
 
@@ -74,7 +74,7 @@ func (t Tar) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan Arc
 	return nil
 }
 
-func (t Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) error {
+func (t Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file FileInfo) error {
 	if err := ctx.Err(); err != nil {
 		return err // honor context cancellation
 	}
@@ -109,7 +109,7 @@ func (t Tar) writeFileToArchive(ctx context.Context, tw *tar.Writer, file File) 
 	return nil
 }
 
-func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) error {
+func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []FileInfo) error {
 	// Tar files may end with some, none, or a lot of zero-byte padding. The spec says
 	// it should end with two 512-byte trailer records consisting solely of null/0
 	// bytes: https://www.gnu.org/software/tar/manual/html_node/Standard.html. However,
@@ -212,16 +212,25 @@ func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			continue
 		}
 
-		file := File{
-			FileInfo:      hdr.FileInfo(),
+		info := hdr.FileInfo()
+		file := FileInfo{
+			FileInfo:      info,
 			Header:        hdr,
 			NameInArchive: hdr.Name,
 			LinkTarget:    hdr.Linkname,
-			Open:          func() (io.ReadCloser, error) { return io.NopCloser(tr), nil },
+			Open: func() (fs.File, error) {
+				return fileInArchive{io.NopCloser(tr), info}, nil
+			},
 		}
 
 		err = handleFile(ctx, file)
 		if errors.Is(err, fs.SkipAll) {
+			// At first, I wasn't sure if fs.SkipAll implied that the rest of the entries
+			// should still be iterated and just "skipped" (i.e. no-ops) or if the walk
+			// should stop; both have the same net effect, one is just less efficient...
+			// apparently the name of fs.StopWalk was the preferred name, but it still
+			// became fs.SkipAll because of semantics with documentation; see
+			// https://github.com/golang/go/issues/47209 -- anyway, the walk should stop.
 			break
 		} else if errors.Is(err, fs.SkipDir) {
 			// if a directory, skip this path; if a file, skip the folder path

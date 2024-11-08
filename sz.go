@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"strings"
 
@@ -15,13 +16,13 @@ func init() {
 // Sz facilitates Snappy compression.
 type Sz struct{}
 
-func (sz Sz) Name() string { return ".sz" }
+func (sz Sz) Extension() string { return ".sz" }
 
-func (sz Sz) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (sz Sz) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), sz.Name()) {
+	if strings.Contains(strings.ToLower(filename), sz.Extension()) {
 		mr.ByName = true
 	}
 

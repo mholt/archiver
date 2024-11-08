@@ -83,13 +83,13 @@ type Zip struct {
 	TextEncoding string
 }
 
-func (z Zip) Name() string { return ".zip" }
+func (z Zip) Extension() string { return ".zip" }
 
-func (z Zip) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (z Zip) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), z.Name()) {
+	if strings.Contains(strings.ToLower(filename), z.Extension()) {
 		mr.ByName = true
 	}
 
@@ -103,7 +103,7 @@ func (z Zip) Match(filename string, stream io.Reader) (MatchResult, error) {
 	return mr, nil
 }
 
-func (z Zip) Archive(ctx context.Context, output io.Writer, files []File) error {
+func (z Zip) Archive(ctx context.Context, output io.Writer, files []FileInfo) error {
 	zw := zip.NewWriter(output)
 	defer zw.Close()
 
@@ -129,7 +129,7 @@ func (z Zip) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan Arc
 	return nil
 }
 
-func (z Zip) archiveOneFile(ctx context.Context, zw *zip.Writer, idx int, file File) error {
+func (z Zip) archiveOneFile(ctx context.Context, zw *zip.Writer, idx int, file FileInfo) error {
 	if err := ctx.Err(); err != nil {
 		return err // honor context cancellation
 	}
@@ -218,11 +218,18 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			continue
 		}
 
-		file := File{
-			FileInfo:      f.FileInfo(),
+		info := f.FileInfo()
+		file := FileInfo{
+			FileInfo:      info,
 			Header:        f.FileHeader,
 			NameInArchive: f.Name,
-			Open:          func() (io.ReadCloser, error) { return f.Open() },
+			Open: func() (fs.File, error) {
+				openedFile, err := f.Open()
+				if err != nil {
+					return nil, err
+				}
+				return fileInArchive{openedFile, info}, nil
+			},
 		}
 
 		err := handleFile(ctx, file)
@@ -266,7 +273,7 @@ func (z Zip) decodeText(hdr *zip.FileHeader) {
 }
 
 // Insert appends the listed files into the provided Zip archive stream.
-func (z Zip) Insert(ctx context.Context, into io.ReadWriteSeeker, files []File) error {
+func (z Zip) Insert(ctx context.Context, into io.ReadWriteSeeker, files []FileInfo) error {
 	// following very simple example at https://github.com/STARRY-S/zip?tab=readme-ov-file#usage
 	zu, err := szip.NewUpdater(into)
 	if err != nil {

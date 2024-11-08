@@ -245,7 +245,8 @@ func TestNameOnDiskToNameInArchive(t *testing.T) {
 		},
 	} {
 		if !strings.HasPrefix(tc.nameOnDisk, tc.rootOnDisk) {
-			t.Fatalf("Test %d: Invalid test case! Filename (on disk) will have rootOnDisk as a prefix according to the fs.WalkDirFunc godoc.", i)
+			t.Errorf("Test %d: Invalid test case! Filename (on disk) will have rootOnDisk as a prefix according to the fs.WalkDirFunc godoc.", i)
+			continue
 		}
 		if tc.windows && runtime.GOOS != "windows" {
 			t.Logf("Test %d: Skipping test that is only compatible with Windows", i)
