@@ -264,6 +264,26 @@ func isSymlink(info fs.FileInfo) bool {
 	return info.Mode()&os.ModeSymlink != 0
 }
 
+// streamSizeBySeeking determines the size of the stream by
+// seeking to the end, then back again, so the resulting
+// seek position upon returning is the same as when called
+// (assuming no errors).
+func streamSizeBySeeking(s io.Seeker) (int64, error) {
+	currentPosition, err := s.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, fmt.Errorf("getting current offset: %w", err)
+	}
+	maxPosition, err := s.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, fmt.Errorf("fast-forwarding to end: %w", err)
+	}
+	_, err = s.Seek(currentPosition, io.SeekStart)
+	if err != nil {
+		return 0, fmt.Errorf("returning to prior offset %d: %w", currentPosition, err)
+	}
+	return maxPosition, nil
+}
+
 // skipList keeps a list of non-intersecting paths
 // as long as its add method is used. Identical
 // elements are rejected, more specific paths are

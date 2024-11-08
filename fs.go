@@ -98,13 +98,9 @@ func FileSystem(ctx context.Context, filename string, stream ReaderAtSeeker) (fs
 
 		// determine size -- we know that the stream value we get back from
 		// Identify is the same type as what we input because it is a Seeker
-		size, err := stream.Seek(0, io.SeekEnd)
+		size, err := streamSizeBySeeking(stream)
 		if err != nil {
 			return nil, fmt.Errorf("seeking for size: %w", err)
-		}
-		_, err = stream.Seek(0, io.SeekStart)
-		if err != nil {
-			return nil, fmt.Errorf("seeking back to beginning: %w", err)
 		}
 
 		sr := io.NewSectionReader(stream, 0, size)
