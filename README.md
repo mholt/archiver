@@ -1,6 +1,6 @@
 # archiver [![Go Reference](https://pkg.go.dev/badge/github.com/mholt/archiver/v4.svg)](https://pkg.go.dev/github.com/mholt/archiver/v4) [![Ubuntu-latest](https://github.com/mholt/archiver/actions/workflows/ubuntu-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/ubuntu-latest.yml) [![Macos-latest](https://github.com/mholt/archiver/actions/workflows/macos-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/macos-latest.yml) [![Windows-latest](https://github.com/mholt/archiver/actions/workflows/windows-latest.yml/badge.svg)](https://github.com/mholt/archiver/actions/workflows/windows-latest.yml)
 
-Introducing **Archiver 4.0** - a cross-platform, multi-format archive utility and Go library. A powerful and flexible library meets an elegant CLI in this generic replacement for several platform-specific or format-specific archive utilities.
+Introducing **Archiver 4.0 (alpha)** - a cross-platform, multi-format archive utility and Go library. A powerful and flexible library meets an elegant CLI in this generic replacement for several platform-specific or format-specific archive utilities.
 
 **:warning: v4 is in ALPHA. The core library APIs work pretty well but the command has not been implemented yet, nor have most automated tests. If you need the `arc` command, stick with v3 for now.**
 
@@ -11,8 +11,8 @@ Introducing **Archiver 4.0** - a cross-platform, multi-format archive utility an
 	- By file name
 	- By header
 - Traverse directories, archive files, and any other file uniformly as [`io/fs`](https://pkg.go.dev/io/fs) file systems:
-	- [`DirFS`](https://pkg.go.dev/github.com/mholt/archiver/v4#DirFS)
 	- [`FileFS`](https://pkg.go.dev/github.com/mholt/archiver/v4#FileFS)
+	- [`DirFS`](https://pkg.go.dev/github.com/mholt/archiver/v4#DirFS)
 	- [`ArchiveFS`](https://pkg.go.dev/github.com/mholt/archiver/v4#ArchiveFS)
 - Compress and decompress files
 - Create and extract archive files
@@ -117,7 +117,7 @@ If you want all the files, pass in a nil list of file paths.
 
 ```go
 // the type that will be used to read the input stream
-format := archiver.Zip{}
+var format archiver.Zip
 
 // the list of files we want out of the archive; any
 // directories will include all their contents unless
@@ -141,7 +141,7 @@ if err != nil {
 Have an input stream with unknown contents? No problem, archiver can identify it for you. It will try matching based on filename and/or the header (which peeks at the stream):
 
 ```go
-format, input, err := archiver.Identify("filename.tar.zst", input)
+format, input, err := archiver.Identify(ctx, "filename.tar.zst", input)
 if err != nil {
 	return err
 }
@@ -165,7 +165,7 @@ if decom, ok := format.(archiver.Decompressor); ok {
 }
 ```
 
-`Identify()` works by reading an arbitrary number of bytes from the beginning of the stream (just enough to check for file headers). It buffers them and returns a new reader that lets you re-read them anew.
+`Identify()` works by reading an arbitrary number of bytes from the beginning of the stream (just enough to check for file headers). It buffers them and returns a new reader that lets you re-read them anew. If your input stream is `io.Seeker` however, no buffer is created (it uses `Seek()` instead).
 
 ### Virtual file systems
 
@@ -212,7 +212,7 @@ if dir, ok := f.(fs.ReadDirFile); ok {
 		return err
 	}
 	for _, e := range entries {
-		fmt.Println(e.Name())
+		fmt.Println(e.Extension())
 	}
 }
 ```
@@ -225,7 +225,7 @@ if err != nil {
 	return err
 }
 for _, e := range entries {
-	fmt.Println(e.Name())
+	fmt.Println(e.Extension())
 }
 ```
 
@@ -246,6 +246,8 @@ if err != nil {
 	return err
 }
 ```
+
+**Important .tar note:** Tar files do not efficiently implement file system semantics due to their roots in sequential-access design for tapes. File systems inherently assume random access, but tar files need to be read from the beginning to access something at the end. This is especially slow when the archive is compressed. Optimizations have been implemented to amortize `ReadDir()` calls so that `fs.WalkDir()` only has to scan the archive once, but they use more memory. Open calls require another scan to find the file. It may be more efficient to use `Tar.Extract()` directly if file system semantics are not important to you.
 
 #### Use with `http.FileServer`
 

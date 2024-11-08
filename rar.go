@@ -30,13 +30,13 @@ type Rar struct {
 	Password string
 }
 
-func (Rar) Name() string { return ".rar" }
+func (Rar) Extension() string { return ".rar" }
 
-func (r Rar) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (r Rar) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), r.Name()) {
+	if strings.Contains(strings.ToLower(filename), r.Extension()) {
 		mr.ByName = true
 	}
 
@@ -104,7 +104,7 @@ func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			Header:        hdr,
 			NameInArchive: hdr.Name,
 			Open: func() (fs.File, error) {
-				return archivedFile{io.NopCloser(rr), info}, nil
+				return fileInArchive{io.NopCloser(rr), info}, nil
 			},
 		}
 

@@ -219,7 +219,7 @@ type FromDiskOptions struct {
 // memory, and skipping lots of directories may run up your memory bill.
 //
 // Any other returned error will terminate a walk and be returned to the caller.
-type FileHandler func(ctx context.Context, f FileInfo) error
+type FileHandler func(ctx context.Context, info FileInfo) error
 
 // openAndCopyFile opens file for reading, copies its
 // contents to w, then closes file.

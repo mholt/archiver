@@ -31,13 +31,13 @@ type SevenZip struct {
 	Password string
 }
 
-func (z SevenZip) Name() string { return ".7z" }
+func (z SevenZip) Extension() string { return ".7z" }
 
-func (z SevenZip) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (z SevenZip) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), z.Name()) {
+	if strings.Contains(strings.ToLower(filename), z.Extension()) {
 		mr.ByName = true
 	}
 
@@ -104,7 +104,7 @@ func (z SevenZip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInA
 				if err != nil {
 					return nil, err
 				}
-				return archivedFile{openedFile, fi}, nil
+				return fileInArchive{openedFile, fi}, nil
 			},
 		}
 

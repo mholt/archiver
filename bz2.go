@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"strings"
 
@@ -17,13 +18,13 @@ type Bz2 struct {
 	CompressionLevel int
 }
 
-func (Bz2) Name() string { return ".bz2" }
+func (Bz2) Extension() string { return ".bz2" }
 
-func (bz Bz2) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (bz Bz2) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), bz.Name()) {
+	if strings.Contains(strings.ToLower(filename), bz.Extension()) {
 		mr.ByName = true
 	}
 

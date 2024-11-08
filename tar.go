@@ -26,13 +26,13 @@ type Tar struct {
 	ContinueOnError bool
 }
 
-func (Tar) Name() string { return ".tar" }
+func (Tar) Extension() string { return ".tar" }
 
-func (t Tar) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (t Tar) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), t.Name()) {
+	if strings.Contains(strings.ToLower(filename), t.Extension()) {
 		mr.ByName = true
 	}
 
@@ -219,12 +219,18 @@ func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 			NameInArchive: hdr.Name,
 			LinkTarget:    hdr.Linkname,
 			Open: func() (fs.File, error) {
-				return archivedFile{io.NopCloser(tr), info}, nil
+				return fileInArchive{io.NopCloser(tr), info}, nil
 			},
 		}
 
 		err = handleFile(ctx, file)
 		if errors.Is(err, fs.SkipAll) {
+			// At first, I wasn't sure if fs.SkipAll implied that the rest of the entries
+			// should still be iterated and just "skipped" (i.e. no-ops) or if the walk
+			// should stop; both have the same net effect, one is just less efficient...
+			// apparently the name of fs.StopWalk was the preferred name, but it still
+			// became fs.SkipAll because of semantics with documentation; see
+			// https://github.com/golang/go/issues/47209 -- anyway, the walk should stop.
 			break
 		} else if errors.Is(err, fs.SkipDir) {
 			// if a directory, skip this path; if a file, skip the folder path

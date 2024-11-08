@@ -58,11 +58,11 @@ func TestSelfTar(t *testing.T) {
 	fn := "testdata/self-tar.tar"
 	fh, err := os.Open(fn)
 	if err != nil {
-		t.Fatalf("Could not load test tar: %v", fn)
+		t.Errorf("Could not load test tar: %v", fn)
 	}
 	fstat, err := os.Stat(fn)
 	if err != nil {
-		t.Fatalf("Could not stat test tar: %v", fn)
+		t.Errorf("Could not stat test tar: %v", fn)
 	}
 	fsys := &ArchiveFS{
 		Stream: io.NewSectionReader(fh, 0, fstat.Size()),
@@ -78,7 +78,7 @@ func TestSelfTar(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }
 
@@ -158,9 +158,7 @@ func TestArchiveFS_ReadDir(t *testing.T) {
 			t.Parallel()
 			fsys := tc.archive
 			for baseDir, wantLS := range tc.want {
-				baseDir := baseDir
-				wantLS := wantLS
-				t.Run(fmt.Sprintf("ReadDir(%s)", baseDir), func(t *testing.T) {
+				t.Run(fmt.Sprintf("ReadDir(%q)", baseDir), func(t *testing.T) {
 					dis, err := fsys.ReadDir(baseDir)
 					if err != nil {
 						t.Error(err)
@@ -183,17 +181,18 @@ func TestArchiveFS_ReadDir(t *testing.T) {
 				t.Run(fmt.Sprintf("Open(%s)", baseDir), func(t *testing.T) {
 					f, err := fsys.Open(baseDir)
 					if err != nil {
-						t.Error(err)
+						t.Errorf("fsys.Open(%q): %#v %s", baseDir, err, err)
+						return
 					}
 
 					rdf, ok := f.(fs.ReadDirFile)
 					if !ok {
-						t.Fatalf("'%s' did not return a fs.ReadDirFile, %+v", baseDir, rdf)
+						t.Errorf("fsys.Open(%q) did not return a fs.ReadDirFile, got: %#v", baseDir, f)
 					}
 
 					dis, err := rdf.ReadDir(-1)
 					if err != nil {
-						t.Fatal(err)
+						t.Error(err)
 					}
 
 					dirs := []string{}

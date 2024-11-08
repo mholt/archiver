@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"context"
 	"io"
 	"strings"
 
@@ -16,13 +17,13 @@ type Zlib struct {
 	CompressionLevel int
 }
 
-func (Zlib) Name() string { return ".zz" }
+func (Zlib) Extension() string { return ".zz" }
 
-func (zz Zlib) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (zz Zlib) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), zz.Name()) {
+	if strings.Contains(strings.ToLower(filename), zz.Extension()) {
 		mr.ByName = true
 	}
 

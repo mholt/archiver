@@ -83,13 +83,13 @@ type Zip struct {
 	TextEncoding string
 }
 
-func (z Zip) Name() string { return ".zip" }
+func (z Zip) Extension() string { return ".zip" }
 
-func (z Zip) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (z Zip) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), z.Name()) {
+	if strings.Contains(strings.ToLower(filename), z.Extension()) {
 		mr.ByName = true
 	}
 
@@ -228,7 +228,7 @@ func (z Zip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 				if err != nil {
 					return nil, err
 				}
-				return archivedFile{openedFile, info}, nil
+				return fileInArchive{openedFile, info}, nil
 			},
 		}
 

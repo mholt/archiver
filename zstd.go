@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"strings"
 
@@ -18,13 +19,13 @@ type Zstd struct {
 	DecoderOptions []zstd.DOption
 }
 
-func (Zstd) Name() string { return ".zst" }
+func (Zstd) Extension() string { return ".zst" }
 
-func (zs Zstd) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (zs Zstd) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), zs.Name()) {
+	if strings.Contains(strings.ToLower(filename), zs.Extension()) {
 		mr.ByName = true
 	}
 

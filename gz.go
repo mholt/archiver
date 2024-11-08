@@ -2,6 +2,7 @@ package archiver
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"strings"
 
@@ -29,13 +30,13 @@ type Gz struct {
 	Multithreaded bool
 }
 
-func (Gz) Name() string { return ".gz" }
+func (Gz) Extension() string { return ".gz" }
 
-func (gz Gz) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (gz Gz) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), gz.Name()) {
+	if strings.Contains(strings.ToLower(filename), gz.Extension()) {
 		mr.ByName = true
 	}
 

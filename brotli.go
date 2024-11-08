@@ -1,6 +1,7 @@
 package archiver
 
 import (
+	"context"
 	"io"
 	"strings"
 
@@ -16,19 +17,25 @@ type Brotli struct {
 	Quality int
 }
 
-func (Brotli) Name() string { return ".br" }
+func (Brotli) Extension() string { return ".br" }
 
-func (br Brotli) Match(filename string, stream io.Reader) (MatchResult, error) {
+func (br Brotli) Match(_ context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var mr MatchResult
 
 	// match filename
-	if strings.Contains(strings.ToLower(filename), br.Name()) {
+	if strings.Contains(strings.ToLower(filename), br.Extension()) {
 		mr.ByName = true
 	}
 
-	// brotli does not have well-defined file headers; the
-	// best way to match the stream would be to try decoding
-	// part of it, and this is not implemented for now
+	// brotli does not have well-defined file headers or a magic number;
+	// the best way to match the stream is probably to try decoding part
+	// of it, but we'll just have to guess a large-enough size that is
+	// still small enough for the smallest streams we'll encounter
+	r := brotli.NewReader(stream)
+	buf := make([]byte, 16)
+	if _, err := io.ReadFull(r, buf); err == nil {
+		mr.ByStream = true
+	}
 
 	return mr, nil
 }

@@ -5,10 +5,12 @@ import (
 	"io"
 )
 
-// Format represents either an archive or compression format.
+// Format represents a way of getting data out of something else.
+// A format usually represents compression or an archive (or both).
 type Format interface {
-	// Name returns the name of the format.
-	Name() string
+	// Extension returns the conventional file extension for this
+	// format.
+	Extension() string
 
 	// Match returns true if the given name/stream is recognized.
 	// One of the arguments is optional: filename might be empty
@@ -21,7 +23,7 @@ type Format interface {
 	// preserve the stream through matching, you should either
 	// buffer what is read by Match, or seek to the last position
 	// before Match was called.
-	Match(filename string, stream io.Reader) (MatchResult, error)
+	Match(ctx context.Context, filename string, stream io.Reader) (MatchResult, error)
 }
 
 // Compression is a compression format with both compress and decompress methods.
@@ -83,14 +85,20 @@ type ArchiverAsync interface {
 
 // Extractor can extract files from an archive.
 type Extractor interface {
-	// Extract reads the files at pathsInArchive from sourceArchive.
+	// Extract walks entries in the archive and calls handleFile for each
+	// entry that matches the pathsInArchive filter by path/name.
+	//
 	// If pathsInArchive is nil, all files are extracted without discretion.
 	// If pathsInArchive is empty, no files are extracted.
 	// If a path refers to a directory, all files within it are extracted.
 	// Extracted files are passed to the handleFile callback for handling.
 	//
+	// Any files opened in the FileHandler should be closed when it returns,
+	// as there is no guarantee the files can be read outside the handler
+	// or after the walk has proceeded to the next file.
+	//
 	// Context cancellation must be honored.
-	Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error
+	Extract(ctx context.Context, archive io.Reader, pathsInArchive []string, handleFile FileHandler) error
 }
 
 // Inserter can insert files into an existing archive.
