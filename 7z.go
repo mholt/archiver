@@ -51,10 +51,7 @@ func (z SevenZip) Match(_ context.Context, filename string, stream io.Reader) (M
 	return mr, nil
 }
 
-// Archive is not implemented for 7z, but the method exists so that SevenZip satisfies the ArchiveFormat interface.
-func (z SevenZip) Archive(_ context.Context, _ io.Writer, _ []FileInfo) error {
-	return fmt.Errorf("not implemented for 7z because there is no pure Go implementation found")
-}
+// Archive is not implemented for 7z because I do not know of a pure-Go 7z writer.
 
 // Extract extracts files from z, implementing the Extractor interface. Uniquely, however,
 // sourceArchive must be an io.ReaderAt and io.Seeker, which are oddly disjoint interfaces
@@ -62,7 +59,7 @@ func (z SevenZip) Archive(_ context.Context, _ io.Writer, _ []FileInfo) error {
 // the interface because we figure you can Read() from anything you can ReadAt() or Seek()
 // with. Due to the nature of the zip archive format, if sourceArchive is not an io.Seeker
 // and io.ReaderAt, an error is returned.
-func (z SevenZip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
+func (z SevenZip) Extract(ctx context.Context, sourceArchive io.Reader, handleFile FileHandler) error {
 	sra, ok := sourceArchive.(seekReaderAt)
 	if !ok {
 		return fmt.Errorf("input type must be an io.ReaderAt and io.Seeker because of zip format constraints")
@@ -87,9 +84,6 @@ func (z SevenZip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInA
 			return err // honor context cancellation
 		}
 
-		if !fileIsIncluded(pathsInArchive, f.Name) {
-			continue
-		}
 		if fileIsIncluded(skipDirs, f.Name) {
 			continue
 		}
@@ -130,3 +124,6 @@ func (z SevenZip) Extract(ctx context.Context, sourceArchive io.Reader, pathsInA
 
 // https://py7zr.readthedocs.io/en/latest/archive_format.html#signature
 var sevenZipHeader = []byte("7z\xBC\xAF\x27\x1C")
+
+// Interface guard
+var _ Extractor = SevenZip{}

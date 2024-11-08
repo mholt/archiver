@@ -42,13 +42,14 @@ func RegisterFormat(format Format) {
 func Identify(ctx context.Context, filename string, stream io.Reader) (Format, io.Reader, error) {
 	var compression Compression
 	var archival Archival
+	var extraction Extraction
 
 	rewindableStream, err := newRewindReader(stream)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// try compression format first, since that's the outer "layer"
+	// try compression format first, since that's the outer "layer" if combined
 	for name, format := range formats {
 		cf, isCompression := format.(Compression)
 		if !isCompression {
@@ -68,10 +69,11 @@ func Identify(ctx context.Context, filename string, stream io.Reader) (Format, i
 		}
 	}
 
-	// try archive format next
+	// try archival and extraction format next
 	for name, format := range formats {
-		af, isArchive := format.(Archival)
-		if !isArchive {
+		ar, isArchive := format.(Archival)
+		ex, isExtract := format.(Extraction)
+		if !isArchive && !isExtract {
 			continue
 		}
 
@@ -81,20 +83,23 @@ func Identify(ctx context.Context, filename string, stream io.Reader) (Format, i
 		}
 
 		if matchResult.Matched() {
-			archival = af
+			archival = ar
+			extraction = ex
 			break
 		}
 	}
 
-	// the stream should be rewound by identifyOne
+	// the stream should be rewound by identifyOne; then return the most specific type of match
 	bufferedStream := rewindableStream.reader()
 	switch {
-	case compression != nil && archival == nil:
+	case compression != nil && archival == nil && extraction == nil:
 		return compression, bufferedStream, nil
-	case compression == nil && archival != nil:
+	case compression == nil && archival != nil && extraction == nil:
 		return archival, bufferedStream, nil
-	case compression != nil && archival != nil:
-		return CompressedArchive{compression, archival}, bufferedStream, nil
+	case compression == nil && archival == nil && extraction != nil:
+		return extraction, bufferedStream, nil
+	case archival != nil || extraction != nil:
+		return Archive{compression, archival, extraction}, bufferedStream, nil
 	default:
 		return nil, bufferedStream, NoMatch
 	}
@@ -161,44 +166,44 @@ func readAtMost(stream io.Reader, n int) ([]byte, error) {
 	return nil, err
 }
 
-// CompressedArchive combines a compression format on top of an archive
-// format (e.g. "tar.gz") and provides both functionalities in a single
-// type. It ensures that archive functions are wrapped by compressors and
+// Archive represents an archive which may be compressed at the outer layer.
+// It combines a compression format on top of an archive/extraction
+// format (e.g. ".tar.gz") and provides both functionalities in a single
+// type. It ensures that archival functions are wrapped by compressors and
 // decompressors. However, compressed archives have some limitations; for
 // example, files cannot be inserted/appended because of complexities with
 // modifying existing compression state (perhaps this could be overcome,
 // but I'm not about to try it).
 //
-// As this type is intended to compose compression and archive formats,
-// both must be specified in order for this value to be valid, or its
-// methods will return errors.
-type CompressedArchive struct {
+// The embedded Archival and Extraction values are used for writing and
+// reading, respectively. Compression is optional and is only needed if the
+// format is compressed externally (for example, tar archives).
+type Archive struct {
 	Compression
 	Archival
+	Extraction
 }
 
-// Name returns a concatenation of the archive format name
-// and the compression format name.
-func (caf CompressedArchive) Extension() string {
-	if caf.Compression == nil && caf.Archival == nil {
-		panic("missing both compression and archive formats")
-	}
+// Name returns a concatenation of the archive and compression format extensions.
+func (ar Archive) Extension() string {
 	var name string
-	if caf.Archival != nil {
-		name += caf.Archival.Extension()
+	if ar.Archival != nil {
+		name += ar.Archival.Extension()
+	} else if ar.Extraction != nil {
+		name += ar.Extraction.Extension()
 	}
-	if caf.Compression != nil {
-		name += caf.Compression.Extension()
+	if ar.Compression != nil {
+		name += ar.Compression.Extension()
 	}
 	return name
 }
 
-// Match matches if the input matches both the compression and archive format.
-func (caf CompressedArchive) Match(ctx context.Context, filename string, stream io.Reader) (MatchResult, error) {
+// Match matches if the input matches both the compression and archival/extraction format.
+func (ar Archive) Match(ctx context.Context, filename string, stream io.Reader) (MatchResult, error) {
 	var conglomerate MatchResult
 
-	if caf.Compression != nil {
-		matchResult, err := caf.Compression.Match(ctx, filename, stream)
+	if ar.Compression != nil {
+		matchResult, err := ar.Compression.Match(ctx, filename, stream)
 		if err != nil {
 			return MatchResult{}, err
 		}
@@ -208,7 +213,7 @@ func (caf CompressedArchive) Match(ctx context.Context, filename string, stream 
 
 		// wrap the reader with the decompressor so we can
 		// attempt to match the archive by reading the stream
-		rc, err := caf.Compression.OpenReader(stream)
+		rc, err := ar.Compression.OpenReader(stream)
 		if err != nil {
 			return matchResult, err
 		}
@@ -218,8 +223,8 @@ func (caf CompressedArchive) Match(ctx context.Context, filename string, stream 
 		conglomerate = matchResult
 	}
 
-	if caf.Archival != nil {
-		matchResult, err := caf.Archival.Match(ctx, filename, stream)
+	if ar.Archival != nil {
+		matchResult, err := ar.Archival.Match(ctx, filename, stream)
 		if err != nil {
 			return MatchResult{}, err
 		}
@@ -234,26 +239,32 @@ func (caf CompressedArchive) Match(ctx context.Context, filename string, stream 
 }
 
 // Archive adds files to the output archive while compressing the result.
-func (caf CompressedArchive) Archive(ctx context.Context, output io.Writer, files []FileInfo) error {
-	if caf.Compression != nil {
-		wc, err := caf.Compression.OpenWriter(output)
+func (ar Archive) Archive(ctx context.Context, output io.Writer, files []FileInfo) error {
+	if ar.Archival == nil {
+		return fmt.Errorf("no archival format")
+	}
+	if ar.Compression != nil {
+		wc, err := ar.Compression.OpenWriter(output)
 		if err != nil {
 			return err
 		}
 		defer wc.Close()
 		output = wc
 	}
-	return caf.Archival.Archive(ctx, output, files)
+	return ar.Archival.Archive(ctx, output, files)
 }
 
 // ArchiveAsync adds files to the output archive while compressing the result asynchronously.
-func (caf CompressedArchive) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan ArchiveAsyncJob) error {
-	do, ok := caf.Archival.(ArchiverAsync)
-	if !ok {
-		return fmt.Errorf("%s archive does not support async writing", caf.Extension())
+func (ar Archive) ArchiveAsync(ctx context.Context, output io.Writer, jobs <-chan ArchiveAsyncJob) error {
+	if ar.Archival == nil {
+		return fmt.Errorf("no archival format")
 	}
-	if caf.Compression != nil {
-		wc, err := caf.Compression.OpenWriter(output)
+	do, ok := ar.Archival.(ArchiverAsync)
+	if !ok {
+		return fmt.Errorf("%T archive does not support async writing", ar.Archival)
+	}
+	if ar.Compression != nil {
+		wc, err := ar.Compression.OpenWriter(output)
 		if err != nil {
 			return err
 		}
@@ -264,16 +275,19 @@ func (caf CompressedArchive) ArchiveAsync(ctx context.Context, output io.Writer,
 }
 
 // Extract reads files out of an archive while decompressing the results.
-func (caf CompressedArchive) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
-	if caf.Compression != nil {
-		rc, err := caf.Compression.OpenReader(sourceArchive)
+func (ar Archive) Extract(ctx context.Context, sourceArchive io.Reader, handleFile FileHandler) error {
+	if ar.Extraction == nil {
+		return fmt.Errorf("no extraction format")
+	}
+	if ar.Compression != nil {
+		rc, err := ar.Compression.OpenReader(sourceArchive)
 		if err != nil {
 			return err
 		}
 		defer rc.Close()
 		sourceArchive = rc
 	}
-	return caf.Archival.Extract(ctx, sourceArchive, pathsInArchive, handleFile)
+	return ar.Extraction.Extract(ctx, sourceArchive, handleFile)
 }
 
 // MatchResult returns true if the format was matched either
@@ -408,8 +422,8 @@ var formats = make(map[string]Format)
 
 // Interface guards
 var (
-	_ Format        = (*CompressedArchive)(nil)
-	_ Archiver      = (*CompressedArchive)(nil)
-	_ ArchiverAsync = (*CompressedArchive)(nil)
-	_ Extractor     = (*CompressedArchive)(nil)
+	_ Format        = (*Archive)(nil)
+	_ Archiver      = (*Archive)(nil)
+	_ ArchiverAsync = (*Archive)(nil)
+	_ Extractor     = (*Archive)(nil)
 )

@@ -33,10 +33,15 @@ type Compression interface {
 	Decompressor
 }
 
-// Archival is an archival format with both archive and extract methods.
+// Archival is an archival format that can create/write archives.
 type Archival interface {
 	Format
 	Archiver
+}
+
+// Extraction is an archival format that extract from (read) archives.
+type Extraction interface {
+	Format
 	Extractor
 }
 
@@ -86,19 +91,14 @@ type ArchiverAsync interface {
 // Extractor can extract files from an archive.
 type Extractor interface {
 	// Extract walks entries in the archive and calls handleFile for each
-	// entry that matches the pathsInArchive filter by path/name.
-	//
-	// If pathsInArchive is nil, all files are extracted without discretion.
-	// If pathsInArchive is empty, no files are extracted.
-	// If a path refers to a directory, all files within it are extracted.
-	// Extracted files are passed to the handleFile callback for handling.
+	// entry in the archive.
 	//
 	// Any files opened in the FileHandler should be closed when it returns,
 	// as there is no guarantee the files can be read outside the handler
 	// or after the walk has proceeded to the next file.
 	//
 	// Context cancellation must be honored.
-	Extract(ctx context.Context, archive io.Reader, pathsInArchive []string, handleFile FileHandler) error
+	Extract(ctx context.Context, archive io.Reader, handleFile FileHandler) error
 }
 
 // Inserter can insert files into an existing archive.

@@ -111,7 +111,7 @@ func checkErr(t *testing.T, err error, msgFmt string, args ...any) {
 		return
 	}
 	args = append(args, err)
-	t.Errorf(msgFmt+": %s", args...)
+	t.Fatalf(msgFmt+": %s", args...)
 }
 
 func TestIdentifyDoesNotMatchContentFromTrimmedKnownHeaderHaving0Suffix(t *testing.T) {
@@ -418,7 +418,7 @@ func TestIdentifyAndOpenZip(t *testing.T) {
 		t.Errorf("unexpected format found: expected=.zip actual=%s", format.Extension())
 	}
 
-	err = format.(Extractor).Extract(context.Background(), reader, nil, func(ctx context.Context, f FileInfo) error {
+	err = format.(Extractor).Extract(context.Background(), reader, func(ctx context.Context, f FileInfo) error {
 		rc, err := f.Open()
 		if err != nil {
 			return err

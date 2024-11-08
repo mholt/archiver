@@ -179,7 +179,7 @@ func (t Tar) Insert(ctx context.Context, into io.ReadWriteSeeker, files []FileIn
 	return nil
 }
 
-func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
+func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, handleFile FileHandler) error {
 	tr := tar.NewReader(sourceArchive)
 
 	// important to initialize to non-nil, empty value due to how fileIsIncluded works
@@ -200,9 +200,6 @@ func (t Tar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 				continue
 			}
 			return err
-		}
-		if !fileIsIncluded(pathsInArchive, hdr.Name) {
-			continue
 		}
 		if fileIsIncluded(skipDirs, hdr.Name) {
 			continue

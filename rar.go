@@ -56,12 +56,9 @@ func (r Rar) Match(_ context.Context, filename string, stream io.Reader) (MatchR
 	return mr, nil
 }
 
-// Archive is not implemented for RAR, but the method exists so that Rar satisfies the ArchiveFormat interface.
-func (r Rar) Archive(_ context.Context, _ io.Writer, _ []FileInfo) error {
-	return fmt.Errorf("not implemented because RAR is a proprietary format")
-}
+// Archive is not implemented for RAR because it is patent-encumbered.
 
-func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchive []string, handleFile FileHandler) error {
+func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, handleFile FileHandler) error {
 	var options []rardecode.Option
 	if r.Password != "" {
 		options = append(options, rardecode.Password(r.Password))
@@ -90,9 +87,6 @@ func (r Rar) Extract(ctx context.Context, sourceArchive io.Reader, pathsInArchiv
 				continue
 			}
 			return err
-		}
-		if !fileIsIncluded(pathsInArchive, hdr.Name) {
-			continue
 		}
 		if fileIsIncluded(skipDirs, hdr.Name) {
 			continue
@@ -142,3 +136,6 @@ var (
 	rarHeaderV1_5 = []byte("Rar!\x1a\x07\x00")     // v1.5
 	rarHeaderV5_0 = []byte("Rar!\x1a\x07\x01\x00") // v5.0
 )
+
+// Interface guard
+var _ Extractor = Rar{}

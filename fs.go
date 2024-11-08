@@ -350,14 +350,12 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	}
 
 	var decompressor io.ReadCloser
-	if caf, ok := f.Format.(CompressedArchive); ok {
-		if caf.Compression != nil {
-			decompressor, err = caf.Compression.OpenReader(inputStream)
-			if err != nil {
-				return nil, err
-			}
-			inputStream = decompressor
+	if decomp, ok := f.Format.(Decompressor); ok {
+		decompressor, err = decomp.OpenReader(inputStream)
+		if err != nil {
+			return nil, err
 		}
+		inputStream = decompressor
 	}
 
 	// prepare the handler that we'll need if we have to iterate the
@@ -413,13 +411,13 @@ func (f ArchiveFS) Open(name string) (fs.File, error) {
 	// files may have a "." component in them, and the underlying format doesn't
 	// know about our file system semantics, so we need to filter ourselves (it's
 	// not significantly less efficient).
-	if caf, ok := f.Format.(CompressedArchive); ok {
+	if ar, ok := f.Format.(Archive); ok {
 		// bypass the CompressedArchive format's opening of the decompressor, since
-		// we already did it, since we need to keep it open after returning
+		// we already did it because we need to keep it open after returning.
 		// "I BYPASSED THE COMPRESSOR!" -Rey
-		err = caf.Archival.Extract(f.context(), inputStream, nil, handler)
+		err = ar.Extraction.Extract(f.context(), inputStream, handler)
 	} else {
-		err = f.Format.Extract(f.context(), inputStream, nil, handler)
+		err = f.Format.Extract(f.context(), inputStream, handler)
 	}
 	if err != nil {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fmt.Errorf("extract: %w", err)}
@@ -486,7 +484,7 @@ func (f ArchiveFS) Stat(name string) (fs.FileInfo, error) {
 	if f.Stream != nil {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
-	err = f.Format.Extract(f.context(), inputStream, nil, handler)
+	err = f.Format.Extract(f.context(), inputStream, handler)
 	if err != nil && result.FileInfo == nil {
 		return nil, err
 	}
@@ -601,7 +599,7 @@ func (f *ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		inputStream = io.NewSectionReader(f.Stream, 0, f.Stream.Size())
 	}
 
-	err = f.Format.Extract(f.context(), inputStream, nil, handler)
+	err = f.Format.Extract(f.context(), inputStream, handler)
 	if err != nil {
 		// these being non-nil implies that we have indexed the archive,
 		// but if an error occurred, we likely only got part of the way
