@@ -17,7 +17,6 @@ require (
 require (
 	github.com/STARRY-S/zip v0.2.1
 	github.com/bodgit/sevenzip v1.5.2
-	github.com/golang/snappy v0.0.4
 	github.com/pierrec/lz4/v4 v4.1.21
 	github.com/sorairolake/lzip-go v0.3.5
 	golang.org/x/text v0.20.0
