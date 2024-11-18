@@ -549,25 +549,28 @@ func (f *ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 		// index this file info for quick access
 		f.contents[file.NameInArchive] = file
 
-		// this is a real directory; prefer its DirEntry over an implicit/fake one we may have created earlier;
-		// first try to find if it exists, and if so, replace the value; otherwise insert it in sorted position
-		if file.IsDir() {
-			dirEntry := fs.FileInfoToDirEntry(file)
-			idx, found := slices.BinarySearchFunc(f.dirs[path.Dir(file.NameInArchive)], dirEntry, func(a, b fs.DirEntry) int {
-				return strings.Compare(a.Name(), b.Name())
-			})
-			if found {
-				f.dirs[path.Dir(file.NameInArchive)][idx] = dirEntry
-			} else {
-				f.dirs[path.Dir(file.NameInArchive)] = slices.Insert(f.dirs[path.Dir(file.NameInArchive)], idx, dirEntry)
-			}
+		// amortize the DirEntry list per directory, and prefer the real entry's DirEntry over an implicit/fake
+		// one we may have created earlier; first try to find if it exists, and if so, replace the value;
+		// otherwise insert it in sorted position
+		dir := path.Dir(file.NameInArchive)
+		dirEntry := fs.FileInfoToDirEntry(file)
+		idx, found := slices.BinarySearchFunc(f.dirs[dir], dirEntry, func(a, b fs.DirEntry) int {
+			return strings.Compare(a.Name(), b.Name())
+		})
+		if found {
+			f.dirs[dir][idx] = dirEntry
+		} else {
+			f.dirs[dir] = slices.Insert(f.dirs[dir], idx, dirEntry)
 		}
 
 		// this loop looks like an abomination, but it's really quite simple: we're
 		// just iterating the directories of the path up to the root; i.e. we lob off
 		// the base (last component) of the path until no separators remain, i.e. only
 		// one component remains -- then loop again to make sure it's not a duplicate
-		for dir, base := path.Dir(file.NameInArchive), path.Base(file.NameInArchive); ; dir, base = path.Dir(dir), path.Base(dir) {
+		// (start without the base, since we know the full filename is an actual entry
+		// in the archive, we don't need to create an implicit directory entry for it)
+		startingPath := path.Dir(file.NameInArchive)
+		for dir, base := path.Dir(startingPath), path.Base(startingPath); base != "."; dir, base = path.Dir(dir), path.Base(dir) {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -584,10 +587,6 @@ func (f *ArchiveFS) ReadDir(name string) ([]fs.DirEntry, error) {
 			})
 			if !found {
 				f.dirs[dir] = slices.Insert(f.dirs[dir], idx, dirInfo)
-			}
-
-			if dir == "." {
-				break
 			}
 		}
 
