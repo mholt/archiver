@@ -308,7 +308,7 @@ func (z Zip) Insert(ctx context.Context, into io.ReadWriteSeeker, files []FileIn
 			}
 		}
 
-		w, err := zu.AppendHeaderAt(hdr, -1)
+		w, err := zu.Append(hdr.Name, szip.APPEND_MODE_OVERWRITE)
 		if err != nil {
 			return fmt.Errorf("inserting file header: %d: %s: %w", idx, file.Name(), err)
 		}
