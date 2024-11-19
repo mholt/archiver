@@ -122,10 +122,10 @@ type S2Level int
 // Compression levels for S2.
 // EXPERIMENTAL: May be changed or removed without a major version bump.
 const (
-	S2LevelNone   S2Level = 1
-	S2LevelFast   S2Level = 2
-	S2LevelBetter S2Level = 3
-	S2LevelBest   S2Level = 4
+	S2LevelNone   S2Level = 0
+	S2LevelFast   S2Level = 1
+	S2LevelBetter S2Level = 2
+	S2LevelBest   S2Level = 3
 )
 
 // https://github.com/google/snappy/blob/master/framing_format.txt - contains "sNaPpY"
